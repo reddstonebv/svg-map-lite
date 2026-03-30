@@ -1,0 +1,973 @@
+/**
+ * SVG Map Lite – Frontend CSS
+ * Stijlen voor de filterbalk, SVG-kaart, en het info-panel op de publieke website.
+ * Aanpasbaar via custom CSS in het Stijlen-menu, of via de CSS-variabelen hieronder.
+ */
+
+/* ── CSS VARIABELEN ─────────────────────────────────────────────────────────── */
+:root {
+    --svgml-accent:      #cc0000;     /* Accentkleur (rode knoppen, actieve regio's) */
+    --svgml-panel-bg:    #ffffff;     /* Achtergrond van het info-panel */
+    --svgml-panel-w:     300px;       /* Breedte van het panel naast de kaart */
+    --svgml-thumb-ratio: 56.25%;      /* Verhouding thumbnail (56.25% = 16:9) */
+
+    /* Status kleuren – override via Custom CSS als gewenst */
+    --svgml-status-available-color: #00a32a;
+    --svgml-status-rented-color:    #cc0000;
+    --svgml-status-reserved-color:  #f0a500;
+}
+
+/* ── BUITENSTE WRAPPER (wrap + filters) ─────────────────────────────────── */
+.svgml-wrap {
+    width: 100%;
+    font-family: inherit;
+}
+
+/* ── FILTERBALK ──────────────────────────────────────────────────────────── */
+.svgml-filters-bar {
+    width: 100%;
+    background: #f8f8f8;
+    border: 1px solid #e4e4e4;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.svgml-filters-inner {
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    padding: 16px 20px;
+    flex-wrap: wrap;
+}
+
+/* Elk filter-item (label + control) */
+.svgml-filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 140px;
+    flex: 1 1 140px;
+    max-width: 260px;
+}
+
+.svgml-filter-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #555;
+}
+
+/* Dropdown filter */
+.svgml-filter-select {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+}
+
+.svgml-filter-select:focus {
+    outline: none;
+    border-color: var(--svgml-accent);
+    box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.15);
+}
+
+/* Range slider container */
+.svgml-range-slider {
+    height: 6px;
+    margin: 8px 4px 4px;
+}
+
+/* noUiSlider stijlen aanpassen aan ons thema */
+.svgml-range-slider.noUi-target {
+    background: #e0e0e0;
+    border: none;
+    box-shadow: none;
+}
+
+.svgml-range-slider .noUi-connect {
+    background: var(--svgml-accent);
+}
+
+.svgml-range-slider .noUi-handle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--svgml-accent);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    top: -5px;
+    right: -8px;
+    cursor: grab;
+}
+
+.svgml-range-slider .noUi-handle:active {
+    cursor: grabbing;
+}
+
+/* Verberg de standaard noUiSlider handvat-kruisjes */
+.svgml-range-slider .noUi-handle::before,
+.svgml-range-slider .noUi-handle::after {
+    display: none;
+}
+
+/* Tooltip boven de handvatten */
+.svgml-range-slider .noUi-tooltip {
+    font-size: 11px;
+    padding: 2px 6px;
+    background: var(--svgml-accent);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+}
+
+/* Min/max waarde labels onder de slider */
+.svgml-range-values {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+}
+
+/* Reset-knop wrapper */
+.svgml-filter-reset-wrap {
+    min-width: auto;
+    flex: 0 0 auto;
+    max-width: none;
+    align-self: flex-end;
+}
+
+.svgml-filter-reset {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.svgml-filter-reset:hover {
+    border-color: var(--svgml-accent);
+    color: var(--svgml-accent);
+    background: rgba(204, 0, 0, 0.05);
+}
+
+/* ── SEARCH FILTER (AUTOCOMPLETE) ───────────────────────────────────────── */
+.svgml-search-wrap {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.svgml-filter-search {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dce5e3;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.svgml-filter-search:focus {
+    border-color: var(--svgml-accent);
+}
+
+.svgml-autocomplete-list {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #dce5e3;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 100;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.svgml-autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s;
+}
+
+.svgml-autocomplete-item:hover {
+    background: #edf5f4;
+}
+
+.svgml-autocomplete-item strong {
+    color: var(--svgml-accent);
+    font-weight: 600;
+}
+
+/* ── BUTTON FILTER ──────────────────────────────────────────────────────── */
+.svgml-filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.svgml-filter-btn {
+    padding: 6px 14px;
+    border: 1px solid #dce5e3;
+    border-radius: 20px;
+    background: #fff;
+    color: #36454f;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.svgml-filter-btn:hover {
+    border-color: var(--svgml-accent);
+    color: var(--svgml-accent);
+}
+
+.svgml-filter-btn-active {
+    background: var(--svgml-accent);
+    border-color: var(--svgml-accent);
+    color: #fff;
+}
+
+.svgml-filter-btn-active:hover {
+    opacity: 0.9;
+}
+
+.svgml-btn-count {
+    opacity: 0.7;
+    font-size: 11px;
+}
+
+/* ── CONTAINER ──────────────────────────────────────────────────────────── */
+.svgml-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    width: 100%;
+    position: relative;
+    font-family: inherit;
+}
+
+.svgml-container.svgml-panel-pos-right  { flex-direction: row; }
+.svgml-container.svgml-panel-pos-left   { flex-direction: row-reverse; }
+.svgml-container.svgml-panel-pos-bottom { flex-direction: column; }
+
+/* ── SVG MAP WRAPPER ──────────────────────────────────────────────────── */
+.svgml-map-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* ── SVG ELEMENT ──────────────────────────────────────────────────────── */
+.svgml-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Alle elementen met een id zijn klikbaar */
+.svgml-svg [id] {
+    cursor: pointer;
+    transition: opacity 0.15s ease, fill 0.15s ease;
+}
+
+/* Hover: licht oplichten */
+.svgml-svg [id]:hover {
+    opacity: 0.80;
+}
+
+/* Uitgesloten regio: geen pointer, geen hover */
+.svgml-svg [id].svgml-region-excluded {
+    cursor: default !important;
+    pointer-events: none;
+}
+
+/* Actief / geselecteerd */
+.svgml-svg [id].svgml-region-active {
+    opacity: 1;
+    filter: brightness(1.1) drop-shadow(0 0 5px rgba(0, 0, 0, 0.40));
+}
+
+/* Gedempt door filter */
+.svgml-svg [id].svgml-region-dimmed {
+    opacity: 0.20;
+    transition: opacity 0.3s ease;
+}
+
+/* ── STATUS KLEUREN OP SVG-REGIO'S ──────────────────────────────────────── */
+/* Standaard status-klassen. Override via Custom CSS voor eigen kleuren. */
+/* De fill-kleur wordt ingesteld op de SVG-paden zelf. */
+.svgml-svg [id].svgml-status-available {
+    fill: #4caf50 !important;
+}
+
+.svgml-svg [id].svgml-status-rented {
+    fill: #e53935 !important;
+}
+
+.svgml-svg [id].svgml-status-reserved {
+    fill: #ff9800 !important;
+}
+
+.svgml-svg [id].svgml-status-sold {
+    fill: #9e9e9e !important;
+}
+
+/* ── INFO PANEL ───────────────────────────────────────────────────────── */
+.svgml-panel {
+    display: none;     /* Zichtbaar via jQuery fadeIn() */
+    background: var(--svgml-panel-bg);
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+}
+
+/* Panel naast de kaart */
+.svgml-panel-pos-right .svgml-panel,
+.svgml-panel-pos-left .svgml-panel {
+    flex: 0 0 var(--svgml-panel-w);
+    max-width: 340px;
+    min-width: 240px;
+    align-self: flex-start;
+}
+
+/* Panel onder de kaart */
+.svgml-panel-pos-bottom .svgml-panel {
+    width: 100%;
+}
+
+/* Standalone panel [svg_map_panel] */
+.svgml-panel-standalone {
+    display: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+/* ── PANEL: BINNENSTE WRAPPER ───────────────────────────────────────────── */
+.svgml-panel-inner {
+    position: relative;
+}
+
+/* ── PANEL: SLUIT-KNOP ──────────────────────────────────────────────────── */
+.svgml-panel-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.05);
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    color: #666;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    z-index: 2;
+}
+
+.svgml-panel-close:hover {
+    background: rgba(0,0,0,0.12);
+    color: #1a1a1a;
+}
+
+/* ── PANEL: TITEL ───────────────────────────────────────────────────────── */
+.svgml-panel-title {
+    margin: 0;
+    padding: 14px 40px 14px 18px; /* rechts ruimte voor sluit-knop */
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a1a;
+    letter-spacing: -0.2px;
+}
+
+/* ── PANEL: CONTENT ─────────────────────────────────────────────────────── */
+.svgml-panel-content {
+    /* Geen extra padding – blokken regelen hun eigen spacing */
+}
+
+/* ── PANEL: STATUS BERICHTEN ────────────────────────────────────────────── */
+.svgml-panel-placeholder,
+.svgml-panel-not-found,
+.svgml-panel-empty {
+    margin: 0;
+    padding: 16px 18px;
+    font-size: 13px;
+    color: #888;
+    font-style: italic;
+}
+
+.svgml-panel-not-found {
+    color: #cc0000;
+    font-style: normal;
+}
+
+/* ── PANEL BLOCKS: FLEXBOX LAYOUT ───────────────────────────────────────── */
+/*
+ * Blokken worden naast elkaar weergegeven via flexbox.
+ * De breedte per blok wordt ingesteld via inline style door panel-renderer.js:
+ *   style="flex: 0 0 50%; max-width: 50%;"
+ * Zo kunnen bijv. twee 50%-blokken naast elkaar staan.
+ */
+.svgml-blocks-wrap {
+    display: flex;
+    flex-wrap: wrap;       /* Blokken die niet passen gaan naar de volgende rij */
+    align-items: flex-start; /* Uitlijnen bovenaan per rij */
+}
+
+/* Standaard is elk blok volledig breed (100%) */
+.svgml-block {
+    flex: 0 0 100%;
+    max-width: 100%;
+    box-sizing: border-box; /* Padding en border meerekenen in de breedte */
+}
+
+/* ── BLOK: THUMBNAIL ────────────────────────────────────────────────────── */
+.svgml-block-thumbnail {
+    width: 100%;
+    overflow: hidden;
+    background: #f0f0f0;
+    /* Geen border-radius bovenaan zodat het naadloos aansluit op het panel */
+    border-bottom: 1px solid #eee;
+}
+
+.svgml-block-thumbnail img {
+    width: 100%;
+    /* Behoud beeldverhouding, stel een maximale hoogte in */
+    max-height: 200px;
+    height: auto;
+    object-fit: cover;
+    display: block;
+}
+
+/* Als de thumbnail het eerste blok is, hoort hij naadloos te sluiten bovenaan */
+.svgml-blocks-wrap .svgml-block-thumbnail:first-child {
+    border-radius: 0; /* Panel heeft al border-radius */
+}
+
+/* ── BLOK: HEADING ──────────────────────────────────────────────────────── */
+.svgml-block-heading {
+    padding: 14px 18px 4px;
+}
+
+.svgml-heading-value {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.3;
+}
+
+/* ── BLOK: BADGE ────────────────────────────────────────────────────────── */
+.svgml-block-badge {
+    padding: 8px 18px 12px;
+}
+
+.svgml-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #e8e8e8;
+    color: #444;
+}
+
+/* Status-specifieke badgekleuren */
+.svgml-badge.svgml-badge-available,
+.svgml-badge-beschikbaar {
+    background: #e6f4ea;
+    color: #00650d;
+}
+
+.svgml-badge.svgml-badge-rented,
+.svgml-badge-verhuurd {
+    background: #fce8e8;
+    color: #8a1515;
+}
+
+.svgml-badge.svgml-badge-reserved,
+.svgml-badge-gereserveerd {
+    background: #fff4e5;
+    color: #8a5c00;
+}
+
+.svgml-badge.svgml-badge-sold,
+.svgml-badge-verkocht {
+    background: #f0f0f0;
+    color: #555;
+}
+
+/* ── BLOK: PRIJS ────────────────────────────────────────────────────────── */
+.svgml-block-price {
+    padding: 10px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.svgml-price-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.2;
+}
+
+/* ── BLOK: TEKST ────────────────────────────────────────────────────────── */
+.svgml-block-text {
+    padding: 8px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* ── BLOK: LINK ─────────────────────────────────────────────────────────── */
+.svgml-block-link {
+    padding: 10px 18px 14px;
+}
+
+.svgml-link-btn {
+    display: inline-block;
+    background: var(--svgml-accent);
+    color: #fff !important;
+    text-decoration: none !important;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.svgml-link-btn:hover {
+    background: #a80000 !important;
+}
+
+/* ── BLOK: SCHEIDINGSLIJN ───────────────────────────────────────────────── */
+.svgml-block-divider {
+    padding: 4px 0;
+}
+
+.svgml-block-divider hr {
+    border: none;
+    border-top: 1px solid #f0f0f0;
+    margin: 0;
+}
+
+/* ── BLOK LABELS EN WAARDEN ─────────────────────────────────────────────── */
+.svgml-block-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    display: block;
+}
+
+.svgml-block-value {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.45;
+    word-break: break-word;
+    display: block;
+}
+
+.svgml-block-value a {
+    color: var(--svgml-accent);
+    text-decoration: none;
+}
+
+.svgml-block-value a:hover {
+    text-decoration: underline;
+}
+
+/* ── HTML (RAW) BLOK ──────────────────────────────────────────────────────── */
+/* Voor velden die HTML-opmaak bevatten (bijv. description met <div>/<p>).    */
+.svgml-block-html {
+    padding: 10px 0 4px;
+}
+
+.svgml-block-html-content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #333;
+}
+
+/* Verwijder de standaard marges van alinea's en andere block-elementen binnen de HTML */
+.svgml-block-html-content p,
+.svgml-block-html-content div {
+    margin: 0 0 6px;
+}
+
+.svgml-block-html-content p:last-child,
+.svgml-block-html-content div:last-child {
+    margin-bottom: 0;
+}
+
+.svgml-block-html-content a {
+    color: var(--svgml-accent);
+    text-decoration: none;
+}
+
+.svgml-block-html-content a:hover {
+    text-decoration: underline;
+}
+
+/* ── LEGACY: DATA LIJST ─────────────────────────────────────────────────── */
+/* Stijlen voor de oudere weergavemethode (zonder Panel Builder). */
+.svgml-data-list {
+    margin: 0;
+    padding: 8px 0;
+}
+
+.svgml-field {
+    padding: 8px 18px;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.svgml-field:last-child {
+    border-bottom: none;
+}
+
+.svgml-field-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #999;
+    margin: 0 0 2px;
+    display: block;
+}
+
+.svgml-field-value {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+    line-height: 1.45;
+    word-break: break-word;
+    display: block;
+}
+
+.svgml-field-value a {
+    color: var(--svgml-accent);
+    text-decoration: none;
+}
+
+.svgml-field-value a:hover {
+    text-decoration: underline;
+}
+
+/* ── OVERZICHT LIJST ─────────────────────────────────────────────────────── */
+/* Scrollbare lijst van alle objecten die in het panel getoond wordt bij laden */
+.svgml-overview-list {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 420px;
+}
+
+/* Elke rij in de lijst */
+.svgml-overview-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.13s;
+    text-decoration: none;
+    color: inherit;
+}
+
+.svgml-overview-item:last-child {
+    border-bottom: none;
+}
+
+.svgml-overview-item:hover {
+    background: #fdf5f5;
+}
+
+/* Koptekst in de rij */
+.svgml-ov-heading {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1a1a1a;
+    flex: 1 1 100%;
+}
+
+/* Badge in de rij (kleiner dan het detail-panel) */
+.svgml-ov-badge {
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+}
+
+/* Prijs in de rij */
+.svgml-ov-price {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* Tekst in de rij */
+.svgml-ov-text {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Link in de rij */
+.svgml-ov-link {
+    font-size: 12px;
+    color: var(--svgml-accent);
+    text-decoration: none;
+}
+
+.svgml-ov-link:hover {
+    text-decoration: underline;
+}
+
+/* ── FOUTMELDING ────────────────────────────────────────────────────────── */
+.svgml-error {
+    padding: 10px 14px;
+    background: #fce8e8;
+    border-left: 4px solid var(--svgml-accent);
+    border-radius: 2px;
+    color: #8a1515;
+    font-size: 14px;
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    /* Filters op kleine schermen: laat wrappen */
+    .svgml-filters-inner {
+        gap: 12px;
+        padding: 12px 14px;
+    }
+
+    .svgml-filter-item {
+        min-width: 120px;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Op kleine schermen: kaart en panel onder elkaar */
+    .svgml-container {
+        flex-direction: column !important;
+    }
+
+    .svgml-panel-pos-right .svgml-panel,
+    .svgml-panel-pos-left .svgml-panel {
+        flex: none;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Filters op telefoon: volledig breed */
+    .svgml-filter-item {
+        flex: 1 1 calc(50% - 12px);
+    }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LAYER SWITCHER – Multi-floor/layer support
+   Gebruikers kunnen tussen verschillende afbeeldingen en hun polygonen schakelen.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Layer switcher container ────────────────────────────────────────────────── */
+.svgml-layer-switcher {
+    margin-bottom: 12px;
+}
+
+/* Button-style layer switcher */
+.svgml-layer-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.svgml-layer-btn {
+    padding: 8px 18px;
+    border: 1px solid #dce5e3;
+    border-radius: 6px;
+    background: #fff;
+    color: #36454f;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.svgml-layer-btn:hover {
+    border-color: #2a9d8f;
+    color: #2a9d8f;
+}
+
+.svgml-layer-btn-active {
+    background: #2a9d8f;
+    border-color: #2a9d8f;
+    color: #fff;
+}
+
+/* Dropdown-style layer switcher */
+.svgml-layer-dropdown-wrap {
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+.svgml-layer-select {
+    padding: 8px 12px;
+    border: 1px solid #dce5e3;
+    border-radius: 6px;
+    font-size: 14px;
+    background: #fff;
+    color: #36454f;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.svgml-layer-select:focus {
+    outline: none;
+    border-color: #2a9d8f;
+}
+
+/* Custom layer switcher (user-selectable options) */
+.svgml-layer-custom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.svgml-layer-option {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border: 1px solid #dce5e3;
+    border-radius: 6px;
+    background: #fff;
+    color: #36454f;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.svgml-layer-option:hover {
+    border-color: #2a9d8f;
+    color: #2a9d8f;
+}
+
+.svgml-layer-option-active {
+    background: #2a9d8f;
+    border-color: #2a9d8f;
+    color: #fff;
+}
+
+/* Layer badge in mapping tabel */
+.svgml-layer-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #edf5f4;
+    border-radius: 10px;
+    font-size: 12px;
+    color: #2a9d8f;
+    font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   POLYGON OVERLAY – Afbeelding + getekende vlakken
+   De polygonen worden gerenderd als een SVG-overlay bovenop een achtergrondafbeelding.
+   Geen externe library nodig op de frontend – enkel CSS voor hover/active/status.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* De container die de afbeelding en SVG-overlay bevat */
+.svgml-image-map {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    line-height: 0; /* Voorkom extra witruimte onder de afbeelding */
+}
+
+/* Achtergrondafbeelding: schaalt mee met de container */
+.svgml-bg-image {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* SVG-overlay: exact bovenop de afbeelding gepositioneerd */
+.svgml-polygon-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Laat klikken door naar individuele polygonen */
+}
+
+/* Individuele polygon-regio's */
+.svgml-poly-region {
+    fill: rgba(42, 157, 143, 0.15);        /* Subtiele teal tint */
+    stroke: rgba(42, 157, 143, 0.5);       /* Zachtere rand in rusttoestand */
+    stroke-width: 0.003;                    /* Dun: relatief aan viewBox 0 0 1 1 */
+    cursor: pointer;
+    pointer-events: all;                    /* Klikbaar, ondanks overlay pointer-events:none */
+    transition: fill 0.2s ease, stroke 0.2s ease, stroke-width 0.15s ease;
+}
+
+/* Hover: vlak licht op */
+.svgml-poly-region:hover {
+    fill: rgba(42, 157, 143, 0.35);
+    stroke: rgba(42, 157, 143, 0.9);
+    stroke-width: 0.005;
+}
+
+/* Actief/geselecteerd vlak: duidelijke highlight */
+.svgml-poly-region.svgml-region-active {
+    fill: rgba(42, 157, 143, 0.45);
+    stroke: #2a9d8f;
+    stroke-width: 0.006;
+}
+
+/* Uitgesloten vlakken: gedimmed, niet klikbaar */
+.svgml-poly-region.svgml-region-excluded {
+    fill: rgba(0, 0, 0, 0.05);
+    stroke: rgba(0, 0, 0, 0.1);
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ── Status-kleuren voor polygon-regio's ──────────────────────────────────
+   De PHP-functie svgml_output_custom_css() genereert CSS voor statuskleuren.
+   Die werkt al voor .svgml-svg [id].svgml-status-xxx, en polygon-regio's
+   zitten ook in .svgml-svg, dus statuskleuren worden automatisch overgenomen. */

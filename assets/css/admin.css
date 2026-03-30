@@ -1,0 +1,1607 @@
+/**
+ * SVG Map Lite – Admin CSS
+ * Stijl geïnspireerd op een luchtige, moderne app-interface:
+ * ronde kaarten, zachte schaduwen, royale witruimte, pill-knoppen.
+ * Kleurpalet: teal (#2a9d8f), charcoal (#264653), coral (#e76f51),
+ *             warm-oranje (#f4a261), goud (#e9c46a).
+ */
+
+/* ── ROOT VARIABELEN ────────────────────────────────────────────────────────── */
+.svgml-admin-wrap {
+    --svgml-red:        #2a9d8f;       /* Primaire accentkleur (teal)           */
+    --svgml-red-dark:   #1f7d71;       /* Donkere variant voor hover/active     */
+    --svgml-red-light:  #e8f5f3;       /* Lichte achtergrond-tint               */
+    --svgml-dark:       #264653;       /* Donkere koptekst-kleur (charcoal)     */
+    --svgml-text:       #36454f;       /* Bodytekst – iets zachter dan zwart    */
+    --svgml-muted:      #7a8a94;       /* Subtiele tekst en labels              */
+    --svgml-border:     #dce5e3;       /* Randkleur met lichte teal-tint        */
+    --svgml-bg:         #f0f5f4;       /* Lichte achtergrond (teal-grijs)       */
+    --svgml-white:      #ffffff;
+    --svgml-success:    #1a7a2e;
+    --svgml-success-bg: #edfaef;
+    --svgml-error:      #c4553b;       /* Foutmeldingen (coral-donker)          */
+    --svgml-error-bg:   #fef0ec;
+    --svgml-coral:      #e76f51;       /* Destructieve acties (verwijderen)     */
+    --svgml-coral-dark: #c4553b;
+    --svgml-warm:       #f4a261;       /* Waarschuwingen / highlights           */
+    --svgml-gold:       #e9c46a;       /* Accent (badges, speciale elementen)   */
+    --svgml-radius:     14px;
+    --svgml-radius-sm:  8px;
+    --svgml-shadow:     0 4px 20px rgba(38, 70, 83, 0.08);
+    --svgml-shadow-sm:  0 2px 8px rgba(38, 70, 83, 0.06);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--svgml-text);
+}
+
+
+/* ── CSS VOOR ALLE TABS ─────────────────────────────────────────────────────── */
+
+/* Standaar kregen velden een width van 25em, maar dit pakt slecht uit op kleine schermen */
+.regular-text {
+    width: 100%;
+}
+
+/* ── PAGINATITEL ────────────────────────────────────────────────────────────── */
+.svgml-admin-wrap h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--svgml-dark);
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--svgml-border);
+    letter-spacing: -0.3px;
+}
+
+.svgml-admin-wrap h1 .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    color: var(--svgml-red);
+    vertical-align: middle;
+}
+
+/* ── SUBTITEL / INTRO TEKST ─────────────────────────────────────────────────── */
+.svgml-admin-wrap > p.svgml-description {
+    color: var(--svgml-muted);
+    font-size: 14px;
+    margin: -12px 0 24px;
+    line-height: 1.6;
+    max-width: 700px;
+}
+
+/* ── SECTIE-KAARTEN ─────────────────────────────────────────────────────────── */
+/* Elke sectie is een witte kaart met royale afronding en zachte schaduw. */
+.svgml-section {
+    background: var(--svgml-white);
+    border: 1px solid var(--svgml-border);
+    border-radius: var(--svgml-radius);
+    overflow: hidden;
+    margin-bottom: 22px;
+    box-shadow: var(--svgml-shadow);
+}
+
+/* Sectieheader: wit met een rode accent-streep links */
+.svgml-section h2 {
+    background: var(--svgml-white);
+    color: var(--svgml-dark);
+    margin: 0;
+    padding: 16px 24px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--svgml-border);
+    border-left: 4px solid var(--svgml-red);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Sectie-body met ruime padding */
+.svgml-section-body {
+    padding: 22px 28px;
+}
+
+/* WordPress form-table: reset WP default margin */
+.svgml-section .form-table {
+    margin: 0;
+}
+
+.svgml-section .form-table td,
+.svgml-section .form-table th {
+    padding: 16px 28px;
+    vertical-align: middle;
+    font-size: 14px;
+}
+
+/* Rijscheiding in form-table */
+.svgml-section .form-table tr:not(:last-child) td,
+.svgml-section .form-table tr:not(:last-child) th {
+    border-bottom: 1px solid var(--svgml-border);
+}
+
+.svgml-section .form-table th {
+    font-weight: 600;
+    color: var(--svgml-dark);
+    width: 200px;
+}
+
+/* WordPress form-table labels */
+.svgml-section .form-table td .description {
+    color: var(--svgml-muted);
+    font-size: 12px;
+    margin-top: 6px;
+    line-height: 1.5;
+}
+
+/* wp-list-table binnen secties */
+.svgml-section .wp-list-table {
+    border: none;
+    box-shadow: none;
+    margin: 0;
+}
+
+/* Sectie-footer (knoppen onder een tabel) */
+.svgml-section-footer {
+    padding: 14px 24px 22px;
+}
+
+/* Paragrafen direct in een sectie */
+.svgml-section > p {
+    padding: 14px 24px;
+    margin: 0;
+    color: var(--svgml-text);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Beschrijving onder een sectie-h2 */
+.svgml-description {
+    color: var(--svgml-muted);
+    margin: 0;
+    padding: 12px 24px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--svgml-border);
+    background: var(--svgml-red-light);
+    line-height: 1.55;
+}
+
+/* ── GEAVANCEERD: <details> SECTIE ──────────────────────────────────────────── */
+.svgml-section-advanced > summary {
+    background: #fdfcfb;
+    padding: 14px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--svgml-muted);
+    border-left: 4px solid #ddd;
+    list-style: none;
+    outline: none;
+    user-select: none;
+}
+
+.svgml-section-advanced > summary:hover {
+    color: var(--svgml-dark);
+    border-left-color: var(--svgml-red);
+    background: var(--svgml-red-light);
+}
+
+.svgml-section-advanced[open] > summary {
+    border-bottom: 1px solid var(--svgml-border);
+    color: var(--svgml-dark);
+}
+
+/* ── OPSLAAN-KNOP (pill style) ──────────────────────────────────────────────── */
+.svgml-admin-wrap .button-primary,
+.svgml-admin-wrap input[type="submit"].button-primary {
+    background: var(--svgml-red) !important;
+    border-color: var(--svgml-red-dark) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 10px rgba(42, 157, 143, 0.28) !important;
+    font-weight: 600;
+    padding: 9px 24px;
+    height: auto;
+    font-size: 13px;
+    border-radius: 50px !important;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+    letter-spacing: 0.02em;
+    display: flex;
+    flex-flow: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+}
+
+.svgml-admin-wrap .button-primary:hover,
+.svgml-admin-wrap input[type="submit"].button-primary:hover {
+    background: var(--svgml-red-dark) !important;
+    box-shadow: 0 4px 16px rgba(42, 157, 143, 0.35) !important;
+    transform: translateY(-1px);
+}
+
+/* Secundaire knoppen (pill style) */
+.svgml-admin-wrap .button-secondary,
+.svgml-admin-wrap .button:not(.button-primary) {
+    border-radius: 50px !important;
+    padding: 7px 18px !important;
+    height: auto !important;
+    font-size: 13px !important;
+    font-weight: 500;
+    transition: background 0.12s, box-shadow 0.12s, transform 0.1s;
+}
+
+.svgml-admin-wrap .button-secondary:hover,
+.svgml-admin-wrap .button:not(.button-primary):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+}
+
+/* ── SVG PREVIEW ────────────────────────────────────────────────────────────── */
+.svgml-svg-preview {
+    width: 300px;
+    height: 200px;
+    border: 2px dashed var(--svgml-border);
+    border-radius: var(--svgml-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    background: var(--svgml-bg);
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.svgml-svg-preview:hover {
+    border-color: var(--svgml-red);
+}
+
+.svgml-svg-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.svgml-no-svg {
+    text-align: center;
+    color: var(--svgml-muted);
+}
+
+.svgml-no-svg .dashicons {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    display: block;
+    margin: 0 auto 8px;
+    color: #ccc;
+}
+
+.svgml-no-svg p {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* Upload-knoppen naast de preview */
+.svgml-upload-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+/* ── STATUS BERICHTEN ───────────────────────────────────────────────────────── */
+.svgml-ids-status {
+    margin-top: 12px;
+}
+
+.svgml-status-box {
+    padding: 12px 18px;
+    border-radius: var(--svgml-radius-sm);
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 600px;
+    border-left: 4px solid transparent;
+}
+
+.svgml-status-success {
+    background: var(--svgml-success-bg);
+    border-left-color: #00a32a;
+    color: var(--svgml-success);
+}
+
+.svgml-status-success code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #1a6e25;
+}
+
+.svgml-status-error {
+    background: var(--svgml-error-bg);
+    border-left-color: var(--svgml-red);
+    color: var(--svgml-error);
+}
+
+.svgml-status-loading {
+    background: #f0f6fc;
+    border-left-color: #72aee6;
+    color: #2271b1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.svgml-status-loading .spinner {
+    float: none;
+    margin: 0;
+}
+
+/* ── MAPPING TABEL ──────────────────────────────────────────────────────────── */
+.svgml-mapping-table {
+    margin-bottom: 0;
+    border: none;
+}
+
+.svgml-mapping-table thead th {
+    background: var(--svgml-bg) !important;
+    color: var(--svgml-muted) !important;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 12px 14px !important;
+    border: none !important;
+    border-bottom: 2px solid var(--svgml-border) !important;
+}
+
+.svgml-col-svg     { width: 20%; }
+.svgml-col-json    { width: 27%; }
+.svgml-col-confirm { width: 24%; }
+.svgml-col-exclude { width: 13%; text-align: center; }
+.svgml-col-status  { width: 16%; }
+
+/* ── UITSLUIT-KOLOM ─────────────────────────────────────────────────────────── */
+.svgml-col-exclude-cell {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.svgml-exclude-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    user-select: none;
+}
+
+.svgml-exclude-text {
+    color: #50575e;
+}
+
+/* Uitgesloten rij gedempt */
+tr.svgml-row-excluded {
+    opacity: 0.5;
+    background: #f6f7f7 !important;
+}
+
+tr.svgml-row-excluded .svgml-exclude-text {
+    color: var(--svgml-coral);
+    font-weight: 600;
+}
+
+tr.svgml-row-excluded .svgml-exclude-label {
+    color: var(--svgml-coral);
+}
+
+.svgml-status-excluded {
+    color: var(--svgml-coral);
+    font-size: 12px;
+}
+
+/* Verwijder-knoppen: koralkleur om destructieve actie aan te geven */
+.svgml-admin-wrap .svgml-remove-block,
+.svgml-admin-wrap .svgml-remove-status,
+.svgml-admin-wrap .svgml-remove-overview,
+.svgml-admin-wrap .svgml-remove-filter {
+    color: var(--svgml-coral) !important;
+    border-color: var(--svgml-coral) !important;
+    background: transparent !important;
+}
+
+.svgml-admin-wrap .svgml-remove-block:hover,
+.svgml-admin-wrap .svgml-remove-status:hover,
+.svgml-admin-wrap .svgml-remove-overview:hover,
+.svgml-admin-wrap .svgml-remove-filter:hover {
+    background: var(--svgml-coral) !important;
+    color: #fff !important;
+    border-color: var(--svgml-coral) !important;
+}
+
+/* ── STATUS LABELS (koppeling-tabel) ────────────────────────────────────────── */
+.svgml-status-ok {
+    color: var(--svgml-success);
+    font-weight: 500;
+}
+
+.svgml-status-empty {
+    color: var(--svgml-muted);
+}
+
+/* ── LIVE BEVESTIGING ───────────────────────────────────────────────────────── */
+.svgml-confirm-loading {
+    color: var(--svgml-muted);
+    font-style: italic;
+    font-size: 12px;
+}
+
+.svgml-confirm-name.svgml-confirm-ok {
+    color: var(--svgml-success);
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.svgml-confirm-name.svgml-confirm-fail {
+    color: var(--svgml-error);
+    font-size: 12px;
+}
+
+/* ── SHORTCODE INFO BLOK ────────────────────────────────────────────────────── */
+.svgml-shortcode-info {
+    background: #fdfcfb;
+}
+
+.svgml-shortcode-display {
+    display: inline-block;
+    background: var(--svgml-dark);
+    color: #a8c3e0;
+    padding: 8px 18px;
+    border-radius: var(--svgml-radius-sm);
+    font-size: 15px;
+    font-family: Consolas, Monaco, 'Courier New', monospace;
+    margin: 8px 0;
+    user-select: all;
+    letter-spacing: 0.02em;
+}
+
+.svgml-shortcode-info .svgml-shortcode-display {
+    margin: 0 24px 6px;
+    display: block;
+}
+
+/* ── PANEL BUILDER: DRAG HANDLE ─────────────────────────────────────────────── */
+.svgml-drag-handle {
+    cursor: grab;
+    color: #ccc;
+    font-size: 16px;
+    text-align: center;
+    user-select: none;
+    vertical-align: middle;
+}
+
+.svgml-drag-handle:hover {
+    color: var(--svgml-red);
+}
+
+/* ── PANEL BUILDER: TABELKOPTEKSTEN ─────────────────────────────────────────── */
+#svgml-blocks-table thead th,
+#svgml-status-table thead th,
+#svgml-filters-table thead th {
+    background: var(--svgml-bg) !important;
+    color: var(--svgml-muted) !important;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 12px 14px !important;
+    border-bottom: 2px solid var(--svgml-border) !important;
+    border-top: none !important;
+}
+
+#svgml-blocks-table td,
+#svgml-status-table td,
+#svgml-filters-table td {
+    vertical-align: middle;
+    padding: 12px 12px !important;
+    border-bottom: 1px solid var(--svgml-border) !important;
+}
+
+/* Rijstriping subtiel */
+#svgml-blocks-table tbody tr:nth-child(even),
+#svgml-status-table tbody tr:nth-child(even),
+#svgml-filters-table tbody tr:nth-child(even) {
+    background: #fdfcfb;
+}
+
+/* Verwijder-knoppen in tabellen */
+.svgml-remove-block,
+.svgml-remove-status,
+.svgml-remove-filter {
+    color: var(--svgml-red) !important;
+    border-color: var(--svgml-red) !important;
+    font-weight: 700;
+}
+
+.svgml-remove-block:hover,
+.svgml-remove-status:hover,
+.svgml-remove-filter:hover {
+    background: var(--svgml-red) !important;
+    color: #fff !important;
+}
+
+/* "Blok toevoegen" knoppen */
+.svgml-add-block {
+    font-size: 12px !important;
+    padding: 5px 12px !important;
+    height: auto !important;
+}
+
+/* ── CSS REFERENTIE PANEEL ──────────────────────────────────────────────────── */
+.svgml-css-reference {
+    position: sticky;
+    top: 32px;
+}
+
+.svgml-css-reference h3 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--svgml-muted);
+    margin: 18px 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--svgml-border);
+}
+
+.svgml-css-reference h3:first-child {
+    margin-top: 0;
+}
+
+.svgml-class-list {
+    margin: 0 0 8px;
+    padding: 0;
+}
+
+.svgml-class-list dt {
+    margin-top: 7px;
+    margin-bottom: 2px;
+}
+
+.svgml-class-list dt code {
+    font-size: 11px;
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--svgml-red-dark);
+    font-family: Consolas, Monaco, monospace;
+}
+
+.svgml-class-list dd {
+    margin: 0 0 0 8px;
+    font-size: 12px;
+    color: #606060;
+}
+
+/* ── KLEURKIEZER ────────────────────────────────────────────────────────────── */
+.svgml-color-input {
+    width: 44px;
+    height: 34px;
+    padding: 3px 4px;
+    border: 1.5px solid var(--svgml-border);
+    border-radius: var(--svgml-radius-sm);
+    cursor: pointer;
+    vertical-align: middle;
+    background: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.svgml-color-input:hover {
+    border-color: var(--svgml-red);
+    box-shadow: 0 0 0 3px rgba(204,0,0,0.1);
+}
+
+/* ── STATUS BADGE PREVIEW ───────────────────────────────────────────────────── */
+.svgml-status-preview {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    vertical-align: middle;
+}
+
+/* ── FILTER KLEUR PREVIEW ───────────────────────────────────────────────────── */
+.svgml-filter-color-preview {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    vertical-align: middle;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    transition: background 0.2s;
+    min-width: 80px;
+    text-align: center;
+}
+
+/* ── NOTICE STYLING (WP notices op onze pagina's) ───────────────────────────── */
+.svgml-admin-wrap .notice {
+    border-left: 4px solid var(--svgml-red);
+    border-radius: 0 var(--svgml-radius-sm) var(--svgml-radius-sm) 0;
+}
+
+.svgml-admin-wrap .notice-success {
+    border-left-color: #00a32a;
+}
+
+/* ── TABEL-RIJEN (wp-list-table override) ───────────────────────────────────── */
+.svgml-section .widefat thead td,
+.svgml-section .widefat thead th {
+    border-bottom: 2px solid var(--svgml-border);
+}
+
+/* ── INVOERVELDEN ────────────────────────────────────────────────────────────── */
+.svgml-admin-wrap input[type="text"],
+.svgml-admin-wrap input[type="url"],
+.svgml-admin-wrap select,
+.svgml-admin-wrap textarea {
+    border-radius: var(--svgml-radius-sm) !important;
+    border-color: var(--svgml-border) !important;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.svgml-admin-wrap input[type="text"]:focus,
+.svgml-admin-wrap input[type="url"]:focus,
+.svgml-admin-wrap select:focus,
+.svgml-admin-wrap textarea:focus {
+    border-color: var(--svgml-red) !important;
+    box-shadow: 0 0 0 3px rgba(42, 157, 143, 0.15) !important;
+    outline: none;
+}
+
+/* ── CODE WEERGAVE ───────────────────────────────────────────────────────────── */
+.svgml-admin-wrap code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--svgml-red-dark);
+}
+
+/* ── DRAG-AND-DROP SLEEPGREEP ────────────────────────────────────────────────── */
+/* De ⠿ kolom in Panel Blokken en Overzicht-blokken tabellen */
+.svgml-drag-handle {
+    cursor: grab;
+    color: #bbb;
+    font-size: 18px;
+    text-align: center;
+    user-select: none;
+    padding: 8px 6px !important;
+    width: 28px;
+    line-height: 1;
+}
+
+.svgml-drag-handle:active {
+    cursor: grabbing;
+    color: #888;
+}
+
+/* Tijdelijke plaatshouder-rij tijdens het slepen (jQuery UI Sortable) */
+.svgml-sort-placeholder {
+    height: 44px;
+    background: #f0f6ff !important;
+}
+
+.svgml-sort-placeholder td {
+    background: transparent !important;
+}
+
+/* De gesleepte kloon-rij: lichte schaduw zodat je hem duidelijk ziet */
+.ui-sortable-helper {
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14) !important;
+    background: #ffffff !important;
+    outline: 2px solid var(--svgml-red);
+}
+
+/* ── BREEDTE-INDICATOR ──────────────────────────────────────────────────────── */
+/* Kleine balk onder de breedte-dropdown die de gekozen breedte visueel toont */
+.svgml-width-bar-wrap {
+    margin-top: 5px;
+    background: #ebebeb;
+    border-radius: 4px;
+    height: 4px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.svgml-width-bar {
+    height: 4px;
+    background: var(--svgml-red);
+    border-radius: 4px;
+    transition: width 0.18s ease;
+}
+
+/* ── PANEL BLOKKEN + LIVE VOORBEELD LAYOUT ──────────────────────────────────── */
+/* Flex-container: blokken-tabel links (75%), voorbeeld-panel rechts (25%) */
+.svgml-blocks-with-preview {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+/* De tabel-wrap neemt 75% van de breedte in */
+.svgml-blocks-table-wrap {
+    flex: 3;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+/* De tabel zelf: rand-tot-rand binnen de wrap */
+.svgml-blocks-table-wrap #svgml-blocks-table {
+    margin-bottom: 0;
+}
+
+/* Knoppen en beschrijving binnen de tabel-wrap hebben padding */
+.svgml-blocks-table-wrap > div {
+    padding: 16px 24px 8px;
+}
+
+.svgml-blocks-table-wrap > p.description {
+    padding: 4px 24px 18px;
+    margin: 0;
+}
+
+/* ── LIVE VOORBEELD PANEL ────────────────────────────────────────────────────── */
+/* Sticky zijpaneel dat het echte frontend-panel simuleert (25%) */
+.svgml-preview-outer {
+    flex: 1;
+    min-width: 180px;
+    background: var(--svgml-bg);
+    border-left: 1px solid var(--svgml-border);
+    border-radius: 0;
+    padding: 18px 16px 16px;
+    position: sticky;
+    top: 42px;       /* Ruimte voor de WP admin-balk (32px) + marge */
+    align-self: stretch;
+}
+
+.svgml-preview-outer h3 {
+    margin: 0 0 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--svgml-muted);
+}
+
+.svgml-preview-label {
+    font-size: 11px;
+    color: #aaa;
+    margin: 0 0 10px;
+    line-height: 1.4;
+}
+
+/* De voorbeeldinhoud: witte kaart die het frontend-panel simuleert */
+#svgml-live-preview {
+    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid var(--svgml-border);
+    min-height: 50px;
+    overflow: hidden;
+}
+
+/* Flex-wrapper voor de blokken in het voorbeeld */
+.svgml-preview-blocks {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* Basis blok-stijl in het voorbeeld */
+.svgml-preview-block {
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border-bottom: 1px solid #f2eeea;
+}
+
+.svgml-preview-block:last-child {
+    border-bottom: none;
+}
+
+/* Labelregel boven de waarde (kleine uppercase tekst) */
+.svgml-preview-label-text {
+    display: block;
+    font-size: 10px;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+}
+
+/* Waarde-tekst */
+.svgml-preview-value {
+    font-size: 12px;
+    color: #2b2b2b;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+/* Koptekst-blok in het voorbeeld */
+.svgml-preview-heading {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a1a;
+    padding: 11px 12px 6px;
+    box-sizing: border-box;
+    word-break: break-word;
+}
+
+/* Badge-blok in het voorbeeld */
+.svgml-preview-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #eee;
+    color: #555;
+}
+
+/* Thumbnail in het voorbeeld */
+.svgml-preview-img {
+    width: 100%;
+    max-height: 140px;
+    object-fit: cover;
+    display: block;
+}
+
+/* Lege-staat tekst in het voorbeeld */
+.svgml-preview-empty {
+    padding: 18px 14px;
+    text-align: center;
+    color: #bbb;
+    font-size: 11px;
+    font-style: italic;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ── OVERZICHT LIVE PREVIEW ─────────────────────────────────────── */
+
+/* Container voor de overzicht-preview rijen */
+.svgml-ov-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Enkele preview-rij (simuleert een klikbare overzichtsrij) */
+.svgml-ov-preview-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--svgml-border, #dce5e3);
+    font-size: 13px;
+    line-height: 1.5;
+    cursor: default;
+    transition: background 0.15s ease;
+}
+.svgml-ov-preview-item:hover {
+    background: var(--svgml-red-light, #e8f5f3);
+}
+.svgml-ov-preview-item:last-of-type {
+    border-bottom: none;
+}
+
+/* Koptekst in overzicht-preview (prominent) */
+.svgml-ov-preview-heading {
+    font-weight: 600;
+    color: var(--svgml-dark, #264653);
+    font-size: 13px;
+}
+
+/* Badge in overzicht-preview */
+.svgml-ov-preview-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--svgml-red-light, #e8f5f3);
+    color: var(--svgml-red, #2a9d8f);
+}
+
+/* Prijs in overzicht-preview */
+.svgml-ov-preview-price {
+    font-weight: 600;
+    color: var(--svgml-dark, #264653);
+    font-size: 13px;
+}
+
+/* Tekst in overzicht-preview */
+.svgml-ov-preview-text {
+    color: var(--svgml-text, #36454f);
+    font-size: 12px;
+}
+
+/* Link in overzicht-preview */
+.svgml-ov-preview-link {
+    color: var(--svgml-red, #2a9d8f);
+    font-size: 12px;
+    text-decoration: none;
+}
+.svgml-ov-preview-link:hover {
+    text-decoration: underline;
+}
+
+/* "... en nog X objecten" indicator */
+.svgml-ov-preview-more {
+    padding: 8px 14px;
+    text-align: center;
+    color: var(--svgml-muted, #7a8a94);
+    font-size: 11px;
+    font-style: italic;
+}
+
+
+/* ── POLYGON EDITOR ─────────────────────────────────────────────────── */
+
+/* Wrapper rond de hele polygon-editor (canvas + lijst) */
+.svgml-polygon-editor-wrap {
+    padding: 18px 20px 10px;
+}
+
+/* Toolbar boven het canvas */
+.svgml-polygon-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0 14px;
+    flex-wrap: wrap;
+}
+
+/* ── Toolbar buttons: reset WordPress standaard styling ──────────────
+   WordPress's .button klasse forceert eigen line-height, padding en height.
+   We resetten alles en gebruiken flexbox voor perfecte centrering. */
+.svgml-polygon-toolbar .button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px;
+    line-height: 1 !important;
+    vertical-align: middle;
+    padding: 7px 16px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    font-size: 13px;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+.svgml-polygon-toolbar .button.button-primary {
+    padding: 8px 20px !important;
+}
+.svgml-polygon-toolbar .button.button-small {
+    padding: 6px 12px !important;
+    font-size: 13px;
+}
+/* Dashicons in knoppen: forceer gelijke maat en geen extra ruimte */
+.svgml-polygon-toolbar .button .dashicons {
+    font-size: 16px !important;
+    width: 16px !important;
+    height: 16px !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+/* De ::before pseudo van dashicons bevat het icoon-karakter */
+.svgml-polygon-toolbar .button .dashicons::before {
+    font-size: 16px;
+    line-height: 1;
+    width: auto;
+    height: auto;
+}
+
+/* Stroke-instellingen in toolbar */
+.svgml-stroke-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--svgml-text, #36454f);
+}
+.svgml-stroke-controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.svgml-stroke-controls input[type="color"] {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--svgml-border, #dce5e3);
+    border-radius: 4px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+.svgml-stroke-controls input[type="number"] {
+    width: 50px;
+    height: 24px;
+    padding: 2px 4px;
+    border: 1px solid var(--svgml-border, #dce5e3);
+    border-radius: 4px;
+    font-size: 12px;
+    text-align: center;
+}
+
+/* Groep-scheiding in de toolbar (bijv. teken-tools | zoom-tools) */
+.svgml-toolbar-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--svgml-border, #dce5e3);
+    margin: 0 4px;
+}
+
+/* Zoom-indicator in de toolbar */
+.svgml-zoom-level {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--svgml-dark, #264653);
+    min-width: 40px;
+    text-align: center;
+}
+
+/* Statustekst in de toolbar */
+.svgml-poly-status {
+    font-size: 12px;
+    color: var(--svgml-muted, #7a8a94);
+    font-style: italic;
+    margin-left: auto;
+    text-align: right;
+}
+
+/* Coral-kleurige knop (voor verwijderen) */
+.svgml-btn-coral {
+    color: var(--svgml-coral, #e76f51) !important;
+    border-color: var(--svgml-coral, #e76f51) !important;
+}
+.svgml-btn-coral:hover {
+    background: var(--svgml-coral, #e76f51) !important;
+    color: #fff !important;
+}
+
+/* Canvas container – overflow:auto voor scrollen bij ingezoomd */
+#svgml-polygon-canvas-wrap {
+    border-radius: 6px;
+    overflow: auto;
+    border: 1px solid var(--svgml-border, #dce5e3);
+    background: #f5f5f5;
+    max-height: 75vh;
+    position: relative;
+    cursor: crosshair;
+}
+/* Pan-modus: middelste/rechter muisknop slepen */
+#svgml-polygon-canvas-wrap.svgml-panning-active {
+    cursor: grabbing !important;
+}
+
+/* Snap-indicatie: optioneel labeltje */
+.svgml-snap-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--svgml-text, #36454f);
+    cursor: pointer;
+    user-select: none;
+}
+.svgml-snap-toggle input[type="checkbox"] {
+    margin: 0;
+}
+
+/* Vlakkenlijst onder het canvas */
+.svgml-polygon-list-wrap {
+    margin-top: 10px;
+    padding: 0 2px;
+}
+
+/* Actieve rij in de vlakkenlijst (geselecteerd vlak) */
+.svgml-poly-row-active {
+    background: var(--svgml-red-light, #e8f5f3) !important;
+}
+
+/* Brontype panel secties – subtiele scheiding */
+.svgml-source-panel {
+    padding: 14px 20px 4px;
+    border-top: 1px dashed var(--svgml-border, #dce5e3);
+    margin-top: 6px;
+}
+
+/* Keyboard hints badge */
+.svgml-kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #f7f7f7;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #555;
+}
+
+/* ── FILTER BUTTONS OPTIES (ADMIN) ────────────────────────────────────── */
+.svgml-buttons-options {
+    margin-top: 6px;
+    padding: 8px 12px;
+    background: #f8fafa;
+    border: 1px solid #edf5f4;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.svgml-buttons-options label {
+    display: block;
+    margin: 4px 0;
+    cursor: pointer;
+}
+
+.svgml-buttons-options textarea {
+    width: 100%;
+    margin-top: 4px;
+    font-size: 12px;
+    min-height: 40px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MULTI-LAYER TABS (ADMIN)
+   Tabs voor het schakelen tussen lagen in de polygon-editor.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.svgml-layer-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-bottom: 2px solid var(--svgml-border, #dce5e3);
+    margin-bottom: 16px;
+}
+
+.svgml-layer-tab {
+    padding: 10px 18px;
+    background: none;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    font-size: 14px;
+    color: var(--svgml-muted, #7a8a94);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px 6px 0 0;
+    position: relative;
+}
+
+.svgml-layer-tab:hover {
+    color: var(--svgml-dark, #264653);
+    background: rgba(42, 157, 143, 0.04);
+}
+
+.svgml-layer-tab-active {
+    color: var(--svgml-dark, #264653);
+    background: #fff;
+    border-color: var(--svgml-border, #dce5e3);
+    border-bottom-color: #fff;
+    font-weight: 600;
+}
+
+.svgml-layer-tab .svgml-tab-close {
+    font-size: 12px;
+    color: var(--svgml-muted, #7a8a94);
+    cursor: pointer;
+    margin-left: 4px;
+    display: inline-flex;
+    align-items: center;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.svgml-layer-tab .svgml-tab-close:hover {
+    opacity: 1;
+    color: var(--svgml-coral, #e76f51);
+}
+
+.svgml-layer-add-btn {
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    color: var(--svgml-red, #2a9d8f);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.svgml-layer-add-btn:hover {
+    color: var(--svgml-dark, #264653);
+}
+
+/* Het name-input veld ziet er standaard uit als gewone tekst.
+   Bij hover verschijnt een subtiele rand + potlood-cursor zodat
+   de gebruiker weet dat het bewerkbaar is. Bij focus wordt het
+   een echt invoerveld. */
+.svgml-layer-name-input {
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 2px 6px;
+    font-size: 14px;
+    font-weight: inherit;
+    color: inherit;
+    width: 120px;
+    border-radius: 3px;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+}
+
+.svgml-layer-name-input:hover {
+    border-color: var(--svgml-border, #dce5e3);
+    background: rgba(42, 157, 143, 0.05);
+}
+
+.svgml-layer-name-input:focus {
+    border-color: var(--svgml-red, #2a9d8f);
+    background: #fff;
+    outline: none;
+    cursor: text;
+}
+
+/* Waarschuwing voor dubbele IDs */
+.svgml-duplicate-warning {
+    background: #fef3cd;
+    border: 1px solid #f0a500;
+    color: #856404;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin: 10px 0;
+}
+
+/* Layer switcher style selector */
+.svgml-layer-switcher-options {
+    display: flex;
+    gap: 12px;
+    margin: 12px 0;
+}
+
+.svgml-layer-switcher-options label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+/* Layer badge in admin UI */
+.svgml-layer-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #edf5f4;
+    border-radius: 10px;
+    font-size: 12px;
+    color: #2a9d8f;
+    font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Regio Koppeling: per-laag secties
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.svgml-layer-section {
+    margin-bottom: 28px;
+}
+
+.svgml-layer-section-title {
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--svgml-dark, #264653);
+    margin: 20px 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--svgml-red, #2a9d8f);
+}
+
+.svgml-layer-section-count {
+    font-weight: 400;
+    font-size: 13px;
+    color: var(--svgml-muted, #7a8a94);
+    margin-left: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERVIEW PAGE: Card grid for all maps
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.svgml-overview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.svgml-overview-header h1 {
+    margin: 0;
+    color: var(--svgml-dark);
+}
+
+.svgml-new-map-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px !important;
+    padding: 8px 18px !important;
+    background: var(--svgml-red) !important;
+    border-color: var(--svgml-red) !important;
+    border-radius: var(--svgml-radius-sm) !important;
+}
+
+.svgml-new-map-btn:hover {
+    background: var(--svgml-red-dark) !important;
+    border-color: var(--svgml-red-dark) !important;
+}
+
+.svgml-new-map-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+}
+
+/* Empty state */
+.svgml-empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    background: var(--svgml-white);
+    border-radius: var(--svgml-radius);
+    box-shadow: var(--svgml-shadow);
+    display: flex;
+    flex-flow: column;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+}
+
+.svgml-empty-state .dashicons {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: var(--svgml-border);
+    margin-bottom: 16px;
+}
+
+.svgml-empty-state h2 {
+    color: var(--svgml-dark);
+    margin: 0 0 8px;
+}
+
+.svgml-empty-state p {
+    color: var(--svgml-muted);
+    margin: 0 0 24px;
+}
+
+/* Card grid */
+.svgml-maps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.svgml-map-card {
+    background: var(--svgml-white);
+    border-radius: var(--svgml-radius);
+    box-shadow: var(--svgml-shadow);
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
+}
+
+.svgml-map-card:hover {
+    box-shadow: 0 8px 30px rgba(38, 70, 83, 0.12);
+    transform: translateY(-2px);
+}
+
+/* Card thumbnail */
+.svgml-map-card-thumb {
+    height: 160px;
+    overflow: hidden;
+    background: var(--svgml-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.svgml-map-card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.svgml-map-card-no-thumb .dashicons {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--svgml-border);
+}
+
+/* Card body */
+.svgml-map-card-body {
+    padding: 16px 18px;
+    flex: 1;
+}
+
+.svgml-map-card-title {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--svgml-dark);
+}
+
+.svgml-map-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.svgml-map-card-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--svgml-bg);
+    color: var(--svgml-muted);
+    font-weight: 500;
+}
+
+.svgml-badge-active {
+    background: var(--svgml-success-bg);
+    color: var(--svgml-success);
+}
+
+.svgml-map-card-shortcode {
+    margin-top: 8px;
+}
+
+.svgml-map-card-shortcode code {
+    display: block;
+    padding: 6px 10px;
+    background: var(--svgml-bg);
+    border-radius: var(--svgml-radius-sm);
+    font-size: 12px;
+    color: var(--svgml-text);
+    cursor: text;
+    user-select: all;
+}
+
+/* Card actions */
+.svgml-map-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--svgml-border);
+    background: var(--svgml-bg);
+}
+
+.svgml-map-card-actions .button {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px !important;
+}
+
+.svgml-map-card-actions .button .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    line-height: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EDITOR HEADER + TAB NAVIGATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.svgml-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 0;
+    padding: 16px 0;
+}
+
+.svgml-back-link {
+    font-size: 13px;
+    color: var(--svgml-muted);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.svgml-back-link:hover {
+    color: var(--svgml-red);
+}
+
+.svgml-map-name-input {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: var(--svgml-dark) !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    padding: 4px 8px !important;
+    border-radius: var(--svgml-radius-sm) !important;
+    min-width: 200px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.svgml-map-name-input:hover {
+    border-color: var(--svgml-border) !important;
+    background: var(--svgml-white) !important;
+}
+
+.svgml-map-name-input:focus {
+    border-color: var(--svgml-red) !important;
+    background: var(--svgml-white) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(42, 157, 143, 0.15) !important;
+}
+
+.svgml-header-shortcode {
+    margin-left: auto;
+    font-size: 12px;
+    padding: 4px 10px;
+    background: var(--svgml-bg);
+    border-radius: var(--svgml-radius-sm);
+    color: var(--svgml-muted);
+    user-select: all;
+    cursor: text;
+}
+
+/* Tab navigation */
+.svgml-editor-tabs {
+    display: flex;
+    gap: 0;
+    margin: 0 0 24px;
+    border-bottom: 2px solid var(--svgml-border);
+}
+
+.svgml-editor-tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--svgml-muted);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.svgml-editor-tab:hover {
+    color: var(--svgml-dark);
+}
+
+.svgml-editor-tab-active {
+    color: var(--svgml-red) !important;
+    border-bottom-color: var(--svgml-red) !important;
+    font-weight: 600;
+}

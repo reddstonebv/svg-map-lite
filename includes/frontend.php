@@ -1,0 +1,658 @@
+<?php
+/**
+ * SVG Map Lite - Frontend Rendering
+ * Shortcodes, custom CSS, and frontend utilities
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * Register shortcodes
+ */
+add_shortcode( 'svg_map', 'svgml_render_shortcode' );
+add_shortcode( 'svg_map_panel', 'svgml_render_panel_shortcode' );
+add_shortcode( 'svg_map_lite', 'svgml_render_shortcode' );  // backward compat
+
+/**
+ * Register custom CSS output hook
+ */
+add_action( 'wp_head', 'svgml_output_custom_css' );
+
+/**
+ * SHORTCODE: [svg_map id="123"]
+ * Renders the interactive map. The id attribute refers to a svgml_map post ID.
+ * If no id is provided, attempts to find the first published svgml_map post.
+ */
+function svgml_render_shortcode( $atts ) {
+
+    // Parse shortcode attributes and extract map_id
+    $atts = shortcode_atts(
+        [ 'id' => '' ],
+        $atts,
+        'svg_map'
+    );
+
+    $map_id = absint( $atts['id'] );
+
+    // Fallback: find first published svgml_map post if no ID provided
+    if ( ! $map_id ) {
+        $first_map = get_posts( [
+            'post_type'      => 'svgml_map',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+        ] );
+        if ( $first_map ) {
+            $map_id = $first_map[0]->ID;
+        } else {
+            $admin_link = current_user_can( 'manage_options' )
+                ? ' <a href="' . admin_url( 'admin.php?page=svgml-settings' ) . '">[Configureer SVG Map Lite]</a>'
+                : '';
+            return '<p class="svgml-error">Geen SVG kaart geconfigureerd.' . $admin_link . '</p>';
+        }
+    }
+
+    // Helper function to get post meta with fallback
+    $get_meta = function( $key, $default = '' ) use ( $map_id ) {
+        $result = get_post_meta( $map_id, '_svgml_' . $key, true );
+        if ( '' === $result || false === $result ) {
+            return $default;
+        }
+        return $result;
+    };
+
+    // Get all options using post meta
+    $source_type         = $get_meta( 'source_type', 'svg' );
+    $svg_attachment_id   = $get_meta( 'svg_attachment_id', '' );
+    $image_attachment_id = $get_meta( 'image_attachment_id', '' );
+    $polygons            = $get_meta( 'polygons', [] );
+    $json_url            = $get_meta( 'json_url', '' );
+    $id_mapping          = $get_meta( 'id_mapping', [] );
+    $display_fields      = $get_meta( 'display_fields', [] );
+    $panel_position      = $get_meta( 'panel_position', 'right' );
+    $panel_title         = $get_meta( 'panel_title', '' );
+    $json_id_field       = $get_meta( 'json_id_field', 'id' );
+    $panel_blocks        = $get_meta( 'panel_blocks', [] );
+    $filter_fields       = $get_meta( 'filter_fields', [] );
+    $status_field        = $get_meta( 'status_field', '' );
+    $status_colors       = $get_meta( 'status_colors', [] );
+    $overview_enabled    = (bool) $get_meta( 'overview_enabled', false );
+    $overview_blocks     = $get_meta( 'overview_blocks', [] );
+    $json_array_key      = $get_meta( 'json_array_key', '' );
+    $layers              = $get_meta( 'layers', [] );
+    $layer_switcher      = $get_meta( 'layer_switcher', 'buttons' );
+
+    // Ensure arrays are actually arrays
+    if ( ! is_array( $polygons ) ) $polygons = [];
+    if ( ! is_array( $id_mapping ) ) $id_mapping = [];
+    if ( ! is_array( $display_fields ) ) $display_fields = [];
+    if ( ! is_array( $panel_blocks ) ) $panel_blocks = [];
+    if ( ! is_array( $filter_fields ) ) $filter_fields = [];
+    if ( ! is_array( $status_colors ) ) $status_colors = [];
+    if ( ! is_array( $overview_blocks ) ) $overview_blocks = [];
+    if ( ! is_array( $layers ) ) $layers = [];
+
+    // ── VALIDATIE OP BASIS VAN BRONTYPE ──────────────────────────────────────
+    $is_image_mode = ( 'image' === $source_type );
+    $svg_content   = '';
+    $image_url     = '';
+
+    if ( $is_image_mode ) {
+        // Polygon-modus: afbeelding + getekende vlakken
+        if ( ! $image_attachment_id ) {
+            $admin_link = current_user_can( 'manage_options' )
+                ? ' <a href="' . admin_url( 'admin.php?page=svgml-settings' ) . '">[Configureer SVG Map Lite]</a>'
+                : '';
+            return '<p class="svgml-error">Achtergrondafbeelding niet geconfigureerd.' . $admin_link . '</p>';
+        }
+        $image_url = wp_get_attachment_url( $image_attachment_id );
+        if ( ! $image_url ) {
+            return '<p class="svgml-error">Achtergrondafbeelding kon niet worden geladen.</p>';
+        }
+    } else {
+        // SVG-modus
+        if ( ! $svg_attachment_id ) {
+            $admin_link = current_user_can( 'manage_options' )
+                ? ' <a href="' . admin_url( 'admin.php?page=svgml-settings' ) . '">[Configureer SVG Map Lite]</a>'
+                : '';
+            return '<p class="svgml-error">SVG kaart niet geconfigureerd.' . $admin_link . '</p>';
+        }
+
+        $svg_path    = get_attached_file( $svg_attachment_id );
+        $svg_content = ( $svg_path && file_exists( $svg_path ) ) ? file_get_contents( $svg_path ) : '';
+
+        if ( empty( $svg_content ) ) {
+            return '<p class="svgml-error">SVG-bestand kon niet worden geladen.</p>';
+        }
+
+        // Remove XML declarations
+        $svg_content = preg_replace( '/<\?xml[^?]*\?>\s*/i', '', $svg_content );
+        $svg_content = preg_replace( '/<!DOCTYPE[^>]*>\s*/i', '', $svg_content );
+
+        // Add CSS class to root SVG element
+        $svg_content = preg_replace(
+            '/<svg\b/i',
+            '<svg class="svgml-svg"',
+            $svg_content,
+            1
+        );
+    }
+
+    // ── JSON DATA OPHALEN ────────────────────────────────────────────────────
+    $json_data    = svgml_get_json_data( $map_id );
+    $excluded_ids = $get_meta( 'excluded_ids', [] );
+    if ( ! is_array( $excluded_ids ) ) $excluded_ids = [];
+
+    // ── DATA DOORGEVEN AAN JAVASCRIPT ───────────────────────────────────────
+    $js_data = json_encode( [
+        'mapId'           => $map_id,  // IMPORTANT: Include map ID for multi-map support
+        'sourceType'      => $source_type,
+        'imageUrl'        => $image_url,
+        'polygons'        => $polygons,
+        'mapping'         => $id_mapping,
+        'jsonData'        => $json_data,
+        'jsonIdField'     => $json_id_field,
+        'displayFields'   => $display_fields,
+        'panelBlocks'     => $panel_blocks,
+        'panelPosition'   => $panel_position,
+        'panelTitle'      => $panel_title,
+        'excludedIds'     => $excluded_ids,
+        'statusField'     => $status_field,
+        'statusColors'    => $status_colors,
+        'filterFields'    => $filter_fields,
+        'overviewEnabled' => $overview_enabled,
+        'overviewBlocks'  => $overview_blocks,
+        'jsonArrayKey'    => $json_array_key,
+    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT );
+
+    wp_add_inline_script( 'svgml-frontend-js', 'var svgmlData = ' . $js_data . ';' );
+
+    // ── BUILD HTML WITH OUTPUT BUFFER ──────────────────────────────────────────
+    ob_start();
+    ?>
+    <div class="svgml-wrap">
+
+        <?php
+        // ── FILTER BAR ──────────────────────────────────────────────────────
+        if ( ! empty( $filter_fields ) ) :
+        ?>
+        <div class="svgml-filters-bar" id="svgml-filters-bar">
+            <div class="svgml-filters-inner">
+                <?php foreach ( $filter_fields as $filter ) :
+                    $f_field = sanitize_key( $filter['field'] ?? '' );
+                    $f_type  = sanitize_text_field( $filter['type'] ?? 'dropdown' );
+                    $f_label = sanitize_text_field( $filter['label'] ?? $f_field );
+
+                    if ( empty( $f_field ) ) continue;
+                ?>
+                <div class="svgml-filter-item svgml-filter-type-<?php echo esc_attr( $f_type ); ?>"
+                     data-field="<?php echo esc_attr( $f_field ); ?>"
+                     data-type="<?php echo esc_attr( $f_type ); ?>">
+                    <label class="svgml-filter-label"><?php echo esc_html( $f_label ); ?></label>
+
+                    <?php if ( 'range' === $f_type ) : ?>
+                        <div class="svgml-range-slider" id="svgml-range-<?php echo esc_attr( $f_field ); ?>"></div>
+                        <div class="svgml-range-values">
+                            <span class="svgml-range-min"></span>
+                            <span class="svgml-range-max"></span>
+                        </div>
+
+                    <?php elseif ( 'search' === $f_type ) : ?>
+                        <div class="svgml-search-wrap">
+                            <input type="text"
+                                   class="svgml-filter-search"
+                                   id="svgml-search-<?php echo esc_attr( $f_field ); ?>"
+                                   placeholder="Search..."
+                                   autocomplete="off">
+                            <ul class="svgml-autocomplete-list" id="svgml-autocomplete-<?php echo esc_attr( $f_field ); ?>"></ul>
+                        </div>
+
+                    <?php elseif ( 'buttons' === $f_type ) : ?>
+                        <div class="svgml-filter-buttons"
+                             id="svgml-buttons-<?php echo esc_attr( $f_field ); ?>"
+                             data-source="<?php echo esc_attr( $filter['button_source'] ?? 'auto' ); ?>"
+                             data-show-count="<?php echo esc_attr( $filter['button_show_count'] ?? '0' ); ?>"
+                             data-custom-values="<?php echo esc_attr( $filter['button_custom_values'] ?? '' ); ?>">
+                        </div>
+
+                    <?php else : ?>
+                        <select class="svgml-filter-select" id="svgml-select-<?php echo esc_attr( $f_field ); ?>">
+                            <option value="">All</option>
+                        </select>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+
+                <div class="svgml-filter-item svgml-filter-reset-wrap">
+                    <button type="button" class="svgml-filter-reset" id="svgml-filter-reset">
+                        ↺ Reset filters
+                    </button>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- ── MAP + PANEL CONTAINER ──────────────────────────────────────── -->
+        <div class="svgml-container svgml-panel-pos-<?php echo esc_attr( $panel_position ); ?>">
+
+            <!-- The map: SVG or image + polygons -->
+            <div class="svgml-map-wrap">
+                <?php if ( $is_image_mode ) : ?>
+                    <?php
+                    // ── MULTI-LAYER SUPPORT ──────────────────────────────────────
+                    if ( empty( $layers ) && ! empty( $image_attachment_id ) ) {
+                        $layers = [[
+                            'name' => 'Overzicht',
+                            'image_attachment_id' => $image_attachment_id,
+                            'polygons' => $polygons,
+                            'stroke_color' => $get_meta( 'poly_stroke_color', '#2a9d8f' ),
+                            'stroke_width' => $get_meta( 'poly_stroke_width', '1' ),
+                        ]];
+                    }
+
+                    $has_multiple_layers = count( $layers ) > 1;
+                    ?>
+
+                    <?php if ( $has_multiple_layers ) : ?>
+                        <?php if ( $layer_switcher === 'buttons' ) : ?>
+                            <div class="svgml-layer-switcher svgml-layer-buttons">
+                                <?php foreach ( $layers as $li => $layer ) : ?>
+                                    <button type="button"
+                                            class="svgml-layer-btn <?php echo $li === 0 ? 'svgml-layer-btn-active' : ''; ?>"
+                                            data-layer="<?php echo $li; ?>">
+                                        <?php echo esc_html( $layer['name'] ); ?>
+                                    </button>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php elseif ( $layer_switcher === 'dropdown' ) : ?>
+                            <div class="svgml-layer-switcher svgml-layer-dropdown-wrap">
+                                <select class="svgml-layer-select" id="svgml-layer-select">
+                                    <?php foreach ( $layers as $li => $layer ) : ?>
+                                        <option value="<?php echo $li; ?>"><?php echo esc_html( $layer['name'] ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php else : ?>
+                            <div class="svgml-layer-switcher svgml-layer-custom">
+                                <?php foreach ( $layers as $li => $layer ) : ?>
+                                    <span class="svgml-layer-option <?php echo $li === 0 ? 'svgml-layer-option-active' : ''; ?>" data-layer="<?php echo $li; ?>">
+                                        <?php echo esc_html( $layer['name'] ); ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+
+                    <!-- ── LAYERS ──────────────────────────────────────────────────── -->
+                    <?php foreach ( $layers as $li => $layer ) :
+                        $layer_img_url = wp_get_attachment_url( $layer['image_attachment_id'] );
+                        $layer_polys   = $layer['polygons'] ?? [];
+                        $layer_stroke  = $layer['stroke_color'] ?? '#2a9d8f';
+                        $layer_width   = $layer['stroke_width'] ?? '1';
+                        if ( ! $layer_img_url ) continue;
+                    ?>
+                        <div class="svgml-image-map svgml-layer"
+                             data-layer="<?php echo $li; ?>"
+                             style="position:relative; display:inline-block; width:100%; <?php echo $li > 0 ? 'display:none;' : ''; ?>">
+                            <img src="<?php echo esc_url( $layer_img_url ); ?>"
+                                 alt="<?php echo esc_attr( $layer['name'] ); ?>"
+                                 class="svgml-bg-image"
+                                 style="display:block; width:100%; height:auto;">
+
+                            <svg class="svgml-svg svgml-polygon-overlay"
+                                 viewBox="0 0 1 1"
+                                 preserveAspectRatio="none"
+                                 style="position:absolute; top:0; left:0; width:100%; height:100%;">
+                                <?php foreach ( $layer_polys as $poly ) :
+                                    $poly_id = esc_attr( $poly['id'] ?? '' );
+                                    $points  = $poly['points'] ?? [];
+                                    if ( empty( $poly_id ) || count( $points ) < 3 ) continue;
+                                    $pts_str = implode( ' ', array_map( function( $pt ) {
+                                        return round( $pt['x'], 6 ) . ',' . round( $pt['y'], 6 );
+                                    }, $points ) );
+                                ?>
+                                    <polygon id="<?php echo $poly_id; ?>"
+                                             points="<?php echo esc_attr( $pts_str ); ?>"
+                                             class="svgml-poly-region" />
+                                <?php endforeach; ?>
+                            </svg>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else : ?>
+                    <?php echo $svg_content; ?>
+                <?php endif; ?>
+            </div>
+
+            <?php if ( 'standalone' !== $panel_position ) : ?>
+            <div class="svgml-panel" id="svgml-panel" aria-hidden="true">
+                <div class="svgml-panel-inner">
+
+                    <button class="svgml-panel-close" id="svgml-panel-close" aria-label="Sluit info panel">
+                        <span aria-hidden="true">×</span>
+                    </button>
+
+                    <?php if ( $panel_title ) : ?>
+                        <h3 class="svgml-panel-title">
+                            <?php echo esc_html( $panel_title ); ?>
+                        </h3>
+                    <?php endif; ?>
+
+                    <div class="svgml-panel-content" id="svgml-panel-content">
+                        <p class="svgml-panel-placeholder">Klik op een regio voor meer informatie.</p>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+        </div><!-- .svgml-container -->
+    </div><!-- .svgml-wrap -->
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * SHORTCODE: [svg_map_panel id="123"]
+ * Renders a standalone panel that can be placed elsewhere on the page.
+ */
+function svgml_render_panel_shortcode( $atts ) {
+
+    $atts = shortcode_atts(
+        [ 'id' => '' ],
+        $atts,
+        'svg_map_panel'
+    );
+
+    $map_id = absint( $atts['id'] );
+
+    // Fallback
+    if ( ! $map_id ) {
+        $first_map = get_posts( [
+            'post_type'      => 'svgml_map',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+        ] );
+        if ( $first_map ) {
+            $map_id = $first_map[0]->ID;
+        }
+    }
+
+    // Get panel title from post meta
+    $panel_title = $map_id
+        ? get_post_meta( $map_id, '_svgml_panel_title', true )
+        : '';
+
+    ob_start();
+    ?>
+    <div class="svgml-panel svgml-panel-standalone" id="svgml-panel-standalone" aria-hidden="true">
+        <div class="svgml-panel-inner">
+
+            <button class="svgml-panel-close svgml-panel-close-standalone"
+                    aria-label="Sluit info panel">
+                <span aria-hidden="true">×</span>
+            </button>
+
+            <?php if ( $panel_title ) : ?>
+                <h3 class="svgml-panel-title">
+                    <?php echo esc_html( $panel_title ); ?>
+                </h3>
+            <?php endif; ?>
+
+            <div class="svgml-panel-content" id="svgml-panel-content-standalone">
+                <p class="svgml-panel-placeholder">Klik op een regio op de kaart voor meer informatie.</p>
+            </div>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * Clear JSON cache for a specific map
+ */
+function svgml_clear_json_cache( $map_id = 0 ) {
+    if ( $map_id ) {
+        delete_transient( 'svgml_json_cache_' . $map_id );
+    }
+}
+
+/**
+ * OUTPUT CUSTOM CSS IN <HEAD>
+ * Generates CSS for all published svgml_map posts
+ */
+function svgml_output_custom_css() {
+
+    $css_output = '';
+
+    // Get all published maps
+    $maps = get_posts( [
+        'post_type'      => 'svgml_map',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+    ] );
+
+    foreach ( $maps as $map ) {
+        $map_id = $map->ID;
+
+        // Helper function
+        $get_meta = function( $key, $default = '' ) use ( $map_id ) {
+            $result = get_post_meta( $map_id, '_svgml_' . $key, true );
+            if ( '' === $result || false === $result ) {
+                return $default;
+            }
+            return $result;
+        };
+
+        // Get map-specific colors and settings
+        $status_colors     = $get_meta( 'status_colors', [] );
+        $status_hex_colors = $get_meta( 'status_hex_colors', [] );
+        $status_opacity    = $get_meta( 'status_opacity', [] );
+
+        if ( ! is_array( $status_colors ) ) $status_colors = [];
+        if ( ! is_array( $status_hex_colors ) ) $status_hex_colors = [];
+        if ( ! is_array( $status_opacity ) ) $status_opacity = [];
+
+        foreach ( $status_hex_colors as $status_val => $hex ) {
+            if ( ! sanitize_hex_color( $hex ) ) continue;
+
+            $css_class = $status_colors[ $status_val ] ?? '';
+            if ( empty( $css_class ) ) continue;
+
+            $opacity_pct  = max( 10, min( 100, intval( $status_opacity[ $status_val ] ?? 100 ) ) );
+            $fill_opacity = round( $opacity_pct / 100, 2 );
+
+            $rgba_light = svgml_hex_to_rgba( $hex, 0.12 );
+            $rgba_mid   = svgml_hex_to_rgba( $hex, 0.90 );
+
+            $css_output .= ".svgml-svg [id].svgml-status-{$css_class},"
+                         . ".svgml-svg [id].svgml-status-{$css_class} * { "
+                         . "fill: {$hex} !important; "
+                         . "fill-opacity: {$fill_opacity} !important; }\n";
+
+            $css_output .= ".svgml-badge.svgml-badge-{$css_class} { "
+                         . "background-color: {$rgba_light} !important; "
+                         . "color: {$hex} !important; "
+                         . "border: 1px solid {$rgba_mid} !important; }\n";
+        }
+
+        // Filter colors
+        $filter_match_color = $get_meta( 'filter_match_color', '' );
+        $filter_dim_color   = $get_meta( 'filter_dim_color', '' );
+
+        if ( ! empty( $filter_match_color ) && sanitize_hex_color( $filter_match_color ) ) {
+            $css_output .= ".svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded),"
+                         . ".svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded) *"
+                         . " { fill: {$filter_match_color} !important; }\n";
+        }
+
+        if ( ! empty( $filter_dim_color ) && sanitize_hex_color( $filter_dim_color ) ) {
+            $css_output .= ".svgml-svg [id].svgml-region-dimmed,"
+                         . ".svgml-svg [id].svgml-region-dimmed *"
+                         . " { fill: {$filter_dim_color} !important; opacity: 1 !important; }\n";
+        }
+
+        // Polygon stroke styling
+        $poly_stroke_color = $get_meta( 'poly_stroke_color', '#2a9d8f' );
+        $poly_stroke_width = $get_meta( 'poly_stroke_width', '1' );
+
+        $vb_stroke = round( floatval( $poly_stroke_width ) / 1000, 6 );
+        $vb_stroke_hover  = round( $vb_stroke * 1.8, 6 );
+        $vb_stroke_active = round( $vb_stroke * 2.2, 6 );
+
+        $stroke_rgba_half = svgml_hex_to_rgba( $poly_stroke_color, 0.5 );
+        $stroke_rgba_full = svgml_hex_to_rgba( $poly_stroke_color, 0.9 );
+
+        $css_output .= ".svgml-poly-region { "
+                     . "stroke: {$stroke_rgba_half}; "
+                     . "stroke-width: {$vb_stroke}; }\n";
+        $css_output .= ".svgml-poly-region:hover { "
+                     . "stroke: {$stroke_rgba_full}; "
+                     . "stroke-width: {$vb_stroke_hover}; }\n";
+        $css_output .= ".svgml-poly-region.svgml-region-active { "
+                     . "stroke: {$poly_stroke_color}; "
+                     . "stroke-width: {$vb_stroke_active}; }\n";
+
+        // Custom CSS (per-map)
+        $custom_css = $get_meta( 'custom_css', '' );
+        if ( ! empty( trim( $custom_css ) ) ) {
+            $css_output .= "/* Map: " . esc_html( $map->post_title ) . " */\n";
+            $css_output .= wp_strip_all_tags( $custom_css ) . "\n";
+        }
+    } // end foreach $maps
+
+    if ( empty( $css_output ) ) return;
+
+    echo "\n<style id=\"svgml-custom-css\">\n";
+    echo "/* SVG Map Lite – Gegenereerd + Custom CSS */\n";
+    echo $css_output;
+    echo "</style>\n";
+}
+
+/**
+ * UTILITY: HEX TO RGBA COLOR CONVERSION
+ * Converts hex color to rgba() string
+ */
+function svgml_hex_to_rgba( $hex, $alpha = 1.0 ) {
+    $hex = ltrim( $hex, '#' );
+
+    if ( strlen( $hex ) === 3 ) {
+        $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+    }
+
+    if ( strlen( $hex ) !== 6 ) return 'rgba(0,0,0,1)';
+
+    $r = hexdec( substr( $hex, 0, 2 ) );
+    $g = hexdec( substr( $hex, 2, 2 ) );
+    $b = hexdec( substr( $hex, 4, 2 ) );
+    $a = number_format( floatval( $alpha ), 2, '.', '' );
+
+    return "rgba({$r}, {$g}, {$b}, {$a})";
+}
+
+/**
+ * Get normalized JSON array from JSON data
+ * Handles wrapped/nested JSON structures
+ */
+function svgml_get_json_array( $map_id = 0 ) {
+    $raw = svgml_get_json_data( $map_id );
+
+    if ( is_array( $raw ) && isset( $raw[0] ) ) {
+        return $raw;
+    }
+
+    if ( ! is_array( $raw ) ) {
+        return [];
+    }
+
+    // Manual override
+    $array_key = ( $map_id ? get_post_meta( $map_id, '_svgml_json_array_key', true ) : get_option( 'svgml_json_array_key', '' ) );
+    if ( ! empty( $array_key ) && isset( $raw[ $array_key ] ) && is_array( $raw[ $array_key ] ) ) {
+        return $raw[ $array_key ];
+    }
+
+    // Auto-detection
+    $known_keys = [ 'assets', 'data', 'items', 'results', 'objects', 'features',
+                    'records', 'list', 'collection', 'entries', 'value', 'spaces',
+                    'units', 'properties', 'lots', 'houses', 'apartments' ];
+
+    foreach ( $known_keys as $key ) {
+        if ( isset( $raw[ $key ] ) && is_array( $raw[ $key ] ) && ! empty( $raw[ $key ] ) ) {
+            return $raw[ $key ];
+        }
+    }
+
+    $best      = [];
+    $best_size = 0;
+    foreach ( $raw as $value ) {
+        if ( is_array( $value ) && count( $value ) > $best_size ) {
+            if ( isset( $value[0] ) && is_array( $value[0] ) ) {
+                $best      = $value;
+                $best_size = count( $value );
+            }
+        }
+    }
+    if ( ! empty( $best ) ) {
+        return $best;
+    }
+
+    return [];
+}
+
+/**
+ * Get field names from JSON data
+ */
+function svgml_get_json_field_names( $map_id = 0 ) {
+    $data = svgml_get_json_array( $map_id );
+
+    if ( empty( $data ) || ! is_array( $data[0] ) ) {
+        return [];
+    }
+
+    return array_keys( $data[0] );
+}
+
+/**
+ * Get JSON data for a specific map
+ * Uses per-map transient caching
+ */
+function svgml_get_json_data( $map_id = 0 ) {
+    if ( ! $map_id ) {
+        $json_url = get_option( 'svgml_json_url', '' );
+    } else {
+        $json_url = get_post_meta( $map_id, '_svgml_json_url', true );
+    }
+
+    if ( empty( $json_url ) ) {
+        return [];
+    }
+
+    // Try to get from cache first
+    $cache_key = $map_id ? 'svgml_json_cache_' . $map_id : 'svgml_json_cache';
+    $cached = get_transient( $cache_key );
+    if ( false !== $cached ) {
+        return $cached;
+    }
+
+    // Fetch data via HTTP
+    $response = wp_remote_get( $json_url, [
+        'timeout'    => 15,
+        'user-agent' => 'SVG Map Lite WordPress Plugin',
+    ]);
+
+    if ( is_wp_error( $response ) ) {
+        return [];
+    }
+
+    $status_code = wp_remote_retrieve_response_code( $response );
+    if ( 200 !== $status_code ) {
+        return [];
+    }
+
+    $body      = wp_remote_retrieve_body( $response );
+    $json_data = json_decode( $body, true ) ?? [];
+
+    // Cache for 5 minutes
+    set_transient( $cache_key, $json_data, 5 * MINUTE_IN_SECONDS );
+
+    return $json_data;
+}
