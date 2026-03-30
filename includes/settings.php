@@ -331,95 +331,109 @@ function svgml_render_settings_page( $map_id ) {
 
                     <!-- ── Polygon Editor Canvas ───────────────────────────────── -->
                     <div id="svgml-polygon-editor-wrap" class="svgml-polygon-editor-wrap" <?php if ( ! $image_url ) echo 'style="display:none"'; ?>>
+                        <div class="svgml-polygon-editor-columns">
+                            <div class="svgml-polygon-editor-sidebar">
+                                <!-- Toolbar boven het canvas -->
+                                <div class="svgml-polygon-toolbar">
+                                    <!-- Teken-gereedschappen -->
+                                    <button type="button" id="svgml-poly-draw" class="button button-primary" title="Nieuw vlak tekenen">
+                                        <span class="dashicons dashicons-edit"></span> Teken
+                                    </button>
+                                    <button type="button" id="svgml-poly-edit" class="button button-secondary" title="Bewerk punten van een vlak – versleep of verwijder punten">
+                                        <span class="dashicons dashicons-move"></span> Bewerk punten
+                                    </button>
+                                    <button type="button" id="svgml-poly-done" class="button button-secondary" style="display:none" title="Voltooi het huidige vlak">
+                                        ✓ Klaar
+                                    </button>
+                                    <button type="button" id="svgml-poly-cancel" class="button button-secondary" style="display:none" title="Annuleer huidige tekening">
+                                        ✕ Annuleer
+                                    </button>
+                                    <button type="button" id="svgml-poly-delete" class="button svgml-btn-coral" title="Verwijder geselecteerd vlak">
+                                        <span class="dashicons dashicons-trash"></span> Verwijder
+                                    </button>
 
-                        <!-- Toolbar boven het canvas -->
-                        <div class="svgml-polygon-toolbar">
-                            <!-- Teken-gereedschappen -->
-                            <button type="button" id="svgml-poly-draw" class="button button-primary" title="Nieuw vlak tekenen">
-                                <span class="dashicons dashicons-edit"></span> Teken
-                            </button>
-                            <button type="button" id="svgml-poly-edit" class="button button-secondary" title="Bewerk punten van een vlak – versleep of verwijder punten">
-                                <span class="dashicons dashicons-move"></span> Bewerk punten
-                            </button>
-                            <button type="button" id="svgml-poly-done" class="button button-secondary" style="display:none" title="Voltooi het huidige vlak">
-                                ✓ Klaar
-                            </button>
-                            <button type="button" id="svgml-poly-cancel" class="button button-secondary" style="display:none" title="Annuleer huidige tekening">
-                                ✕ Annuleer
-                            </button>
-                            <button type="button" id="svgml-poly-delete" class="button svgml-btn-coral" title="Verwijder geselecteerd vlak">
-                                <span class="dashicons dashicons-trash"></span> Verwijder
-                            </button>
+                                    <span class="svgml-toolbar-sep"></span>
 
-                            <span class="svgml-toolbar-sep"></span>
+                                    <!-- Zoom-gereedschappen -->
+                                    <button type="button" id="svgml-zoom-in" class="button button-small" title="Inzoomen (scroll-wiel of +)">
+                                        <span class="dashicons dashicons-plus-alt2"></span>
+                                    </button>
+                                    <span class="svgml-zoom-level" id="svgml-zoom-level">100%</span>
+                                    <button type="button" id="svgml-zoom-out" class="button button-small" title="Uitzoomen (scroll-wiel of -)">
+                                        <span class="dashicons dashicons-minus"></span>
+                                    </button>
+                                    <button type="button" id="svgml-zoom-reset" class="button button-small" title="Reset zoom naar 100%">
+                                        1:1
+                                    </button>
 
-                            <!-- Zoom-gereedschappen -->
-                            <button type="button" id="svgml-zoom-in" class="button button-small" title="Inzoomen (scroll-wiel of +)">
-                                <span class="dashicons dashicons-plus-alt2"></span>
-                            </button>
-                            <span class="svgml-zoom-level" id="svgml-zoom-level">100%</span>
-                            <button type="button" id="svgml-zoom-out" class="button button-small" title="Uitzoomen (scroll-wiel of -)">
-                                <span class="dashicons dashicons-minus"></span>
-                            </button>
-                            <button type="button" id="svgml-zoom-reset" class="button button-small" title="Reset zoom naar 100%">
-                                1:1
-                            </button>
+                                    <span class="svgml-toolbar-sep"></span>
 
-                            <span class="svgml-toolbar-sep"></span>
+                                    <!-- Snap toggle -->
+                                    <label class="svgml-snap-toggle" title="Magnetisch vastklikken aan punten van naastgelegen polygonen">
+                                        <input type="checkbox" id="svgml-snap-toggle" checked>
+                                        🧲 Snap
+                                    </label>
 
-                            <!-- Snap toggle -->
-                            <label class="svgml-snap-toggle" title="Magnetisch vastklikken aan punten van naastgelegen polygonen">
-                                <input type="checkbox" id="svgml-snap-toggle" checked>
-                                🧲 Snap
-                            </label>
+                                    <span class="svgml-toolbar-sep"></span>
 
-                            <span class="svgml-toolbar-sep"></span>
+                                    <!-- Lijnstijl-instellingen -->
+                                    <span class="svgml-stroke-controls">
+                                        <label title="Lijnkleur van polygonen">
+                                            Lijn
+                                            <input type="color" id="svgml-stroke-color" value="<?php echo esc_attr( $poly_stroke_color ); ?>">
+                                        </label>
+                                        <label title="Lijndikte in pixels">
+                                            Dikte
+                                            <input type="number" id="svgml-stroke-width" value="<?php echo esc_attr( $poly_stroke_width ); ?>" min="0.5" max="10" step="0.5">
+                                        </label>
+                                    </span>
 
-                            <!-- Lijnstijl-instellingen -->
-                            <span class="svgml-stroke-controls">
-                                <label title="Lijnkleur van polygonen">
-                                    Lijn
-                                    <input type="color" id="svgml-stroke-color" value="<?php echo esc_attr( $poly_stroke_color ); ?>">
-                                </label>
-                                <label title="Lijndikte in pixels">
-                                    Dikte
-                                    <input type="number" id="svgml-stroke-width" value="<?php echo esc_attr( $poly_stroke_width ); ?>" min="0.5" max="10" step="0.5">
-                                </label>
-                            </span>
+                                    <!-- Status tekst (rechts uitgelijnd) -->
+                                    <span class="svgml-poly-status" id="svgml-poly-status"></span>
+                                </div>
 
-                            <!-- Status tekst (rechts uitgelijnd) -->
-                            <span class="svgml-poly-status" id="svgml-poly-status"></span>
-                        </div>
+                                <!-- Vlakkenlijst: overzicht van alle getekende polygonen -->
+                                <div class="svgml-polygon-list-wrap">
+                                    <h4 style="margin:14px 0 6px">Getekende vlakken</h4>
+                                    <table class="wp-list-table widefat fixed striped" id="svgml-polygon-list">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:35%">ID</th>
+                                                <th style="width:35%">Punten</th>
+                                                <th style="width:30%">Acties</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="svgml-polygon-tbody">
+                                            <!-- Wordt gevuld door JavaScript -->
+                                        </tbody>
+                                    </table>
+                                    <p class="description" style="margin-top:8px">
+                                        <strong>Tips:</strong> Klik op een vlak om het te selecteren.
+                                        Gebruik <em>Bewerk punten</em> om hoekpunten te verslepen of te verwijderen
+                                        (<span class="svgml-kbd">Backspace</span> op een geselecteerd punt).
+                                        Zoom met <span class="svgml-kbd">Ctrl</span>+<span class="svgml-kbd">scroll</span>
+                                        of de knoppen. Sleep met de <em>rechtermuisknop</em> om te pannen bij ingezoomde afbeelding.
+                                        🧲 Snap klikt punten vast aan naastgelegen vlakken.
+                                        Klik op een <em>rand</em> van een polygon in bewerk-modus om een nieuw punt in te voegen.
+                                    </p>
+                                </div>
+                            </div>
 
-                        <!-- Fabric.js canvas (wordt via JS geïnitialiseerd) -->
-                        <div id="svgml-polygon-canvas-wrap" style="position:relative; border:1px solid var(--svgml-border,#dce5e3); border-radius:6px; overflow:hidden; background:#f5f5f5;">
-                            <canvas id="svgml-polygon-canvas"></canvas>
-                        </div>
-
-                        <!-- Vlakkenlijst: overzicht van alle getekende polygonen -->
-                        <div class="svgml-polygon-list-wrap">
-                            <h4 style="margin:14px 0 6px">Getekende vlakken</h4>
-                            <table class="wp-list-table widefat fixed striped" id="svgml-polygon-list">
-                                <thead>
-                                    <tr>
-                                        <th style="width:35%">ID</th>
-                                        <th style="width:35%">Punten</th>
-                                        <th style="width:30%">Acties</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="svgml-polygon-tbody">
-                                    <!-- Wordt gevuld door JavaScript -->
-                                </tbody>
-                            </table>
-                            <p class="description" style="margin-top:8px">
-                                <strong>Tips:</strong> Klik op een vlak om het te selecteren.
-                                Gebruik <em>Bewerk punten</em> om hoekpunten te verslepen of te verwijderen
-                                (<span class="svgml-kbd">Backspace</span> op een geselecteerd punt).
-                                Zoom met <span class="svgml-kbd">Ctrl</span>+<span class="svgml-kbd">scroll</span>
-                                of de knoppen. Sleep met de <em>rechtermuisknop</em> om te pannen bij ingezoomde afbeelding.
-                                🧲 Snap klikt punten vast aan naastgelegen vlakken.
-                                Klik op een <em>rand</em> van een polygon in bewerk-modus om een nieuw punt in te voegen.
-                            </p>
+                            <div class="svgml-polygon-editor-main">
+                                <div id="svgml-polygon-canvas-wrap" style="position:relative; border:1px solid var(--svgml-border,#dce5e3); border-radius:6px; overflow:hidden; background:#f5f5f5;">
+                                    <canvas id="svgml-polygon-canvas"></canvas>
+                                    <div class="svgml-polygon-controls-overlay">
+                                        <strong>Controls</strong>
+                                        <ul>
+                                            <li>Click to place points</li>
+                                            <li>Done or continue clicking to finish</li>
+                                            <li>Ctrl + scroll to zoom</li>
+                                            <li>Right-drag to pan</li>
+                                            <li>Backspace deletes a selected point</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Knop om een verdieping/viewpoint toe te voegen -->

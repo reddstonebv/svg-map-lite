@@ -959,6 +959,68 @@ tr.svgml-row-excluded .svgml-exclude-label {
     padding: 18px 20px 10px;
 }
 
+.svgml-polygon-editor-columns {
+    display: flex;
+    gap: 22px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.svgml-polygon-editor-sidebar {
+    flex: 0 0 320px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.svgml-polygon-editor-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.svgml-polygon-controls-overlay {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 20;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+    max-width: 250px;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.08);
+    font-size: 12px;
+    color: #2a3b43;
+}
+
+.svgml-polygon-controls-overlay strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.svgml-polygon-controls-overlay ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.svgml-polygon-controls-overlay li {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+@media (max-width: 1120px) {
+    .svgml-polygon-editor-columns {
+        flex-direction: column;
+    }
+    .svgml-polygon-editor-sidebar {
+        width: auto;
+        min-width: 0;
+    }
+}
+
 /* Toolbar boven het canvas */
 .svgml-polygon-toolbar {
     display: flex;

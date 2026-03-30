@@ -673,8 +673,8 @@ jQuery(document).ready(function($) {
             }
             polyId = polyId.trim();
 
-            if (findPolyById(polyId)) {
-                alert('This ID already exists. Choose a different ID.');
+            if (findPolyByIdAcrossLayers(polyId)) {
+                alert('This ID already exists in another layer. Choose a different ID.');
                 continue;
             }
 
@@ -1219,6 +1219,7 @@ jQuery(document).ready(function($) {
                 '<tr><td colspan="3" style="text-align:center;color:#999;font-style:italic;padding:14px;">' +
                 'No polygons drawn yet</td></tr>'
             );
+            updateDuplicateWarning();
             return;
         }
         $.each(polygons, function(i, poly) {
@@ -1242,6 +1243,7 @@ jQuery(document).ready(function($) {
                 '</tr>'
             );
         });
+        updateDuplicateWarning();
     }
 
     // ── List events ──────────────────────────────────────────────────────
@@ -1285,11 +1287,8 @@ jQuery(document).ready(function($) {
 
         if (!newId) { alert('ID cannot be empty.'); $input.val(originalId); return; }
 
-        var dup = false;
-        $.each(polygons, function(i, p) {
-            if (p.id === newId && p.id !== originalId) { dup = true; return false; }
-        });
-        if (dup) { alert('This ID already exists.'); $input.val(originalId); return; }
+        var dup = findPolyByIdAcrossLayers(newId, originalId);
+        if (dup) { alert('This ID already exists in another layer or polygon.'); $input.val(originalId); return; }
 
         var poly = findPolyById(originalId);
         if (poly) {
@@ -1300,6 +1299,7 @@ jQuery(document).ready(function($) {
         $input.closest('tr').attr('data-poly-id', newId);
         syncToHiddenField();
         updateStatus('ID: "' + originalId + '" → "' + newId + '"');
+        updateDuplicateWarning();
     });
 
     // ════════════════════════════════════════════════════════════════════
@@ -1321,6 +1321,55 @@ jQuery(document).ready(function($) {
         var found = null;
         $.each(polygons, function(i, p) { if (p.id === id) { found = p; return false; } });
         return found;
+    }
+
+    function findPolyByIdAcrossLayers(id, ignoreOriginalId) {
+        var found = null;
+
+        $.each(polygons, function(i, p) {
+            if (p.id === id && p.id !== ignoreOriginalId) { found = p; return false; }
+        });
+        if (found) return found;
+
+        $.each(layers, function(li, layer) {
+            if (li === activeLayerIndex) return true;
+            $.each(layer.polygons || [], function(i, p) {
+                if (p.id === id && p.id !== ignoreOriginalId) { found = p; return false; }
+            });
+            if (found) return false;
+            return true;
+        });
+
+        return found;
+    }
+
+    function updateDuplicateWarning() {
+        if (canvas && activeLayerIndex >= 0 && activeLayerIndex < layers.length) {
+            layers[activeLayerIndex].polygons = $.map(polygons, function(p) {
+                return { id: p.id, points: p.points };
+            });
+        }
+
+        var counts = {};
+        $.each(layers, function(li, layer) {
+            $.each(layer.polygons || [], function(i, p) {
+                if (!p.id) return true;
+                counts[p.id] = (counts[p.id] || 0) + 1;
+            });
+        });
+
+        var duplicates = [];
+        $.each(counts, function(id, count) {
+            if (count > 1) duplicates.push(id);
+        });
+
+        var $warning = $('#svgml-duplicate-warning');
+        if (duplicates.length > 0) {
+            $warning.html('Duplicate polygon IDs found across layers: <strong>' + escHtml(duplicates.join(', ')) + '</strong>. Polygon IDs must be unique across all layers.');
+            $warning.show();
+        } else {
+            $warning.hide();
+        }
     }
 
     function clearAllPolygons() {
