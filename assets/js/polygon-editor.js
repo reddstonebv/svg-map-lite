@@ -1360,17 +1360,8 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
         var data = $.map(polygons, function(p) {
             return { id: p.id, points: p.points };
         });
-        var jsonStr = JSON.stringify(data);
-        $hiddenJson.val(jsonStr);
+        $hiddenJson.val(JSON.stringify(data));
         
-        // Debug logging
-        console.log('📋 Synced ' + polygons.length + ' polygons to hidden field', {
-            polygonCount: polygons.length,
-            polygonIds: $.map(polygons, function(p) { return p.id; }),
-            hidden_field_name: $hiddenJson.attr('name'),
-            data_length: jsonStr.length
-        });
-
         // Also sync to layers JSON if layers exist
         if (typeof syncLayersToHiddenField === 'function') {
             syncLayersToHiddenField();
@@ -1575,20 +1566,8 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
             };
         });
 
-        var jsonStr = JSON.stringify(layersData);
         // Update the hidden field (for form submission)
-        $('#svgml_layers_json').val(jsonStr);
-
-        // Debug logging
-        console.log('📦 Synced ' + layers.length + ' layer(s) to hidden field', {
-            layers: layers.length,
-            layerNames: $.map(layers, function(l) { return l.name; }),
-            totalPolygons: $.map(layers, function(l) { return (l.polygons || []).length; }).reduce(function(a, b) { return a + b; }, 0),
-            hidden_field_name: $('#svgml_layers_json').attr('name'),
-            data_length: jsonStr.length,
-            activeLayer: activeLayerIndex,
-            currentPolygons: polygons.length
-        });
+        $('#svgml_layers_json').val(JSON.stringify(layersData));
     }
 
     // ════════════════════════════════════════════════════════════════════
