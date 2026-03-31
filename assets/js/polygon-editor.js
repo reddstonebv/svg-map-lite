@@ -1567,13 +1567,22 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
         });
 
         var jsonStr = JSON.stringify(layersData);
+        var polyCount = $.map(layersData, function(l) { return (l.polygons || []).length; }).reduce(function(a, b) { return a + b; }, 0);
         
-        // DIAGNOSTIC: Log what we're syncing
-        console.log('Syncing data...', {
-            layers: layersData,
-            jsonLength: jsonStr.length,
-            polygonCount: $.map(layersData, function(l) { return (l.polygons || []).length; }).reduce(function(a, b) { return a + b; }, 0)
-        });
+        // DIAGNOSTIC: Log complete data pipeline
+        console.log('━━ SYNC TO HIDDEN FIELD ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('  Layers count:', layersData.length);
+        console.log('  Total polygons:', polyCount);
+        console.log('  JSON size:', jsonStr.length + ' bytes');
+        console.log('  Image IDs:', $.map(layersData, function(l) { return l.image_attachment_id; }));
+        console.log('  Polygon IDs:',
+            $.map(layersData, function(l, idx) {
+                var ids = $.map( (l.polygons || []), function(p) { return p.id; });
+                return 'Layer ' + (idx+1) + ': [' + ids.join(', ') + ']';
+            }).join(' | ')
+        );
+        console.log('  Full payload:', layersData);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
         // Update the hidden field (for form submission)
         $('#svgml_layers_json').val(jsonStr);

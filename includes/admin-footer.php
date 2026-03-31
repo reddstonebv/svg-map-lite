@@ -33,12 +33,28 @@ function svgml_save_shortcut_script() {
         // ── SAVE FUNCTIONS ────────────────────────────────────────────────────
         function svgmlSavePage() {
             var $form = $('.svgml-admin-wrap form[method="post"]').first();
-            if (!$form.length) return;
+            if (!$form.length) {
+                console.log('[SVG Map Lite] Form not found');
+                return;
+            }
+
+            console.log('[SVG Map Lite] Form submission triggered');
 
             // For Settings page: sync polygon data to hidden field before submit
             if (typeof window.svgmlSyncLayersToHidden === 'function') {
+                console.log('[SVG Map Lite] Syncing polygon data before form submission...');
                 window.svgmlSyncLayersToHidden();
+                console.log('[SVG Map Lite] Sync complete');
             }
+
+            // Log the hidden field values before submission
+            var layersJson = $form.find('#svgml_layers_json').val();
+            var imageId = $form.find('#svgml_image_attachment_id').val();
+            console.log('[SVG Map Lite] Form data:', {
+                layersJsonLength: (layersJson || '').length,
+                imageId: imageId,
+                nonce: $form.find('[name="svgml_settings_nonce"]').length > 0 ? 'present' : 'MISSING'
+            });
 
             var $submit = $form.find('input[type="submit"], button[type="submit"]').first();
             if ($submit.length) {

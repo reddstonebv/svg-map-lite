@@ -11,6 +11,17 @@ function svgml_render_settings_page( $map_id ) {
     // Process the form if it has been submitted (POST request)
     if ( isset( $_POST['svgml_settings_nonce'] ) ) {
 
+        // ── DIAGNOSTIC LOGGING ────────────────────────────────────────────
+        // Log the incoming POST data to verify the data pipeline
+        $layers_json_length = strlen( $_POST['svgml_layers_json'] ?? '' );
+        $image_id = intval( $_POST['svgml_image_attachment_id'] ?? 0 );
+        error_log( sprintf(
+            '[SVG Map Lite] Saving Map ID %d | Layers JSON: %d bytes | Image ID: %d',
+            $map_id,
+            $layers_json_length,
+            $image_id
+        ) );
+
         // Verify the nonce to prevent CSRF (Cross-Site Request Forgery)
         if ( ! wp_verify_nonce( $_POST['svgml_settings_nonce'], 'svgml_save_settings' ) ) {
             echo '<div class="notice notice-error"><p>Beveiligingsfout. Vernieuw de pagina en probeer opnieuw.</p></div>';
@@ -160,6 +171,16 @@ function svgml_render_settings_page( $map_id ) {
                 if ( ! in_array( $switcher, [ 'buttons', 'dropdown', 'custom' ] ) ) $switcher = 'buttons';
                 update_post_meta( $map_id, '_svgml_layer_switcher', $switcher );
             }
+
+            // ── CONFIRMATION LOGGING ──────────────────────────────────────────
+            // Verify data was persisted to database
+            $saved_layers = get_post_meta( $map_id, '_svgml_layers', true );
+            $saved_image_id = get_post_meta( $map_id, '_svgml_image_attachment_id', true );
+            error_log( sprintf(
+                '[SVG Map Lite] Saved successfully | Layers in DB: %d | Image ID in DB: %d',
+                is_array( $saved_layers ) ? count( $saved_layers ) : 0,
+                $saved_image_id
+            ) );
 
             echo '<div class="notice notice-success is-dismissible"><p>Instellingen opgeslagen!</p></div>';
         }
