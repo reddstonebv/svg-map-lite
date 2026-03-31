@@ -299,6 +299,14 @@ function svgml_render_settings_page( $map_id ) {
                         Geef elk vlak een uniek ID dat je later koppelt aan de JSON feed.
                     </p>
 
+                    <!-- Knop om een verdieping/viewpoint toe te voegen -->
+                    <div class="svgml-add-layer-wrap" style="margin-bottom:8px;">
+                        <button type="button" id="svgml-add-layer" class="button button-secondary">
+                            <span class="dashicons dashicons-plus-alt2"></span>
+                            Voeg verdieping of viewpoint toe
+                        </button>
+                    </div>
+
                     <!-- Lagen-tabs: worden dynamisch gevuld door polygon-editor.js -->
                     <div id="svgml-layer-tabs-container"></div>
                     <!-- Waarschuwing bij dubbele polygon-IDs over lagen -->
@@ -384,9 +392,9 @@ function svgml_render_settings_page( $map_id ) {
                                     <table class="wp-list-table widefat fixed striped" id="svgml-polygon-list">
                                         <thead>
                                             <tr>
-                                                <th style="width:35%">ID</th>
-                                                <th style="width:35%">Punten</th>
-                                                <th style="width:30%">Acties</th>
+                                                <th style="width:30%">ID</th>
+                                                <th style="width:20%">Punten</th>
+                                                <th style="width:50%">Acties</th>
                                             </tr>
                                         </thead>
                                         <tbody id="svgml-polygon-tbody">
@@ -435,16 +443,6 @@ function svgml_render_settings_page( $map_id ) {
                             </div>
                         </div>
 
-                        <!-- Knop om een verdieping/viewpoint toe te voegen -->
-                        <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--svgml-border, #dce5e3);">
-                            <button type="button" id="svgml-add-layer" class="button button-secondary">
-                                <span class="dashicons dashicons-plus-alt2"></span>
-                                Voeg verdieping of viewpoint toe
-                            </button>
-                            <span style="color:var(--svgml-muted, #7a8a94); font-size:12px; margin-left:8px;">
-                                Voeg een extra afbeelding toe voor een andere verdieping of perspectief.
-                            </span>
-                        </div>
 
                         <!-- Verborgen veld: JSON met alle polygon-data (legacy single-layer) -->
                         <input type="hidden"

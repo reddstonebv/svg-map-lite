@@ -456,21 +456,28 @@ function svgml_render_editor_wrapper() {
                 <button type="submit" class="button button-small" title="Naam opslaan">✓</button>
             </form>
 
-            <!-- Shortcode display -->
-            <code class="svgml-header-shortcode">[svg_map id="<?php echo $map_id; ?>"]</code>
         </div>
 
-        <!-- Tab navigation -->
-        <nav class="svgml-editor-tabs">
-            <?php foreach ( $tabs as $slug => $tab_info ) :
-                $tab_url = admin_url( 'admin.php?page=' . $slug . '&map_id=' . $map_id );
-                $is_active = ( $current_page === $slug );
-            ?>
-                <a href="<?php echo esc_url( $tab_url ); ?>"
-                   class="svgml-editor-tab <?php echo $is_active ? 'svgml-editor-tab-active' : ''; ?>">
-                    <?php echo esc_html( $tab_info[0] ); ?>
-                </a>
-            <?php endforeach; ?>
+        <!-- Tab navigation (sticky) -->
+        <nav class="svgml-editor-tabs" id="svgml-editor-tabs">
+            <div class="svgml-editor-tabs-left">
+                <?php foreach ( $tabs as $slug => $tab_info ) :
+                    $tab_url = admin_url( 'admin.php?page=' . $slug . '&map_id=' . $map_id );
+                    $is_active = ( $current_page === $slug );
+                ?>
+                    <a href="<?php echo esc_url( $tab_url ); ?>"
+                       class="svgml-editor-tab <?php echo $is_active ? 'svgml-editor-tab-active' : ''; ?>">
+                        <?php echo esc_html( $tab_info[0] ); ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+            <div class="svgml-editor-tabs-right">
+                <code class="svgml-header-shortcode">[svg_map id="<?php echo $map_id; ?>"]</code>
+                <button type="button" id="svgml-save-btn" class="button button-primary svgml-save-btn">
+                    <span class="dashicons dashicons-saved"></span> Opslaan
+                </button>
+                <span class="svgml-save-hint">⌘/Ctrl + S</span>
+            </div>
         </nav>
 
         <?php

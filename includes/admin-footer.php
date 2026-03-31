@@ -8,6 +8,65 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CTRL+S / CMD+S SAVE SHORTCUT
+// Works on ALL editor pages. Finds the first <form> on the page and submits it.
+// Also handles the "Opslaan" button in the sticky tab bar.
+// ─────────────────────────────────────────────────────────────────────────────
+add_action( 'admin_footer', 'svgml_save_shortcut_script' );
+
+function svgml_save_shortcut_script() {
+    $current_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : '';
+
+    // All editor pages (not the overview)
+    $editor_pages = [
+        'svgml-settings', 'svgml-mapping', 'svgml-display',
+        'svgml-panel-builder', 'svgml-filters', 'svgml-styles',
+    ];
+
+    if ( ! in_array( $current_page, $editor_pages, true ) ) {
+        return;
+    }
+    ?>
+    <script>
+    jQuery(document).ready(function($) {
+        /**
+         * Find the main form on the page and submit it.
+         * Triggers a native submit so WordPress nonces and
+         * hidden fields are all included.
+         */
+        function svgmlSavePage() {
+            // Find the first <form> inside .svgml-admin-wrap
+            var $form = $('.svgml-admin-wrap form[method="post"]').first();
+            if ($form.length) {
+                // Click the submit button if present (triggers any JS listeners)
+                var $submit = $form.find('input[type="submit"], button[type="submit"]').first();
+                if ($submit.length) {
+                    $submit.trigger('click');
+                } else {
+                    $form.submit();
+                }
+            }
+        }
+
+        // Keyboard shortcut: Ctrl+S / Cmd+S
+        $(document).on('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();  // Prevent browser "Save page" dialog
+                svgmlSavePage();
+            }
+        });
+
+        // Save button in the sticky tab bar
+        $('#svgml-save-btn').on('click', function(e) {
+            e.preventDefault();
+            svgmlSavePage();
+        });
+    });
+    </script>
+    <?php
+}
+
 add_action( 'admin_footer', 'svgml_admin_footer_scripts' );
 
 function svgml_admin_footer_scripts() {

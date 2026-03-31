@@ -40,6 +40,9 @@
 .regular-text {
     width: 100%;
 }
+.widefat td {
+    vertical-align: middle;
+}
 
 /* ── PAGINATITEL ────────────────────────────────────────────────────────────── */
 .svgml-admin-wrap h1 {
@@ -134,7 +137,7 @@
 .svgml-section .form-table td .description {
     color: var(--svgml-muted);
     font-size: 12px;
-    margin-top: 6px;
+    margin-top: 16px;
     line-height: 1.5;
 }
 
@@ -198,9 +201,9 @@
 .svgml-admin-wrap .button-primary,
 .svgml-admin-wrap input[type="submit"].button-primary {
     background: var(--svgml-red) !important;
-    border-color: var(--svgml-red-dark) !important;
+    border-width: 0;
     color: #fff !important;
-    box-shadow: 0 2px 10px rgba(42, 157, 143, 0.28) !important;
+    box-shadow: 1px 1px #1f7d71!important;
     font-weight: 600;
     padding: 9px 24px;
     height: auto;
@@ -217,9 +220,10 @@
 
 .svgml-admin-wrap .button-primary:hover,
 .svgml-admin-wrap input[type="submit"].button-primary:hover {
-    background: var(--svgml-red-dark) !important;
-    box-shadow: 0 4px 16px rgba(42, 157, 143, 0.35) !important;
+    background: var(--svgml-red-light) !important;
+    box-shadow: 2px 2px 1px #1f7d71 !important;
     transform: translateY(-1px);
+    color: var(--svgml-dark) !important;
 }
 
 /* Secundaire knoppen (pill style) */
@@ -237,6 +241,7 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    box-shadow: 1px 1px #1f7d71;
 }
 
 .svgml-admin-wrap .button-secondary:hover,
@@ -244,7 +249,7 @@
     background: var(--svgml-red-light) !important;
     color: var(--svgml-dark) !important;
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(42, 157, 143, 0.15) !important;
+    box-shadow: 2px 2px 1px #1f7d71 !important;
 }
 
 /* ── SVG PREVIEW ────────────────────────────────────────────────────────────── */
@@ -684,9 +689,9 @@ tr.svgml-row-excluded .svgml-exclude-label {
 
 /* ── CODE WEERGAVE ───────────────────────────────────────────────────────────── */
 .svgml-admin-wrap code {
-    background: #f0f0f0;
-    padding: 2px 6px;
-    border-radius: 4px;
+    background: var(--svgml-bg);
+    padding: 4px 10px;
+    border-radius: 20px;
     font-size: 12px;
     color: var(--svgml-red-dark);
 }
@@ -972,7 +977,7 @@ tr.svgml-row-excluded .svgml-exclude-label {
 
 /* Wrapper rond de hele polygon-editor (canvas + lijst) */
 .svgml-polygon-editor-wrap {
-    padding: 18px 20px 10px;
+    padding: 18px 0px 10px 0px;
 }
 
 .svgml-polygon-editor-columns {
@@ -1749,39 +1754,94 @@ tr.svgml-row-excluded .svgml-exclude-label {
 .svgml-header-shortcode {
     margin-left: auto;
     font-size: 12px;
-    padding: 4px 10px;
-    background: var(--svgml-bg);
-    border-radius: var(--svgml-radius-sm);
-    color: var(--svgml-muted);
+    padding: 10px 20px !important;
+    background: #fff !important;
     user-select: all;
     cursor: text;
 }
 
-/* Tab navigation */
+/* Tab navigation – sticky bar */
 .svgml-editor-tabs {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 0;
-    margin: 0 0 24px;
+    margin: 0px 0px 12px -21px;
+    padding: 10px 20px 0 20px;
     border-bottom: 2px solid var(--svgml-border);
+    background: #edf5f4;
+    position: sticky;
+    top: 32px;
+    z-index: 99;
+    width: 100%;
+}
+
+/* When WP admin bar is not fixed (small screens) */
+@media screen and (max-width: 782px) {
+    .svgml-editor-tabs { top: 46px; }
+}
+
+.svgml-editor-tabs-left {
+    display: flex;
+    gap: 0;
+}
+
+.svgml-editor-tabs-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    padding: 4px 0;
+}
+
+.svgml-save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.svgml-save-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+}
+
+.svgml-save-hint {
+    font-size: 11px;
+    color: var(--svgml-muted, #7a8a94);
+    white-space: nowrap;
+}
+
+.svgml-editor-tabs-right .svgml-header-shortcode {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    line-height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    box-sizing: border-box;
 }
 
 .svgml-editor-tab {
-    padding: 10px 18px;
+    border-radius: 10px 10px 0 0;
+    padding: 18px;
     font-size: 13px;
     font-weight: 500;
     color: var(--svgml-muted);
     text-decoration: none;
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s, border-color 0.15s, background .2s ease;
 }
 
 .svgml-editor-tab:hover {
     color: var(--svgml-dark);
 }
 
-.svgml-editor-tab-active {
+.svgml-editor-tab-active,
+.svgml-editor-tab:hover {
     color: var(--svgml-red) !important;
     border-bottom-color: var(--svgml-red) !important;
     font-weight: 600;
+    background: #fff;
 }

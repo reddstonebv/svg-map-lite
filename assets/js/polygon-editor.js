@@ -1258,8 +1258,8 @@ jQuery(document).ready(function($) {
                                'data-original-id="' + escHtml(poly.id) + '" ' +
                                'style="width:100%">' +
                     '</td>' +
-                    '<td style="padding:6px 10px;">' + poly.points.length + ' punten</td>' +
-                    '<td style="padding:6px 10px;">' +
+                    '<td style="padding:6px 10px;">' + poly.points.length + '</td>' +
+                    '<td style="padding:6px 10px; white-space:nowrap;">' +
                         '<button type="button" class="button button-small svgml-poly-focus" ' +
                                 'data-poly-id="' + escHtml(poly.id) + '">🔍</button> ' +
                         '<button type="button" class="button button-small svgml-poly-edit-btn" ' +
