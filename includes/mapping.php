@@ -8,7 +8,23 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 function svgml_render_mapping_page( $map_id ) {
 
-    // Formulier verwerken
+    // Get map mode to determine which interface to show
+    $map_mode = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'manual';
+
+    // Show JSON mapping interface for JSON mode
+    if ( 'json' === $map_mode ) {
+        svgml_render_json_mapping_interface( $map_id );
+    } else {
+        // Show manual data entry interface for manual mode
+        svgml_render_manual_data_interface( $map_id );
+    }
+}
+
+/**
+ * JSON Mode: Region mapping interface (original functionality)
+ * Maps SVG IDs to JSON object IDs
+ */
+function svgml_render_json_mapping_interface( $map_id ) {
     if ( isset( $_POST['svgml_mapping_nonce'] ) ) {
 
         if ( ! wp_verify_nonce( $_POST['svgml_mapping_nonce'], 'svgml_save_mapping' ) ) {
@@ -251,5 +267,295 @@ function svgml_render_mapping_table( $svg_ids, $id_mapping, $excluded_ids ) {
             <?php endforeach; ?>
         </tbody>
     </table>
+    <?php
+}
+
+/**
+ * Manual Mode: Data entry interface for manual region mapping
+ * Displays a two-column layout: polygon list (left) + data form (right)
+ */
+function svgml_render_manual_data_interface( $map_id ) {
+    // Handle form submission for manual data
+    if ( isset( $_POST['svgml_manual_data_nonce'] ) ) {
+        if ( ! wp_verify_nonce( $_POST['svgml_manual_data_nonce'], 'svgml_save_manual_data' ) ) {
+            echo '<div class="notice notice-error"><p>Beveiligingsfout. Probeer opnieuw.</p></div>';
+        } else {
+            // Process and save manual region data
+            $polygon_id = isset( $_POST['polygon_id'] ) ? sanitize_text_field( $_POST['polygon_id'] ) : '';
+            $polygon_title = isset( $_POST['polygon_title'] ) ? sanitize_text_field( $_POST['polygon_title'] ) : '';
+            $polygon_status = isset( $_POST['polygon_status'] ) ? sanitize_text_field( $_POST['polygon_status'] ) : '';
+            $polygon_size = isset( $_POST['polygon_size'] ) ? sanitize_text_field( $_POST['polygon_size'] ) : '';
+
+            if ( ! empty( $polygon_id ) ) {
+                // Get existing manual data
+                $manual_data = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
+                
+                // Update/add polygon data
+                $manual_data[ $polygon_id ] = [
+                    'title' => $polygon_title,
+                    'status' => $polygon_status,
+                    'size' => $polygon_size,
+                ];
+                
+                update_post_meta( $map_id, '_svgml_manual_data', $manual_data );
+                echo '<div class="notice notice-success is-dismissible"><p>Regio gegevens opgeslagen!</p></div>';
+            }
+        }
+    }
+
+    // Get map data
+    $layers = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
+    $source_type = get_post_meta( $map_id, '_svgml_source_type', true ) ?: 'svg';
+    $manual_data = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
+
+    // Build list of all polygons
+    $all_polygons = [];
+    if ( 'image' === $source_type && ! empty( $layers ) ) {
+        foreach ( $layers as $layer_idx => $layer ) {
+            foreach ( ( $layer['polygons'] ?? [] ) as $poly ) {
+                $pid = $poly['id'] ?? '';
+                if ( $pid ) {
+                    $all_polygons[] = [
+                        'id' => $pid,
+                        'name' => $poly['name'] ?? $pid,
+                        'layer' => $layer['name'] ?? ( 'Laag ' . ( $layer_idx + 1 ) ),
+                    ];
+                }
+            }
+        }
+    }
+
+    if ( empty( $all_polygons ) ) {
+        ?>
+        <div class="wrap svgml-admin-wrap">
+            <h1><span class="dashicons dashicons-location-alt"></span> SVG Map Lite – Region Data</h1>
+            <div class="notice notice-warning">
+                <p>
+                    Geen regio's gevonden in de kaart.
+                    <a href="<?php echo admin_url( 'admin.php?page=svgml-settings&map_id=' . $map_id ); ?>">
+                        → Ga eerst naar Instellingen
+                    </a>
+                </p>
+            </div>
+        </div>
+        <?php return;
+    }
+    ?>
+
+    <div class="wrap svgml-admin-wrap">
+        <h1><span class="dashicons dashicons-location-alt"></span> SVG Map Lite – Region Data</h1>
+        
+        <!-- Two-column layout: Polygon list + Data form -->
+        <div class="svgml-manual-layout">
+            <!-- Left: Polygon List -->
+            <div class="svgml-manual-sidebar">
+                <h3 style="margin-top:0; color:var(--svgml-red, #2a9d8f);">Regio's</h3>
+                <div class="svgml-polygon-list">
+                    <?php foreach ( $all_polygons as $idx => $poly ) : 
+                        $is_selected = ( $idx === 0 ); // First one selected by default
+                        $has_data = isset( $manual_data[ $poly['id'] ] );
+                    ?>
+                        <div class="svgml-polygon-item <?php echo $is_selected ? 'active' : ''; ?> <?php echo $has_data ? 'has-data' : ''; ?>"
+                             data-polygon-id="<?php echo esc_attr( $poly['id'] ); ?>"
+                             data-polygon-index="<?php echo $idx; ?>">
+                            <div class="svgml-polygon-item-name">
+                                <?php echo esc_html( $poly['name'] ); ?>
+                                <?php if ( $has_data ) : ?>
+                                    <span class="svgml-data-indicator" title="Gegevens ingevuld">✓</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="svgml-polygon-item-layer">
+                                <?php echo esc_html( $poly['layer'] ); ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- Right: Data Form -->
+            <div class="svgml-manual-content">
+                <form method="post" action="" class="svgml-manual-form" id="svgml-manual-form">
+                    <?php wp_nonce_field( 'svgml_save_manual_data', 'svgml_manual_data_nonce' ); ?>
+                    
+                    <input type="hidden" name="polygon_id" id="polygon_id" value="<?php echo isset( $all_polygons[0] ) ? esc_attr( $all_polygons[0]['id'] ) : ''; ?>">
+                    
+                    <div class="form-group">
+                        <label for="polygon_title">
+                            <strong>Regio Naam:</strong>
+                        </label>
+                        <input type="text" 
+                               id="polygon_title" 
+                               name="polygon_title" 
+                               class="regular-text"
+                               placeholder="Voer de naam van de regio in">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="polygon_status">
+                            <strong>Status:</strong>
+                        </label>
+                        <select id="polygon_status" name="polygon_status" class="regular-text">
+                            <option value="">-- Selecteer een status --</option>
+                            <option value="active">Actief</option>
+                            <option value="inactive">Inactief</option>
+                            <option value="pending">In afwachting</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="polygon_size">
+                            <strong>Grootte/Oppervlakte:</strong>
+                        </label>
+                        <input type="text" 
+                               id="polygon_size" 
+                               name="polygon_size" 
+                               class="regular-text"
+                               placeholder="Bijv. 1250 km²">
+                    </div>
+
+                    <?php submit_button( 'Gegevens opslaan' ); ?>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .svgml-manual-layout {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .svgml-manual-sidebar {
+            flex: 0 0 280px;
+            padding: 15px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .svgml-polygon-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .svgml-polygon-item {
+            padding: 10px 12px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .svgml-polygon-item:hover {
+            border-color: var(--svgml-red, #2a9d8f);
+            background: #f5fffe;
+        }
+
+        .svgml-polygon-item.active {
+            background: var(--svgml-red, #2a9d8f);
+            color: white;
+            border-color: var(--svgml-red, #2a9d8f);
+        }
+
+        .svgml-polygon-item.has-data::after {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--svgml-success, #28a745);
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+
+        .svgml-polygon-item-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .svgml-polygon-item-layer {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .svgml-polygon-item.active .svgml-polygon-item-layer {
+            opacity: 0.9;
+        }
+
+        .svgml-data-indicator {
+            font-weight: bold;
+            margin-left: 4px;
+            font-size: 12px;
+        }
+
+        .svgml-manual-content {
+            flex: 1;
+            padding: 20px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .svgml-manual-content h4 {
+            margin-top: 0;
+            color: var(--svgml-red, #2a9d8f);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .form-group input[type="text"],
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--svgml-red, #2a9d8f);
+            box-shadow: 0 0 0 3px rgba(42, 157, 143, 0.1);
+        }
+    </style>
+
+    <script>
+    jQuery(document).ready(function($) {
+        // Handle polygon selection
+        $('.svgml-polygon-item').on('click', function() {
+            // Remove active class from all items
+            $('.svgml-polygon-item').removeClass('active');
+            // Add active class to clicked item
+            $(this).addClass('active');
+
+            // Get polygon ID
+            const polygonId = $(this).data('polygon-id');
+            $('#polygon_id').val(polygonId);
+
+            // TODO: Load polygon data from manual_data meta and populate form
+            // For now, clear the form
+            $('#polygon_title').val('');
+            $('#polygon_status').val('');
+            $('#polygon_size').val('');
+        });
+
+        // Trigger click on first polygon to load its data
+        $('.svgml-polygon-item').first().click();
+    });
+    </script>
     <?php
 }

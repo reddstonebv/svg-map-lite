@@ -1704,6 +1704,11 @@ tr.svgml-row-excluded .svgml-exclude-label {
     line-height: 14px;
 }
 
+.wp-core-ui .button-group.button-small .button, 
+.wp-core-ui .button.button-small {
+    min-height: 46px !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    EDITOR HEADER + TAB NAVIGATION
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -1844,4 +1849,97 @@ tr.svgml-row-excluded .svgml-exclude-label {
     border-bottom-color: var(--svgml-red) !important;
     font-weight: 600;
     background: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEUZE PAGINA NIEUWE KAART
+   ═══════════════════════════════════════════════════════════════════════════ */
+.svgml-selection-container {
+    max-width: 1000px;
+    margin: 60px auto;
+    padding: 0 20px;
+}
+
+.svgml-selection-header {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.svgml-selection-header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.svgml-selection-header p {
+    font-size: 1.2em;
+    color: #666;
+}
+
+.svgml-selection-grid {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+}
+
+.svgml-selection-card {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    padding: 40px 30px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.svgml-selection-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.svgml-selection-card .dashicons {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: #2a9d8f; /* Je primaire thema kleur */
+    margin-bottom: 20px;
+}
+
+.svgml-selection-card h2 {
+    font-size: 1.5em;
+    margin: 0 0 15px;
+}
+
+.svgml-selection-card p {
+    min-height: 60px;
+    margin-bottom: 30px;
+    color: #555;
+    line-height: 1.5;
+}
+
+.svgml-selection-card .button {
+    width: 100%;
+    justify-content: center;
+}
+
+.svgml-selection-footer {
+    text-align: center;
+    margin-top: 50px;
+}
+
+.svgml-selection-footer a {
+    text-decoration: none;
+    color: #666;
+    font-weight: 500;
+}
+
+.svgml-selection-footer a:hover {
+    color: #2a9d8f;
+}
+
+/* Responsive fix */
+@media (max-width: 768px) {
+    .svgml-selection-grid {
+        flex-direction: column;
+    }
 }

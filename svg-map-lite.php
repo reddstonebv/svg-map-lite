@@ -91,43 +91,49 @@ function svgml_register_map_cpt() {
 add_action( 'admin_init', 'svgml_handle_overview_actions' );
 
 function svgml_handle_overview_actions() {
-    // Only run on our overview page
     if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'svgml-overview' ) {
         return;
     }
-    // Only run when an action is present
     if ( ! isset( $_GET['action'] ) ) {
         return;
     }
-    // Check permissions
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
     }
 
-    // ── CREATE NEW MAP ──────────────────────────────────────────────────────
+    // ── STAP 1: Alleen doorsturen naar de keuzepagina ───────────────────────
     if ( $_GET['action'] === 'new' ) {
-        // Verify nonce to prevent CSRF
         if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'svgml_create_map' ) ) {
             wp_die( 'Beveiligingsfout.' );
         }
+        
+        // We maken hier NOG GEEN post aan. We sturen de gebruiker naar de selectie.
+        wp_redirect( admin_url( 'admin.php?page=svgml-selection' ) );
+        exit;
+    }
 
-        // Create a new svgml_map post
+    // ── STAP 2: De kaart echt aanmaken NADAT de mode is gekozen ─────────────
+    if ( $_GET['action'] === 'create_with_mode' && isset( $_GET['mode'] ) ) {
+        if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'svgml_create_map_with_mode' ) ) {
+            wp_die( 'Beveiligingsfout.' );
+        }
+
+        $mode = sanitize_text_field( $_GET['mode'] );
         $new_id = wp_insert_post( [
             'post_type'   => 'svgml_map',
-            'post_title'  => 'Nieuwe kaart',
+            'post_title'  => 'Nieuwe kaart (' . ( $mode === 'json' ? 'JSON' : 'Manual' ) . ')',
             'post_status' => 'publish',
         ] );
 
         if ( $new_id && ! is_wp_error( $new_id ) ) {
-            // Set default meta values for the new map
+            update_post_meta( $new_id, '_svgml_map_mode', $mode ); // Hier slaan we de keuze op!
             svgml_set_default_map_meta( $new_id );
-            // Redirect to the editor for this new map
             wp_redirect( admin_url( 'admin.php?page=svgml-settings&map_id=' . $new_id ) );
             exit;
         }
     }
 
-    // ── DELETE MAP ──────────────────────────────────────────────────────────
+    // DELETE logica (ongewijzigd laten)
     if ( $_GET['action'] === 'delete' && isset( $_GET['map_id'] ) ) {
         $del_id = intval( $_GET['map_id'] );
         if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'svgml_delete_map_' . $del_id ) ) {
@@ -177,7 +183,8 @@ function svgml_add_admin_menu() {
     // By using null as parent_slug, these pages are registered in WordPress
     // (so admin.php?page=xxx works) but they do NOT appear in the sidebar.
     // This prevents the empty <li> items that showed up with '' as menu title.
-    $editor_pages = [
+$editor_pages = [
+        'svgml-selection'      => [ 'Modus selectie',    'svgml_render_selection_page' ], // VOEG DEZE TOE
         'svgml-settings'      => [ 'Instellingen',    'svgml_render_editor_wrapper' ],
         'svgml-mapping'       => [ 'Regio Koppeling',  'svgml_render_editor_wrapper' ],
         'svgml-display'       => [ 'Weergave',         'svgml_render_editor_wrapper' ],
@@ -417,10 +424,16 @@ function svgml_render_editor_wrapper() {
     // Determine which tab/page we're on based on the page slug
     $current_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : 'svgml-settings';
 
+    // Get map mode to conditionally set tab labels
+    $map_mode = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'manual';
+    
+    // Determine mapping tab label based on mode
+    $mapping_label = ( 'json' === $map_mode ) ? 'Regio Koppeling' : 'Region Data';
+
     // Tab definitions: slug => [ label, include_file, render_function ]
     $tabs = [
         'svgml-settings'      => [ 'Instellingen',    'settings.php',      'svgml_render_settings_page' ],
-        'svgml-mapping'       => [ 'Regio Koppeling', 'mapping.php',       'svgml_render_mapping_page' ],
+        'svgml-mapping'       => [ $mapping_label,    'mapping.php',       'svgml_render_mapping_page' ],
         'svgml-display'       => [ 'Weergave',        'display.php',       'svgml_render_display_page' ],
         'svgml-panel-builder' => [ 'Panel Builder',    'panel-builder.php', 'svgml_render_panel_builder_page' ],
         'svgml-filters'       => [ 'Filters',          'filters.php',      'svgml_render_filters_page' ],
@@ -516,6 +529,7 @@ function svgml_admin_enqueue( $hook ) {
     // List of all our page slugs
     $svgml_pages = [
         'svgml-overview',
+        'svgml-selection',
         'svgml-settings',
         'svgml-mapping',
         'svgml-display',
@@ -688,4 +702,42 @@ function svgml_fix_svg_mime( $data, $file, $filename, $mimes ) {
         $data['type'] = 'image/svg+xml';
     }
     return $data;
+}
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render de selectiepagina voor het kaarttype (JSON vs Handmatig).
+// ─────────────────────────────────────────────────────────────────────────────
+function svgml_render_selection_page() {
+    ?>
+    <div class="wrap svgml-admin-wrap">
+        <div class="svgml-selection-container">         
+            <header class="svgml-selection-header">
+                <h1>Kies een kaarttype</h1>
+                <p>Hoe wil je de informatie voor deze kaart beheren?</p>
+            </header>
+            <div class="svgml-selection-grid">               
+                <div class="svgml-selection-card">
+                    <span class="dashicons dashicons-cloud"></span>
+                    <h2>JSON Feed (Ally)</h2>
+                    <p>Koppel je kaart aan een externe JSON bron. Ideaal voor automatische updates van prijzen en statussen.</p>
+                    <a href="<?php echo wp_nonce_url( admin_url('admin.php?page=svgml-overview&action=create_with_mode&mode=json'), 'svgml_create_map_with_mode' ); ?>" 
+                       class="button button-primary button-large">Kies JSON Modus</a>
+                </div>
+
+                <div class="svgml-selection-card">
+                    <span class="dashicons dashicons-edit"></span>
+                    <h2>Handmatige invoer</h2>
+                    <p>Voer per regio zelf de teksten en statussen in. Perfect voor statische kaarten zonder externe koppeling.</p>
+                    <a href="<?php echo wp_nonce_url( admin_url('admin.php?page=svgml-overview&action=create_with_mode&mode=manual'), 'svgml_create_map_with_mode' ); ?>" 
+                       class="button button-primary button-large">Kies Handmatige Modus</a>
+                </div>
+            </div>
+            <footer class="svgml-selection-footer">
+                <a href="<?php echo admin_url('admin.php?page=svgml-overview'); ?>">← Terug naar overzicht</a>
+            </footer>
+        </div>
+    </div>
+    <?php
 }
