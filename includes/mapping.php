@@ -535,6 +535,30 @@ function svgml_render_manual_data_interface( $map_id ) {
 
     <script>
     jQuery(document).ready(function($) {
+        // Manual data from the database (passed as JSON in data attribute)
+        var manualData = <?php echo wp_json_encode( $manual_data ); ?>;
+
+        /**
+         * Load polygon data from manualData and populate the form
+         */
+        function loadPolygonData(polygonId) {
+            $('#polygon_id').val(polygonId);
+
+            if (manualData && manualData[polygonId]) {
+                var data = manualData[polygonId];
+                $('#polygon_title').val(data.title || '');
+                $('#polygon_status').val(data.status || '');
+                $('#polygon_size').val(data.size || '');
+                console.log('✓ Loaded manual data for polygon:', polygonId, data);
+            } else {
+                // Clear the form if no data exists
+                $('#polygon_title').val('');
+                $('#polygon_status').val('');
+                $('#polygon_size').val('');
+                console.log('ℹ️  No manual data for polygon:', polygonId);
+            }
+        }
+
         // Handle polygon selection
         $('.svgml-polygon-item').on('click', function() {
             // Remove active class from all items
@@ -542,15 +566,20 @@ function svgml_render_manual_data_interface( $map_id ) {
             // Add active class to clicked item
             $(this).addClass('active');
 
-            // Get polygon ID
+            // Get polygon ID and load its data
             const polygonId = $(this).data('polygon-id');
-            $('#polygon_id').val(polygonId);
+            loadPolygonData(polygonId);
+        });
 
-            // TODO: Load polygon data from manual_data meta and populate form
-            // For now, clear the form
-            $('#polygon_title').val('');
-            $('#polygon_status').val('');
-            $('#polygon_size').val('');
+        // Handle form submission
+        $('#svgml-manual-form').on('submit', function(e) {
+            var polygonId = $('#polygon_id').val();
+            if (!polygonId) {
+                e.preventDefault();
+                console.warn('❌ No polygon selected');
+                return false;
+            }
+            console.log('💾 Saving manual data for polygon:', polygonId);
         });
 
         // Trigger click on first polygon to load its data

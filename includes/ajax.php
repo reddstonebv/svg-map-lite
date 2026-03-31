@@ -312,3 +312,179 @@ function svgml_ajax_delete_map() {
         'message' => 'Kaart verwijderd',
     ] );
 }
+
+/**
+ * AJAX: SAVE MAP DATA
+ * Receives polygon/layers data from the admin editor and saves to post meta.
+ * Handles both layers (image mode) and manual data without overwriting coordinates.
+ */
+add_action( 'wp_ajax_svgml_save_map_data', 'svgml_ajax_save_map_data' );
+
+function svgml_ajax_save_map_data() {
+
+    check_ajax_referer( 'svgml_admin_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => 'Geen rechten.' ] );
+        return;
+    }
+
+    $map_id = intval( $_POST['map_id'] ?? 0 );
+    if ( ! $map_id ) {
+        wp_send_json_error( [ 'message' => 'Geen kaart ID opgegeven.' ] );
+        return;
+    }
+
+    $map = get_post( $map_id );
+    if ( ! $map || $map->post_type !== 'svgml_map' ) {
+        wp_send_json_error( [ 'message' => 'Kaart niet gevonden.' ] );
+        return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // PROCESS LAYERS DATA (from Fabric.js polygon editor)
+    // ─────────────────────────────────────────────────────────────────────────────
+    $raw_layers_str = stripslashes( $_POST['layers_json'] ?? '[]' );
+    $raw_layers     = json_decode( $raw_layers_str, true );
+
+    if ( is_array( $raw_layers ) ) {
+        $clean_layers = [];
+
+        foreach ( $raw_layers as $layer ) {
+            // Validate layer data
+            $layer_name   = sanitize_text_field( $layer['name'] ?? '' );
+            $layer_img_id = intval( $layer['image_attachment_id'] ?? 0 );
+            $layer_stroke_color = sanitize_hex_color( $layer['stroke_color'] ?? '#2a9d8f' ) ?: '#2a9d8f';
+            $layer_stroke_width = max( 0.5, min( 10, floatval( $layer['stroke_width'] ?? 1 ) ) );
+            $raw_polygons = $layer['polygons'] ?? [];
+
+            // Get existing layer data to preserve manual data
+            $existing_layers = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
+            $existing_layer_data = null;
+            foreach ( $existing_layers as $ex_layer ) {
+                if ( $ex_layer['image_attachment_id'] === $layer_img_id ) {
+                    $existing_layer_data = $ex_layer;
+                    break;
+                }
+            }
+
+            // Give empty layers a default name
+            if ( empty( $layer_name ) ) {
+                $layer_name = 'Laag ' . ( count( $clean_layers ) + 1 );
+            }
+
+            $clean_polygons = [];
+            $all_poly_ids = [];
+
+            if ( is_array( $raw_polygons ) ) {
+                foreach ( $raw_polygons as $poly ) {
+                    $poly_id = sanitize_text_field( $poly['id'] ?? '' );
+                    $points  = $poly['points'] ?? [];
+
+                    if ( empty( $poly_id ) || ! is_array( $points ) || count( $points ) < 3 ) {
+                        continue;
+                    }
+
+                    // Validate and clean points
+                    $clean_points = [];
+                    foreach ( $points as $pt ) {
+                        $x = floatval( $pt['x'] ?? 0 );
+                        $y = floatval( $pt['y'] ?? 0 );
+                        $clean_points[] = [ 'x' => round( $x, 6 ), 'y' => round( $y, 6 ) ];
+                    }
+
+                    // Preserve manual data from existing polygon if it exists
+                    $polygon_data = [
+                        'id'     => $poly_id,
+                        'points' => $clean_points,
+                    ];
+
+                    // If there's existing manual data for this polygon, merge it
+                    if ( $existing_layer_data ) {
+                        foreach ( $existing_layer_data['polygons'] ?? [] as $ex_poly ) {
+                            if ( $ex_poly['id'] === $poly_id && isset( $ex_poly['title'] ) ) {
+                                // Preserve manual fields: title, status, size
+                                $polygon_data['title']  = $ex_poly['title'] ?? '';
+                                $polygon_data['status'] = $ex_poly['status'] ?? '';
+                                $polygon_data['size']   = $ex_poly['size'] ?? '';
+                                break;
+                            }
+                        }
+                    }
+
+                    $clean_polygons[] = $polygon_data;
+                    $all_poly_ids[] = $poly_id;
+                }
+            }
+
+            $clean_layers[] = [
+                'name'                => $layer_name,
+                'image_attachment_id' => $layer_img_id,
+                'polygons'            => $clean_polygons,
+                'stroke_color'        => $layer_stroke_color,
+                'stroke_width'        => (string) $layer_stroke_width,
+            ];
+        }
+
+        // Save layers to database
+        update_post_meta( $map_id, '_svgml_layers', $clean_layers );
+
+        // Also update single-layer meta for backward compatibility
+        if ( ! empty( $clean_layers ) ) {
+            $first = $clean_layers[0];
+            update_post_meta( $map_id, '_svgml_image_attachment_id', $first['image_attachment_id'] );
+            update_post_meta( $map_id, '_svgml_polygons', $first['polygons'] );
+            update_post_meta( $map_id, '_svgml_poly_stroke_color', $first['stroke_color'] );
+            update_post_meta( $map_id, '_svgml_poly_stroke_width', $first['stroke_width'] );
+        }
+
+        // Update SVG IDs for region mapping
+        if ( ! empty( $all_poly_ids ) ) {
+            update_post_meta( $map_id, '_svgml_svg_ids', array_values( array_unique( $all_poly_ids ) ) );
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // PROCESS MANUAL DATA (from manual entry interface)
+    // ─────────────────────────────────────────────────────────────────────────────
+    $raw_manual_data = stripslashes( $_POST['manual_data'] ?? '{}' );
+    $manual_data     = json_decode( $raw_manual_data, true );
+
+    if ( is_array( $manual_data ) && ! empty( $manual_data ) ) {
+        $clean_manual_data = [];
+
+        // Get existing layers to update polygons with manual data
+        $layers = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
+
+        foreach ( $layers as $layer_idx => $layer ) {
+            if ( ! isset( $layer['polygons'] ) ) {
+                continue;
+            }
+
+            foreach ( $layer['polygons'] as $poly_idx => $poly ) {
+                $poly_id = $poly['id'] ?? '';
+
+                // If this polygon has manual data, merge it
+                if ( isset( $manual_data[ $poly_id ] ) ) {
+                    $manual_entry = $manual_data[ $poly_id ];
+
+                    // Only update manual fields, never touch coordinates
+                    $layers[ $layer_idx ]['polygons'][ $poly_idx ]['title']  = sanitize_text_field( $manual_entry['title'] ?? '' );
+                    $layers[ $layer_idx ]['polygons'][ $poly_idx ]['status'] = sanitize_text_field( $manual_entry['status'] ?? '' );
+                    $layers[ $layer_idx ]['polygons'][ $poly_idx ]['size']   = sanitize_text_field( $manual_entry['size'] ?? '' );
+                }
+            }
+        }
+
+        // Save updated layers
+        update_post_meta( $map_id, '_svgml_layers', $layers );
+
+        // Store manual data separately for easy access
+        update_post_meta( $map_id, '_svgml_manual_data', $manual_data );
+    }
+
+    wp_send_json_success( [
+        'message' => 'Gegevens opgeslagen',
+        'map_id'  => $map_id,
+    ] );
+}

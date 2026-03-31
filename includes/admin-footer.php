@@ -31,21 +31,43 @@ function svgml_save_shortcut_script() {
     <script>
     jQuery(document).ready(function($) {
         /**
-         * Find the main form on the page and submit it.
-         * Triggers a native submit so WordPress nonces and
-         * hidden fields are all included.
+         * Gather all map data and save via AJAX/form
          */
         function svgmlSavePage() {
-            // Find the first <form> inside .svgml-admin-wrap
-            var $form = $('.svgml-admin-wrap form[method="post"]').first();
-            if ($form.length) {
-                // Click the submit button if present (triggers any JS listeners)
-                var $submit = $form.find('input[type="submit"], button[type="submit"]').first();
-                if ($submit.length) {
-                    $submit.trigger('click');
-                } else {
-                    $form.submit();
-                }
+            var $wrap = $('.svgml-admin-wrap');
+            var $form = $wrap.find('form[method="post"]').first();
+            
+            if (!$form.length) {
+                console.warn('❌ No form found on this page');
+                return;
+            }
+
+            // For Settings page: Sync polygon editor data to hidden fields
+            // Try to call the global sync function if it exists
+            if (typeof window.svgmlSyncLayersToHidden === 'function') {
+                console.log('🔄 Syncing layers to hidden field...');
+                window.svgmlSyncLayersToHidden();
+                console.log('✅ Layers synced successfully');
+            } else if (typeof syncLayersToHiddenField === 'function') {
+                console.log('🔄 Syncing layers to hidden field (direct)...');
+                syncLayersToHiddenField();
+                console.log('✅ Layers synced successfully');
+            }
+            
+            // Log form data before submission
+            console.log('📊 Form submission details:', {
+                page: '<?php echo esc_js( $current_page ); ?>',
+                form_fields: $form.find('input, textarea, select').length,
+                hidden_layers_json: $('#svgml_layers_json').val() ? 'Present (' + $('#svgml_layers_json').val().length + ' chars)' : 'Empty',
+                hidden_polygons_json: $('#svgml_polygons_json').val() ? 'Present (' + $('#svgml_polygons_json').val().length + ' chars)' : 'Empty',
+            });
+
+            // Submit the form normally to preserve all nonce and field data
+            var $submit = $form.find('input[type="submit"], button[type="submit"]').first();
+            if ($submit.length) {
+                $submit.trigger('click');
+            } else {
+                $form.submit();
             }
         }
 
@@ -53,6 +75,7 @@ function svgml_save_shortcut_script() {
         $(document).on('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();  // Prevent browser "Save page" dialog
+                console.log('⌨️  Save shortcut triggered (Ctrl+S or Cmd+S)');
                 svgmlSavePage();
             }
         });
@@ -60,7 +83,16 @@ function svgml_save_shortcut_script() {
         // Save button in the sticky tab bar
         $('#svgml-save-btn').on('click', function(e) {
             e.preventDefault();
+            console.log('🖱️  Save button clicked');
             svgmlSavePage();
+        });
+
+        // Also sync data when the form is about to be submitted normally
+        $('.svgml-admin-wrap form[method="post"]').on('submit', function(e) {
+            if (typeof window.svgmlSyncLayersToHidden === 'function') {
+                console.log('📤 Form submit detected - syncing layers before submission');
+                window.svgmlSyncLayersToHidden();
+            }
         });
     });
     </script>
