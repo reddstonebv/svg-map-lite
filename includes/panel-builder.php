@@ -9,54 +9,70 @@ function svgml_render_panel_builder_page( $map_id ) {
         if ( ! wp_verify_nonce( $_POST['svgml_panelbuilder_nonce'], 'svgml_save_panelbuilder' ) ) {
             echo '<div class="notice notice-error"><p>Beveiligingsfout. Probeer opnieuw.</p></div>';
         } else {
-            // Panel blokken komen binnen als parallelle arrays:
-            //   svgml_block_field[]  = veldnamen
-            //   svgml_block_type[]   = block types
-            //   svgml_block_label[]  = labels
-            //   svgml_block_width[]  = widths (100, 75, 50, 33, 25)
-            //   svgml_block_html[]   = '1' if this field contains HTML markup (else '0')
-            $raw_fields     = $_POST['svgml_block_field'] ?? [];
-            $raw_types      = $_POST['svgml_block_type']  ?? [];
-            $raw_labels     = $_POST['svgml_block_label'] ?? [];
-            $raw_widths     = $_POST['svgml_block_width'] ?? [];
-            // HTML flag: always sends a value ('0' or '1') via hidden + checkbox combo.
-            // See the form: a hidden input with value="0" appears before each checkbox,
-            // so the array index remains consistent even if the checkbox is unchecked.
-            $raw_html_flags = $_POST['svgml_block_html']  ?? [];
+            // ── Shared validation constants ──────────────────────────────────
+            $valid_types  = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider' ];
+            $valid_widths = [ 25, 33, 50, 75, 100 ];
+
+            // ── Primary path: JSON from hidden field (panel-builder.js) ──────
+            // assets/js/panel-builder.js serialises the current DOM order into
+            // #svgml_panel_blocks before the POST fires, so this field always
+            // reflects the correct drag-and-drop order and checkbox state.
+            $raw_json    = stripslashes( $_POST['svgml_panel_blocks'] ?? '' );
+            $json_blocks = ( $raw_json !== '' ) ? json_decode( $raw_json, true ) : null;
 
             $blocks = [];
-            foreach ( $raw_fields as $i => $field ) {
-                $clean_field = sanitize_text_field( $field );
-                $clean_type  = sanitize_text_field( $raw_types[ $i ] ?? 'text' );
-                $clean_label = sanitize_text_field( $raw_labels[ $i ] ?? '' );
-                $clean_width = intval( $raw_widths[ $i ] ?? 100 );
-                // '1' = render HTML, '0' or missing = escape
-                $clean_html  = ( ( $raw_html_flags[ $i ] ?? '0' ) === '1' );
 
-                // Valid block types: thumbnail, heading, badge, price, text, html, link, divider
-                $valid_types = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider' ];
-                if ( ! in_array( $clean_type, $valid_types ) ) {
-                    $clean_type = 'text';
+            if ( is_array( $json_blocks ) ) {
+                // JSON path — authoritative; JS has already done the ordering.
+                foreach ( $json_blocks as $block ) {
+                    $clean_type  = sanitize_text_field( $block['type']  ?? 'text' );
+                    $clean_field = sanitize_text_field( $block['field'] ?? '' );
+                    $clean_label = sanitize_text_field( $block['label'] ?? '' );
+                    $clean_width = intval( $block['width'] ?? 100 );
+                    $clean_html  = ! empty( $block['html'] );
+
+                    if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
+                    if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
+                    if ( 'divider' !== $clean_type && empty( $clean_field ) ) continue;
+
+                    $blocks[] = [
+                        'field' => $clean_field,
+                        'type'  => $clean_type,
+                        'label' => $clean_label,
+                        'width' => $clean_width,
+                        'html'  => $clean_html,
+                    ];
                 }
+            } else {
+                // ── Fallback path: parallel arrays (no-JS / legacy) ──────────
+                // Used when the JSON field is missing or unparseable.
+                // The hidden + checkbox combo keeps array indices consistent
+                // even for unchecked checkboxes.
+                $raw_fields     = $_POST['svgml_block_field'] ?? [];
+                $raw_types      = $_POST['svgml_block_type']  ?? [];
+                $raw_labels     = $_POST['svgml_block_label'] ?? [];
+                $raw_widths     = $_POST['svgml_block_width'] ?? [];
+                $raw_html_flags = $_POST['svgml_block_html']  ?? [];
 
-                // Valid widths: 25, 33, 50, 75, 100
-                $valid_widths = [ 25, 33, 50, 75, 100 ];
-                if ( ! in_array( $clean_width, $valid_widths ) ) {
-                    $clean_width = 100;
+                foreach ( $raw_fields as $i => $field ) {
+                    $clean_field = sanitize_text_field( $field );
+                    $clean_type  = sanitize_text_field( $raw_types[ $i ] ?? 'text' );
+                    $clean_label = sanitize_text_field( $raw_labels[ $i ] ?? '' );
+                    $clean_width = intval( $raw_widths[ $i ] ?? 100 );
+                    $clean_html  = ( ( $raw_html_flags[ $i ] ?? '0' ) === '1' );
+
+                    if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
+                    if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
+                    if ( 'divider' !== $clean_type && empty( $clean_field ) ) continue;
+
+                    $blocks[] = [
+                        'field' => $clean_field,
+                        'type'  => $clean_type,
+                        'label' => $clean_label,
+                        'width' => $clean_width,
+                        'html'  => $clean_html,
+                    ];
                 }
-
-                // Divider doesn't need a field name
-                if ( 'divider' !== $clean_type && empty( $clean_field ) ) {
-                    continue; // Skip if no field name
-                }
-
-                $blocks[] = [
-                    'field' => $clean_field,
-                    'type'  => $clean_type,
-                    'label' => $clean_label,
-                    'width' => $clean_width,  // Width as percentage (e.g., 50 = 50%)
-                    'html'  => $clean_html,   // true = render value as raw HTML
-                ];
             }
 
             update_post_meta( $map_id, '_svgml_panel_blocks', $blocks );
@@ -540,6 +556,16 @@ function svgml_render_panel_builder_page( $map_id ) {
                     </tr>
                 </table>
             </details>
+
+            <?php
+            /**
+             * Hidden field: populated by assets/js/panel-builder.js right
+             * before the form submits.  The JS walks every .svgml-block-row,
+             * builds an array of objects and JSON.stringifies it here.
+             * The PHP save handler below reads this field as its primary path.
+             */
+            ?>
+            <input type="hidden" name="svgml_panel_blocks" id="svgml_panel_blocks" value="">
 
             <?php submit_button( 'Panel Builder opslaan' ); ?>
         </form>

@@ -603,6 +603,17 @@ function svgml_admin_enqueue( $hook ) {
         $cm_settings = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
     }
 
+    // Panel Builder submit serializer (populates #svgml_panel_blocks before POST)
+    if ( 'svgml-panel-builder' === $current_page ) {
+        wp_enqueue_script(
+            'svgml-panel-builder-js',
+            SVGML_URL . 'assets/js/panel-builder.js',
+            [ 'jquery' ],         // only jQuery needed – no Fabric, no utils
+            SVGML_VERSION,
+            true                  // load in footer, after DOM is ready
+        );
+    }
+
     // ── Build localize data from post_meta ───────────────────────────────────
     $map_id = isset( $_GET['map_id'] ) ? intval( $_GET['map_id'] ) : 0;
 
