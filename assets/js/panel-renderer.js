@@ -371,7 +371,7 @@ jQuery(document).ready(function($) {
         html += '</dl>';
 
         if (html === '<dl class="svgml-data-list"></dl>') {
-            html = '<p class="svgml-panel-empty">No fields to display.</p>';
+            html = '<p class="svgml-panel-empty">Geen velden om weer te geven.</p>';
         }
 
         return html;
@@ -417,7 +417,7 @@ jQuery(document).ready(function($) {
         var idField        = svgmlData.jsonIdField || 'id';
 
         if (!data || data.length === 0) {
-            return '<p class="svgml-panel-empty">No objects available.</p>';
+            return '<p class="svgml-panel-empty">Geen objecten beschikbaar.</p>';
         }
 
         // Build a fast lookup: json-id → json-object
@@ -479,7 +479,7 @@ jQuery(document).ready(function($) {
 
         // If nothing was rendered
         if (html === '<div class="svgml-overview-list"></div>') {
-            html = '<p class="svgml-panel-empty">No objects to display.</p>';
+            html = '<p class="svgml-panel-empty">Geen objecten om weer te geven.</p>';
         }
 
         return html;

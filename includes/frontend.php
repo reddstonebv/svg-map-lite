@@ -218,7 +218,7 @@ function svgml_render_shortcode( $atts ) {
 
                     <?php else : ?>
                         <select class="svgml-filter-select" id="svgml-select-<?php echo esc_attr( $f_field ); ?>">
-                            <option value="">All</option>
+                            <option value="">Alles</option>
                         </select>
                     <?php endif; ?>
                 </div>
@@ -226,7 +226,7 @@ function svgml_render_shortcode( $atts ) {
 
                 <div class="svgml-filter-item svgml-filter-reset-wrap">
                     <button type="button" class="svgml-filter-reset" id="svgml-filter-reset">
-                        ↺ Reset filters
+                        ↺ Filters resetten
                     </button>
                 </div>
             </div>

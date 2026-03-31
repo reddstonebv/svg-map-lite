@@ -214,8 +214,8 @@ jQuery(document).ready(function($) {
 
         // If no field produced any output
         if (html === '<dl class="svgml-data-list"></dl>') {
-            html = '<p class="svgml-panel-empty">No fields to display. ' +
-                   'Check the <em>Display</em> settings.</p>';
+            html = '<p class="svgml-panel-empty">Geen velden om weer te geven. ' +
+                   'Controleer de <em>Weergave</em>-instellingen.</p>';
         }
 
         // Put the content in the panel

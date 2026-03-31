@@ -108,6 +108,7 @@
 /* WordPress form-table: reset WP default margin */
 .svgml-section .form-table {
     margin: 0;
+    background: #e8f5f3; /* Lichte tint voor onderscheid tussen secties */
 }
 
 .svgml-section .form-table td,
@@ -161,7 +162,7 @@
 /* Beschrijving onder een sectie-h2 */
 .svgml-description {
     color: var(--svgml-muted);
-    margin: 0;
+    margin: 0 -20px 16px -20px;
     padding: 12px 24px;
     font-size: 13px;
     border-bottom: 1px solid var(--svgml-border);
@@ -224,18 +225,26 @@
 /* Secundaire knoppen (pill style) */
 .svgml-admin-wrap .button-secondary,
 .svgml-admin-wrap .button:not(.button-primary) {
+    background: var(--svgml-bg) !important;
+    color: var(--svgml-dark) !important;
+    border: none !important;
     border-radius: 50px !important;
-    padding: 7px 18px !important;
+    padding: 8px 16px !important;
     height: auto !important;
     font-size: 13px !important;
     font-weight: 500;
-    transition: background 0.12s, box-shadow 0.12s, transform 0.1s;
+    transition: background 0.15s, color 0.15s, transform 0.1s, box-shadow 0.15s;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 .svgml-admin-wrap .button-secondary:hover,
 .svgml-admin-wrap .button:not(.button-primary):hover {
+    background: var(--svgml-red-light) !important;
+    color: var(--svgml-dark) !important;
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+    box-shadow: 0 2px 8px rgba(42, 157, 143, 0.15) !important;
 }
 
 /* ── SVG PREVIEW ────────────────────────────────────────────────────────────── */
@@ -407,18 +416,25 @@ tr.svgml-row-excluded .svgml-exclude-label {
 .svgml-admin-wrap .svgml-remove-status,
 .svgml-admin-wrap .svgml-remove-overview,
 .svgml-admin-wrap .svgml-remove-filter {
-    color: var(--svgml-coral) !important;
-    border-color: var(--svgml-coral) !important;
-    background: transparent !important;
+    background: var(--svgml-error-bg) !important;
+    color: var(--svgml-error) !important;
+    border: none !important;
+    font-weight: 600;
+    border-radius: 50px !important;
+    padding: 8px 16px !important;
+    height: auto !important;
+    font-size: 13px !important;
+    transition: background 0.15s, color 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 
 .svgml-admin-wrap .svgml-remove-block:hover,
 .svgml-admin-wrap .svgml-remove-status:hover,
 .svgml-admin-wrap .svgml-remove-overview:hover,
 .svgml-admin-wrap .svgml-remove-filter:hover {
-    background: var(--svgml-coral) !important;
+    background: var(--svgml-error) !important;
     color: #fff !important;
-    border-color: var(--svgml-coral) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(196, 85, 59, 0.2) !important;
 }
 
 /* ── STATUS LABELS (koppeling-tabel) ────────────────────────────────────────── */
@@ -473,18 +489,7 @@ tr.svgml-row-excluded .svgml-exclude-label {
 }
 
 /* ── PANEL BUILDER: DRAG HANDLE ─────────────────────────────────────────────── */
-.svgml-drag-handle {
-    cursor: grab;
-    color: #ccc;
-    font-size: 16px;
-    text-align: center;
-    user-select: none;
-    vertical-align: middle;
-}
 
-.svgml-drag-handle:hover {
-    color: var(--svgml-red);
-}
 
 /* ── PANEL BUILDER: TABELKOPTEKSTEN ─────────────────────────────────────────── */
 #svgml-blocks-table thead th,
@@ -520,16 +525,27 @@ tr.svgml-row-excluded .svgml-exclude-label {
 .svgml-remove-block,
 .svgml-remove-status,
 .svgml-remove-filter {
-    color: var(--svgml-red) !important;
-    border-color: var(--svgml-red) !important;
-    font-weight: 700;
+    background: var(--svgml-error-bg) !important;
+    color: var(--svgml-error) !important;
+    border: none !important;
+    font-weight: 600;
+    border-radius: 50px !important;
+    padding: 8px 16px !important;
+    height: auto !important;
+    font-size: 13px !important;
+    transition: background 0.15s, color 0.15s, transform 0.1s, box-shadow 0.15s;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 .svgml-remove-block:hover,
 .svgml-remove-status:hover,
 .svgml-remove-filter:hover {
-    background: var(--svgml-red) !important;
+    background: var(--svgml-error) !important;
     color: #fff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(196, 85, 59, 0.2) !important;
 }
 
 /* "Blok toevoegen" knoppen */
@@ -967,8 +983,8 @@ tr.svgml-row-excluded .svgml-exclude-label {
 }
 
 .svgml-polygon-editor-sidebar {
-    flex: 0 0 320px;
-    min-width: 280px;
+    flex: 0 0 360px;
+    min-width: 320px;
     display: flex;
     flex-direction: column;
     gap: 18px;
@@ -977,39 +993,141 @@ tr.svgml-row-excluded .svgml-exclude-label {
 .svgml-polygon-editor-main {
     flex: 1;
     min-width: 0;
+    position: relative;
+}
+
+.svgml-polygon-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.svgml-polygon-sidebar-zoom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 0;
+}
+
+.svgml-polygon-sidebar-zoom .button {
+    min-width: 40px;
+    padding: 6px 0 !important;
+}
+
+.svgml-polygon-sidebar-zoom .svgml-zoom-level {
+    flex: 1;
+    text-align: center;
+    font-weight: 600;
+}
+
+.svgml-edit-options {
+    display: none;
+    margin-top: 10px;
+}
+
+.svgml-edit-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--svgml-border, #dce5e3);
+    border-radius: 10px;
+    background: #fff;
+}
+
+.svgml-polygon-image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.svgml-polygon-image-actions {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    pointer-events: auto;
+    display: none;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--svgml-red-light, #e8f5f3);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+    width: auto;
+    max-width: calc(100% - 56px);
+}
+
+.svgml-polygon-image-actions .button {
+    min-width: auto;
 }
 
 .svgml-polygon-controls-overlay {
     position: absolute;
     top: 14px;
     right: 14px;
-    z-index: 20;
-    pointer-events: none;
-    background: rgba(255, 255, 255, 0.92);
+    pointer-events: auto;
+    width: min(280px, calc(100% - 56px));
+    background: var(--svgml-red-light, #e8f5f3);
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 10px;
-    padding: 12px 14px;
-    max-width: 250px;
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.08);
-    font-size: 12px;
-    color: #2a3b43;
+    padding: 10px 12px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+    max-height: calc(100% - 28px);
+    overflow: auto;
 }
 
 .svgml-polygon-controls-overlay strong {
     display: block;
     margin-bottom: 8px;
-    font-size: 13px;
 }
 
 .svgml-polygon-controls-overlay ul {
     margin: 0;
-    padding-left: 18px;
+    padding-left: 0;
+    list-style: none;
 }
 
 .svgml-polygon-controls-overlay li {
-    margin-bottom: 5px;
-    line-height: 1.4;
+    margin-bottom: 6px;
+    line-height: 1.5;
+    position: relative;
+    padding-left: 28px;
+    word-break: break-word;
+    white-space: normal;
+    font-size: 12px;
 }
+
+.svgml-polygon-controls-overlay li:last-child {
+    margin-bottom: 0;
+}
+
+.svgml-polygon-controls-overlay li::before {
+    position: absolute;
+    left: 2px;
+    top: 1px;
+    font-size: 14px;
+    line-height: 1;
+    margin-right: 4px;
+}
+
+.svgml-polygon-controls-overlay li:nth-child(1)::before { content: '🖱️'; }
+.svgml-polygon-controls-overlay li:nth-child(2)::before { content: '✅'; }
+.svgml-polygon-controls-overlay li:nth-child(3)::before { content: '🔍'; }
+.svgml-polygon-controls-overlay li:nth-child(4)::before { content: '✋'; }
+.svgml-polygon-controls-overlay li:nth-child(5)::before { content: '⌫'; }
+
+
+
+
 
 @media (max-width: 1120px) {
     .svgml-polygon-editor-columns {
@@ -1142,10 +1260,10 @@ tr.svgml-row-excluded .svgml-exclude-label {
     color: #fff !important;
 }
 
-/* Canvas container – overflow:auto voor scrollen bij ingezoomd */
+/* Canvas container – overflow:hidden om scrollbars te voorkomen */
 #svgml-polygon-canvas-wrap {
     border-radius: 6px;
-    overflow: auto;
+    overflow: hidden !important;
     border: 1px solid var(--svgml-border, #dce5e3);
     background: #f5f5f5;
     max-height: 75vh;
@@ -1235,7 +1353,7 @@ tr.svgml-row-excluded .svgml-exclude-label {
     align-items: center;
     gap: 0;
     border-bottom: 2px solid var(--svgml-border, #dce5e3);
-    margin-bottom: 16px;
+    margin-bottom: 0px;
 }
 
 .svgml-layer-tab {
@@ -1262,9 +1380,9 @@ tr.svgml-row-excluded .svgml-exclude-label {
 
 .svgml-layer-tab-active {
     color: var(--svgml-dark, #264653);
-    background: #fff;
+    background: #e8f5f3;
     border-color: var(--svgml-border, #dce5e3);
-    border-bottom-color: #fff;
+    border-bottom-color: #e8f5f3;
     font-weight: 600;
 }
 

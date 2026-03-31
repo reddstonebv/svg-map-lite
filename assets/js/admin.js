@@ -96,7 +96,7 @@ jQuery(document).ready(function($) {
         $svgPreview.html(
             '<div class="svgml-no-svg">' +
             '<span class="dashicons dashicons-format-image"></span>' +
-            '<p>No SVG selected yet</p>' +
+            '<p>Nog geen SVG geselecteerd</p>' +
             '</div>'
         );
 
@@ -104,7 +104,7 @@ jQuery(document).ready(function($) {
         $idsStatus.html('');
 
         // Adjust the button
-        $uploadBtn.text('Select SVG');
+        $uploadBtn.text('Selecteer SVG');
         $(this).hide();
     });
 
@@ -121,7 +121,7 @@ jQuery(document).ready(function($) {
         // Replace the contents of the preview div with an <img> element
         // We trust the URL because it comes from WordPress itself
         $svgPreview.html('<img src="' + url + '" alt="' + filename + '">');
-        $uploadBtn.text('Change SVG');
+        $uploadBtn.text('Wijzig SVG');
 
         // Make sure the "remove" button is visible
         if ($removeBtn.length) {

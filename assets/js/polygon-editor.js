@@ -89,8 +89,8 @@ jQuery(document).ready(function($) {
     if ($strokeColor.length && $strokeColor.val()) POLY_STROKE = $strokeColor.val();
     if ($strokeWidth.length && $strokeWidth.val()) POLY_STROKE_WIDTH = parseFloat($strokeWidth.val()) || 1;
 
-    // Hide the "Edit Points" button – clicking a polygon goes directly to edit mode
-    $editBtn.hide();
+    $deleteBtn.hide();
+    $('.svgml-edit-options').hide();
 
     // ════════════════════════════════════════════════════════════════════
     //  SOURCE TYPE TOGGLE
@@ -175,6 +175,11 @@ jQuery(document).ready(function($) {
             selectionColor:     'transparent',       // No blue selection overlay
             selectionBorderColor: 'transparent',     // No blue selection border
         });
+        // Optimize canvas for multiple readback operations (getImageData)
+        const ctx = canvas.getContext('2d');
+        if (ctx && ctx.canvas) {
+            ctx.canvas.getContext('2d', { willReadFrequently: true });
+        }
         canvas.on('mouse:down', onCanvasClick);
         canvas.on('selection:created', onObjectSelected);
         canvas.on('selection:updated', onObjectSelected);
@@ -562,7 +567,8 @@ jQuery(document).ready(function($) {
         $editBtn.hide();
         $doneBtn.show();
         $cancelBtn.show();
-        updateStatus('Click on the image to place points. Min. 3 points.');
+        showEditOptions();
+        updateStatus('Klik op de afbeelding om punten te plaatsen. Min. 3 punten.');
 
         drawPoints  = [];
         drawHelpers = [];
@@ -608,8 +614,8 @@ jQuery(document).ready(function($) {
 
         canvas.renderAll();
         var remaining = Math.max(0, 3 - drawPoints.length);
-        updateStatus('Point ' + drawPoints.length + ' placed.' +
-                     (remaining > 0 ? ' ' + remaining + ' more needed.' : ' Click "Done" or continue.'));
+        updateStatus('Punt ' + drawPoints.length + ' geplaatst.' +
+                     (remaining > 0 ? ' ' + remaining + ' nog nodig.' : ' Klik op "Klaar" of ga door.'));
     }
 
     /**
@@ -623,7 +629,7 @@ jQuery(document).ready(function($) {
         // Draw mode: save new polygon
         if (isDrawing) {
             if (drawPoints.length < 3) {
-                updateStatus('Minimum 3 points required.');
+                updateStatus('Minimaal 3 punten vereist.');
                 return;
             }
 
@@ -650,31 +656,31 @@ jQuery(document).ready(function($) {
         if (isEditing) {
             saveEditedPoints();
             exitEditMode();
-            updateStatus('Points saved.');
+            updateStatus('Punten opgeslagen.');
         }
     }
 
     $cancelBtn.on('click', function() {
         if (isDrawing)  cancelDrawing();
-        if (isEditing)  { exitEditMode(); updateStatus('Edit cancelled.'); }
+        if (isEditing)  { exitEditMode(); updateStatus('Bewerking geannuleerd.'); }
     });
 
     function cancelDrawing() {
         cleanupHelpers();
         finishDrawing();
-        updateStatus('Drawing cancelled.');
+        updateStatus('Tekenen geannuleerd.');
     }
 
     function promptForId() {
         while (true) {
-            var polyId = prompt('Give a unique ID for this polygon (e.g. "unit-1"):');
+            var polyId = prompt('Geef een unieke ID voor dit vlak (bijv. "unit-1"):');
             if (!polyId || !polyId.trim()) {
                 return null;
             }
             polyId = polyId.trim();
 
             if (findPolyByIdAcrossLayers(polyId)) {
-                alert('This ID already exists in another layer. Choose a different ID.');
+                alert('Deze ID bestaat al in een andere laag. Kies een andere ID.');
                 continue;
             }
 
@@ -691,12 +697,24 @@ jQuery(document).ready(function($) {
         $editBtn.show();
         $doneBtn.hide();
         $cancelBtn.hide();
+        hideEditOptions();
+        $deleteBtn.hide();
     }
 
     function cleanupHelpers() {
         $.each(drawHelpers, function(i, obj) { canvas.remove(obj); });
         drawHelpers = [];
         canvas.renderAll();
+    }
+
+    function showEditOptions() {
+        $('.svgml-edit-options').show();
+        $('.svgml-polygon-image-actions').show();
+    }
+
+    function hideEditOptions() {
+        $('.svgml-edit-options').hide();
+        $('.svgml-polygon-image-actions').hide();
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -710,9 +728,9 @@ jQuery(document).ready(function($) {
     $editBtn.on('click', function() {
         if (isDrawing || isEditing) return;
 
-        // A polygon must be selected
+        // Er moet een vlak geselecteerd zijn
         if (!selectedPoly || !selectedPoly.svgmlId) {
-            alert('First select a polygon on the canvas.');
+            alert('Selecteer eerst een vlak op het canvas.');
             return;
         }
 
@@ -778,11 +796,13 @@ jQuery(document).ready(function($) {
         // UI
         $drawBtn.hide();
         $editBtn.hide();
-        $doneBtn.show().text('✓ Done');
+        $doneBtn.show().text('✓ Klaar');
         $cancelBtn.show();
+        showEditOptions();
+        $deleteBtn.show();
 
         canvas.renderAll();
-        updateStatus('Drag points or click on an edge to add a point. Backspace deletes a point.');
+        updateStatus('Sleep punten of klik op een rand om een punt toe te voegen. Backspace verwijdert een punt.');
     }
 
     /**
@@ -956,7 +976,7 @@ jQuery(document).ready(function($) {
         canvas.setActiveObject(newCircle);
         canvas.renderAll();
 
-        updateStatus('Point added. ' + editCircles.length + ' points total.');
+        updateStatus('Punt toegevoegd. ' + editCircles.length + ' punten in totaal.');
     }
 
     /**
@@ -1071,9 +1091,11 @@ jQuery(document).ready(function($) {
 
         setPolygonsSelectable(true);
         $drawBtn.show();
-        $editBtn.hide();    // Hidden: clicking on polygon goes directly to edit mode
-        $doneBtn.hide().text('✓ Done');
+        $editBtn.show();
+        $doneBtn.hide().text('✓ Klaar');
         $cancelBtn.hide();
+        hideEditOptions();
+        $deleteBtn.hide();
 
         canvas.renderAll();
     }
@@ -1092,7 +1114,7 @@ jQuery(document).ready(function($) {
 
         // Minimum 3 points required
         if (editCircles.length <= 3) {
-            updateStatus('Minimum 3 points required. Delete the entire polygon to remove it.');
+            updateStatus('Minimaal 3 punten vereist. Verwijder het hele vlak om het te verwijderen.');
             return;
         }
 
@@ -1105,7 +1127,7 @@ jQuery(document).ready(function($) {
             $.each(editCircles, function(i, c) { c.svgmlPtIndex = i; });
             updatePolygonFromEditCircles();
             canvas.discardActiveObject();
-            updateStatus('Point deleted. ' + editCircles.length + ' points remaining.');
+            updateStatus('Punt verwijderd. ' + editCircles.length + ' punten over.');
         }
     });
 
@@ -1146,6 +1168,11 @@ jQuery(document).ready(function($) {
         // do nothing — the user is trying to add a point.
         if (isEditing && hoverPreviewCircle) return;
 
+        // Deselect the previously selected polygon before selecting the new one
+        if (selectedPoly && selectedPoly !== obj) {
+            selectedPoly.set('fill', POLY_FILL);
+        }
+
         selectedPoly = obj;
         obj.set('fill', POLY_FILL_ACTIVE);
         canvas.renderAll();
@@ -1155,7 +1182,7 @@ jQuery(document).ready(function($) {
 
         // Go directly to edit mode if we're not already drawing or editing
         if (!isDrawing && !isEditing) {
-            enterEditMode(obj.svgmlId);
+            updateStatus('Vlak "' + obj.svgmlId + '" geselecteerd. Klik op Bewerk punten om te bewerken.');
         }
     }
 
@@ -1184,17 +1211,17 @@ jQuery(document).ready(function($) {
         if (isEditing) {
             // In edit mode: delete the entire polygon
             if (!editPolyRef) return;
-            if (!confirm('Delete polygon "' + editPolyRef.id + '"?')) return;
+            if (!confirm('Weet je zeker dat je vlak "' + editPolyRef.id + '" wilt verwijderen?')) return;
             var id = editPolyRef.id;
             exitEditMode();
             deletePolygon(id);
             return;
         }
         if (!selectedPoly || !selectedPoly.svgmlId) {
-            alert('First select a polygon.');
+            alert('Selecteer eerst een vlak.');
             return;
         }
-        if (!confirm('Delete polygon "' + selectedPoly.svgmlId + '"?')) return;
+        if (!confirm('Weet je zeker dat je vlak "' + selectedPoly.svgmlId + '" wilt verwijderen?')) return;
         deletePolygon(selectedPoly.svgmlId);
     });
 
@@ -1205,7 +1232,7 @@ jQuery(document).ready(function($) {
         selectedPoly = null;
         syncToHiddenField();
         renderPolygonList();
-        updateStatus('Polygon "' + id + '" deleted.');
+        updateStatus('Vlak "' + id + '" verwijderd.');
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -1217,7 +1244,7 @@ jQuery(document).ready(function($) {
         if (polygons.length === 0) {
             $polygonList.append(
                 '<tr><td colspan="3" style="text-align:center;color:#999;font-style:italic;padding:14px;">' +
-                'No polygons drawn yet</td></tr>'
+                'Nog geen polygonen getekend</td></tr>'
             );
             updateDuplicateWarning();
             return;
@@ -1231,12 +1258,12 @@ jQuery(document).ready(function($) {
                                'data-original-id="' + escHtml(poly.id) + '" ' +
                                'style="width:100%">' +
                     '</td>' +
-                    '<td style="padding:6px 10px;">' + poly.points.length + ' points</td>' +
+                    '<td style="padding:6px 10px;">' + poly.points.length + ' punten</td>' +
                     '<td style="padding:6px 10px;">' +
                         '<button type="button" class="button button-small svgml-poly-focus" ' +
                                 'data-poly-id="' + escHtml(poly.id) + '">🔍</button> ' +
                         '<button type="button" class="button button-small svgml-poly-edit-btn" ' +
-                                'data-poly-id="' + escHtml(poly.id) + '" title="Edit points">✏️</button> ' +
+                                'data-poly-id="' + escHtml(poly.id) + '" title="Bewerk punten">✏️</button> ' +
                         '<button type="button" class="button button-small svgml-btn-coral svgml-poly-remove" ' +
                                 'data-poly-id="' + escHtml(poly.id) + '">✕</button>' +
                     '</td>' +
@@ -1247,6 +1274,29 @@ jQuery(document).ready(function($) {
     }
 
     // ── List events ──────────────────────────────────────────────────────
+
+    // Highlight polygon on hover
+    $(document).on('mouseenter', '#svgml_poly_list tr[data-poly-id]', function() {
+        var id = $(this).data('poly-id');
+        var poly = findPolyById(id);
+        if (poly && poly.fabricObj && !isEditing) {
+            poly.fabricObj.set('fill', POLY_FILL_ACTIVE);
+            canvas.renderAll();
+        }
+    });
+
+    // Unhighlight polygon on leave (unless selected)
+    $(document).on('mouseleave', '#svgml_poly_list tr[data-poly-id]', function() {
+        var id = $(this).data('poly-id');
+        var poly = findPolyById(id);
+        if (poly && poly.fabricObj && !isEditing) {
+            // Only unhighlight if this isn't the selected polygon
+            if (!selectedPoly || selectedPoly !== poly.fabricObj) {
+                poly.fabricObj.set('fill', POLY_FILL);
+            }
+            canvas.renderAll();
+        }
+    });
 
     // Focus on polygon
     $(document).on('click', '.svgml-poly-focus', function() {
@@ -1274,7 +1324,7 @@ jQuery(document).ready(function($) {
     // Delete from list
     $(document).on('click', '.svgml-poly-remove', function() {
         var id = $(this).data('poly-id');
-        if (!confirm('Delete polygon "' + id + '"?')) return;
+        if (!confirm('Weet je zeker dat je vlak "' + id + '" wilt verwijderen?')) return;
         if (isEditing && editPolyRef && editPolyRef.id === id) exitEditMode();
         deletePolygon(id);
     });
@@ -1288,7 +1338,7 @@ jQuery(document).ready(function($) {
         if (!newId) { alert('ID cannot be empty.'); $input.val(originalId); return; }
 
         var dup = findPolyByIdAcrossLayers(newId, originalId);
-        if (dup) { alert('This ID already exists in another layer or polygon.'); $input.val(originalId); return; }
+if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.val(originalId); return; }
 
         var poly = findPolyById(originalId);
         if (poly) {
@@ -1441,8 +1491,8 @@ jQuery(document).ready(function($) {
                        '<span class="dashicons dashicons-format-image" style="font-size:16px;width:16px;height:16px;line-height:16px;margin-right:2px;opacity:0.5;"></span>' +
                        '<input type="text" class="svgml-layer-name-input" value="' +
                        escHtml(layer.name) + '" data-layer-idx="' + idx + '" ' +
-                       'title="Double click to change name">' +
-                       '<span class="svgml-tab-close" data-layer-idx="' + idx + '" title="Delete layer">✕</span>' +
+                       'title="Dubbelklik om naam te wijzigen">' +
+                       '<span class="svgml-tab-close" data-layer-idx="' + idx + '" title="Verwijder laag">✕</span>' +
                        '</button>';
         });
         tabsHtml += '</div>';
@@ -1609,10 +1659,10 @@ jQuery(document).ready(function($) {
             e.stopPropagation();
             var idx = parseInt($(this).data('layer-idx'), 10);
             if (layers.length <= 1) {
-                alert('You need at least one layer.');
+                alert('Je hebt minimaal één laag nodig.');
                 return;
             }
-            if (!confirm('Are you sure you want to delete this layer? All polygons on this layer will be deleted.')) return;
+            if (!confirm('Weet je zeker dat je deze laag wilt verwijderen? Alle polygonen op deze laag worden verwijderd.')) return;
 
             layers.splice(idx, 1);
 

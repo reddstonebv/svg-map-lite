@@ -445,19 +445,19 @@ function svgml_admin_footer_scripts() {
 
             var raw = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.jsonData : null;
             if (!raw) {
-                $preview.html('<p class="svgml-preview-empty">No JSON data loaded.<br>' +
-                              '<small>Enter a JSON URL in Settings.</small></p>');
+                $preview.html('<p class="svgml-preview-empty">Geen JSON-data geladen.<br>' +
+                              '<small>Voer een JSON-URL in bij Instellingen.</small></p>');
                 return;
             }
             var data = svgml_previewNormalizeToArray(raw);
             if (!data || data.length === 0) {
-                $preview.html('<p class="svgml-preview-empty">No objects found in the feed.</p>');
+                $preview.html('<p class="svgml-preview-empty">Geen objecten gevonden in de feed.</p>');
                 return;
             }
 
             var blocks = svgml_readOverviewBlocks();
             if (blocks.length === 0) {
-                $preview.html('<p class="svgml-preview-empty">Add blocks to see the preview.</p>');
+                $preview.html('<p class="svgml-preview-empty">Voeg blokken toe om de preview te zien.</p>');
                 return;
             }
 

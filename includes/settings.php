@@ -335,61 +335,47 @@ function svgml_render_settings_page( $map_id ) {
                             <div class="svgml-polygon-editor-sidebar">
                                 <!-- Toolbar boven het canvas -->
                                 <div class="svgml-polygon-toolbar">
-                                    <!-- Teken-gereedschappen -->
-                                    <button type="button" id="svgml-poly-draw" class="button button-primary" title="Nieuw vlak tekenen">
-                                        <span class="dashicons dashicons-edit"></span> Teken
-                                    </button>
-                                    <button type="button" id="svgml-poly-edit" class="button button-secondary" title="Bewerk punten van een vlak – versleep of verwijder punten">
-                                        <span class="dashicons dashicons-move"></span> Bewerk punten
-                                    </button>
-                                    <button type="button" id="svgml-poly-done" class="button button-secondary" style="display:none" title="Voltooi het huidige vlak">
-                                        ✓ Klaar
-                                    </button>
-                                    <button type="button" id="svgml-poly-cancel" class="button button-secondary" style="display:none" title="Annuleer huidige tekening">
-                                        ✕ Annuleer
-                                    </button>
-                                    <button type="button" id="svgml-poly-delete" class="button svgml-btn-coral" title="Verwijder geselecteerd vlak">
-                                        <span class="dashicons dashicons-trash"></span> Verwijder
-                                    </button>
+                                    <div class="svgml-polygon-actions">
+                                        <button type="button" id="svgml-poly-draw" class="button button-primary" title="Nieuw vlak tekenen">
+                                            <span class="dashicons dashicons-edit"></span> Teken
+                                        </button>
+                                        <button type="button" id="svgml-poly-edit" class="button button-secondary" title="Bewerk punten van een vlak – versleep of verwijder punten">
+                                            <span class="dashicons dashicons-move"></span> Bewerk punten
+                                        </button>
+                                    </div>
+                                    <span class="svgml-poly-status" id="svgml-poly-status"></span>
+                                </div>
 
-                                    <span class="svgml-toolbar-sep"></span>
-
-                                    <!-- Zoom-gereedschappen -->
-                                    <button type="button" id="svgml-zoom-in" class="button button-small" title="Inzoomen (scroll-wiel of +)">
-                                        <span class="dashicons dashicons-plus-alt2"></span>
-                                    </button>
-                                    <span class="svgml-zoom-level" id="svgml-zoom-level">100%</span>
+                                <div class="svgml-polygon-sidebar-zoom">
                                     <button type="button" id="svgml-zoom-out" class="button button-small" title="Uitzoomen (scroll-wiel of -)">
                                         <span class="dashicons dashicons-minus"></span>
                                     </button>
+                                    <span class="svgml-zoom-level" id="svgml-zoom-level">100%</span>
                                     <button type="button" id="svgml-zoom-reset" class="button button-small" title="Reset zoom naar 100%">
                                         1:1
                                     </button>
+                                    <button type="button" id="svgml-zoom-in" class="button button-small" title="Inzoomen (scroll-wiel of +)">
+                                        <span class="dashicons dashicons-plus-alt2"></span>
+                                    </button>
+                                </div>
 
-                                    <span class="svgml-toolbar-sep"></span>
-
-                                    <!-- Snap toggle -->
-                                    <label class="svgml-snap-toggle" title="Magnetisch vastklikken aan punten van naastgelegen polygonen">
-                                        <input type="checkbox" id="svgml-snap-toggle" checked>
-                                        🧲 Snap
-                                    </label>
-
-                                    <span class="svgml-toolbar-sep"></span>
-
-                                    <!-- Lijnstijl-instellingen -->
-                                    <span class="svgml-stroke-controls">
-                                        <label title="Lijnkleur van polygonen">
-                                            Lijn
-                                            <input type="color" id="svgml-stroke-color" value="<?php echo esc_attr( $poly_stroke_color ); ?>">
+                                <div class="svgml-edit-options">
+                                    <div class="svgml-edit-settings">
+                                        <label class="svgml-snap-toggle" title="Magnetisch vastklikken aan punten van naastgelegen polygonen">
+                                            <input type="checkbox" id="svgml-snap-toggle" checked>
+                                            🧲 Vast
                                         </label>
-                                        <label title="Lijndikte in pixels">
-                                            Dikte
-                                            <input type="number" id="svgml-stroke-width" value="<?php echo esc_attr( $poly_stroke_width ); ?>" min="0.5" max="10" step="0.5">
-                                        </label>
-                                    </span>
-
-                                    <!-- Status tekst (rechts uitgelijnd) -->
-                                    <span class="svgml-poly-status" id="svgml-poly-status"></span>
+                                        <div class="svgml-stroke-controls">
+                                            <label title="Lijnkleur van polygonen">
+                                                Lijn
+                                                <input type="color" id="svgml-stroke-color" value="<?php echo esc_attr( $poly_stroke_color ); ?>">
+                                            </label>
+                                            <label title="Lijndikte in pixels">
+                                                Dikte
+                                                <input type="number" id="svgml-stroke-width" value="<?php echo esc_attr( $poly_stroke_width ); ?>" min="0.5" max="10" step="0.5">
+                                            </label>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Vlakkenlijst: overzicht van alle getekende polygonen -->
@@ -420,16 +406,29 @@ function svgml_render_settings_page( $map_id ) {
                             </div>
 
                             <div class="svgml-polygon-editor-main">
-                                <div id="svgml-polygon-canvas-wrap" style="position:relative; border:1px solid var(--svgml-border,#dce5e3); border-radius:6px; overflow:hidden; background:#f5f5f5;">
+                                <div id="svgml-polygon-canvas-wrap" style="position:relative; border:1px solid var(--svgml-border,#dce5e3); border-radius:6px; overflow:auto; background:#f5f5f5;">
                                     <canvas id="svgml-polygon-canvas"></canvas>
+                                </div>
+                                <div class="svgml-polygon-image-overlay">
+                                    <div class="svgml-polygon-image-actions">
+                                        <button type="button" id="svgml-poly-done" class="button button-secondary" style="display:none" title="Voltooi het huidige vlak">
+                                            ✓ Klaar
+                                        </button>
+                                        <button type="button" id="svgml-poly-cancel" class="button button-secondary" style="display:none" title="Annuleer huidige tekening">
+                                            ✕ Annuleer
+                                        </button>
+                                        <button type="button" id="svgml-poly-delete" class="button svgml-btn-coral" style="display:none" title="Verwijder geselecteerd vlak">
+                                            <span class="dashicons dashicons-trash"></span> Verwijder
+                                        </button>
+                                    </div>
                                     <div class="svgml-polygon-controls-overlay">
-                                        <strong>Controls</strong>
+                                        <strong>Bediening</strong>
                                         <ul>
-                                            <li>Click to place points</li>
-                                            <li>Done or continue clicking to finish</li>
-                                            <li>Ctrl + scroll to zoom</li>
-                                            <li>Right-drag to pan</li>
-                                            <li>Backspace deletes a selected point</li>
+                                            <li>Klik om punten te plaatsen</li>
+                                            <li>Klaar of blijf klikken om af te ronden</li>
+                                            <li>Ctrl + scroll om te zoomen</li>
+                                            <li>Rechts slepen om te pannen</li>
+                                            <li>Backspace verwijdert een geselecteerd punt</li>
                                         </ul>
                                     </div>
                                 </div>

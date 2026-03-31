@@ -404,7 +404,7 @@ jQuery(document).ready(function($) {
 
         // "All" button
         $container.append(
-            '<button type="button" class="svgml-filter-btn svgml-filter-btn-active" data-value="">All</button>'
+            '<button type="button" class="svgml-filter-btn svgml-filter-btn-active" data-value="">Alles</button>'
         );
 
         // Button per value
