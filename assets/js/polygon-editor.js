@@ -1566,8 +1566,17 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
             };
         });
 
+        var jsonStr = JSON.stringify(layersData);
+        
+        // DIAGNOSTIC: Log what we're syncing
+        console.log('Syncing data...', {
+            layers: layersData,
+            jsonLength: jsonStr.length,
+            polygonCount: $.map(layersData, function(l) { return (l.polygons || []).length; }).reduce(function(a, b) { return a + b; }, 0)
+        });
+        
         // Update the hidden field (for form submission)
-        $('#svgml_layers_json').val(JSON.stringify(layersData));
+        $('#svgml_layers_json').val(jsonStr);
     }
 
     // ════════════════════════════════════════════════════════════════════
