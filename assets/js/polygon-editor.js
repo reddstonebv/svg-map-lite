@@ -1763,4 +1763,17 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
     window.svgmlSyncLayersToHidden = syncLayersToHiddenField;
     window.svgmlSyncPolygonsToHidden = syncToHiddenField;
 
+    // ════════════════════════════════════════════════════════════════════
+    // FORM SUBMIT HOOK
+    // Sync canvas data to hidden fields whenever the settings form submits,
+    // regardless of whether it is the native button or a JS trigger.
+    // This is the guaranteed "last moment" before data leaves the browser.
+    // ════════════════════════════════════════════════════════════════════
+    $(document).on('submit', '#post, form[name="svgml_settings_nonce"], .svgml-admin-wrap form[method="post"]', function() {
+        // Only run on the settings form (has svgml_layers_json inside it)
+        if ($(this).find('#svgml_layers_json').length) {
+            syncLayersToHiddenField();
+        }
+    });
+
 });

@@ -610,6 +610,7 @@ function svgml_admin_enqueue( $hook ) {
         'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
         'nonce'         => wp_create_nonce( 'svgml_admin_nonce' ),
         'mapId'         => $map_id,
+        'mapMode'       => $map_id ? ( get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json' ) : 'json',
         'svgId'         => $map_id ? get_post_meta( $map_id, '_svgml_svg_attachment_id', true ) : '',
         'jsonArrayKey'  => $map_id ? ( get_post_meta( $map_id, '_svgml_json_array_key', true ) ?: '' ) : '',
         'layers'        => $map_id ? ( get_post_meta( $map_id, '_svgml_layers', true ) ?: [] ) : [],

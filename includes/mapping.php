@@ -275,6 +275,12 @@ function svgml_render_mapping_table( $svg_ids, $id_mapping, $excluded_ids ) {
  * Displays a two-column layout: polygon list (left) + data form (right)
  */
 function svgml_render_manual_data_interface( $map_id ) {
+    // Fetch panel config (dynamic fields)
+    $panel_config = get_post_meta( $map_id, '_svgml_panel_blocks', true );
+    if ( empty( $panel_config ) || ! is_array( $panel_config ) ) {
+        $panel_config = [];
+    }
+
     // Handle form submission for manual data
     if ( isset( $_POST['svgml_manual_data_nonce'] ) ) {
         if ( ! wp_verify_nonce( $_POST['svgml_manual_data_nonce'], 'svgml_save_manual_data' ) ) {
@@ -282,21 +288,15 @@ function svgml_render_manual_data_interface( $map_id ) {
         } else {
             // Process and save manual region data
             $polygon_id = isset( $_POST['polygon_id'] ) ? sanitize_text_field( $_POST['polygon_id'] ) : '';
-            $polygon_title = isset( $_POST['polygon_title'] ) ? sanitize_text_field( $_POST['polygon_title'] ) : '';
-            $polygon_status = isset( $_POST['polygon_status'] ) ? sanitize_text_field( $_POST['polygon_status'] ) : '';
-            $polygon_size = isset( $_POST['polygon_size'] ) ? sanitize_text_field( $_POST['polygon_size'] ) : '';
-
             if ( ! empty( $polygon_id ) ) {
                 // Get existing manual data
                 $manual_data = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
-                
-                // Update/add polygon data
-                $manual_data[ $polygon_id ] = [
-                    'title' => $polygon_title,
-                    'status' => $polygon_status,
-                    'size' => $polygon_size,
-                ];
-                
+                $block_data = [];
+                foreach ( $panel_config as $i => $block ) {
+                    $field_key = 'manual_field_' . $i;
+                    $block_data[ $field_key ] = isset( $_POST[ $field_key ] ) ? sanitize_text_field( $_POST[ $field_key ] ) : '';
+                }
+                $manual_data[ $polygon_id ] = $block_data;
                 update_post_meta( $map_id, '_svgml_manual_data', $manual_data );
                 echo '<div class="notice notice-success is-dismissible"><p>Regio gegevens opgeslagen!</p></div>';
             }
@@ -331,9 +331,9 @@ function svgml_render_manual_data_interface( $map_id ) {
             <h1><span class="dashicons dashicons-location-alt"></span> SVG Map Lite – Region Data</h1>
             <div class="notice notice-warning">
                 <p>
-                    Geen regio's gevonden in de kaart.
+                    Geen regio&#39;s gevonden in de kaart.
                     <a href="<?php echo admin_url( 'admin.php?page=svgml-settings&map_id=' . $map_id ); ?>">
-                        → Ga eerst naar Instellingen
+                        &rarr; Ga eerst naar Instellingen
                     </a>
                 </p>
             </div>
@@ -345,11 +345,9 @@ function svgml_render_manual_data_interface( $map_id ) {
     <div class="wrap svgml-admin-wrap">
         <h1><span class="dashicons dashicons-location-alt"></span> SVG Map Lite – Region Data</h1>
         
-        <!-- Two-column layout: Polygon list + Data form -->
         <div class="svgml-manual-layout">
-            <!-- Left: Polygon List -->
             <div class="svgml-manual-sidebar">
-                <h3 style="margin-top:0; color:var(--svgml-red, #2a9d8f);">Regio's</h3>
+                <h3 style="margin-top:0; color:var(--svgml-red, #2a9d8f);">Regio&#39;s</h3>
                 <div class="svgml-polygon-list">
                     <?php foreach ( $all_polygons as $idx => $poly ) : 
                         $is_selected = ( $idx === 0 ); // First one selected by default
@@ -361,7 +359,7 @@ function svgml_render_manual_data_interface( $map_id ) {
                             <div class="svgml-polygon-item-name">
                                 <?php echo esc_html( $poly['name'] ); ?>
                                 <?php if ( $has_data ) : ?>
-                                    <span class="svgml-data-indicator" title="Gegevens ingevuld">✓</span>
+                                    <span class="svgml-data-indicator" title="Gegevens ingevuld">&#10003;</span>
                                 <?php endif; ?>
                             </div>
                             <div class="svgml-polygon-item-layer">
@@ -372,46 +370,45 @@ function svgml_render_manual_data_interface( $map_id ) {
                 </div>
             </div>
 
-            <!-- Right: Data Form -->
             <div class="svgml-manual-content">
                 <form method="post" action="" class="svgml-manual-form" id="svgml-manual-form">
                     <?php wp_nonce_field( 'svgml_save_manual_data', 'svgml_manual_data_nonce' ); ?>
                     
                     <input type="hidden" name="polygon_id" id="polygon_id" value="<?php echo isset( $all_polygons[0] ) ? esc_attr( $all_polygons[0]['id'] ) : ''; ?>">
                     
-                    <div class="form-group">
-                        <label for="polygon_title">
-                            <strong>Regio Naam:</strong>
-                        </label>
-                        <input type="text" 
-                               id="polygon_title" 
-                               name="polygon_title" 
-                               class="regular-text"
-                               placeholder="Voer de naam van de regio in">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="polygon_status">
-                            <strong>Status:</strong>
-                        </label>
-                        <select id="polygon_status" name="polygon_status" class="regular-text">
-                            <option value="">-- Selecteer een status --</option>
-                            <option value="active">Actief</option>
-                            <option value="inactive">Inactief</option>
-                            <option value="pending">In afwachting</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="polygon_size">
-                            <strong>Grootte/Oppervlakte:</strong>
-                        </label>
-                        <input type="text" 
-                               id="polygon_size" 
-                               name="polygon_size" 
-                               class="regular-text"
-                               placeholder="Bijv. 1250 km²">
-                    </div>
+                    <?php if ( empty( $panel_config ) ) : ?>
+                        <div class="form-group" style="padding:24px 12px;color:#b00;background:#fff3f3;border:1px solid #f5cccc;border-radius:6px;text-align:center;font-weight:600;">
+                            Bouw eerst je paneel in de <em>Panel Builder</em> tab om hier velden in te vullen.
+                        </div>
+                    <?php else : ?>
+                        <?php foreach ( $panel_config as $i => $block ) :
+                            $type = isset( $block['type'] ) ? $block['type'] : '';
+                            $label = isset( $block['label'] ) && !empty( $block['label'] ) ? esc_html( $block['label'] ) : 'Veld ' . ($i+1);
+                            $field_key = 'manual_field_' . $i;
+                        ?>
+                        <div class="form-group">
+                            <label for="<?php echo esc_attr( $field_key ); ?>">
+                                <strong><?php echo $label; ?></strong>
+                            </label>
+                            <?php if ( $type === 'text' || $type === 'html' ) : ?>
+                                <textarea 
+                                    id="<?php echo esc_attr( $field_key ); ?>"
+                                    name="<?php echo esc_attr( $field_key ); ?>"
+                                    class="regular-text svgml-manual-field"
+                                    data-manual-key="<?php echo esc_attr( $field_key ); ?>"
+                                    rows="3"
+                                    placeholder="<?php echo $label; ?>"></textarea>
+                            <?php else : ?>
+                                <input type="text"
+                                    id="<?php echo esc_attr( $field_key ); ?>"
+                                    name="<?php echo esc_attr( $field_key ); ?>"
+                                    class="regular-text svgml-manual-field"
+                                    data-manual-key="<?php echo esc_attr( $field_key ); ?>"
+                                    placeholder="<?php echo $label; ?>">
+                            <?php endif; ?>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
 
                     <?php submit_button( 'Gegevens opslaan' ); ?>
                 </form>
@@ -517,7 +514,8 @@ function svgml_render_manual_data_interface( $map_id ) {
         }
 
         .form-group input[type="text"],
-        .form-group select {
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid #ddd;
@@ -526,7 +524,8 @@ function svgml_render_manual_data_interface( $map_id ) {
         }
 
         .form-group input[type="text"]:focus,
-        .form-group select:focus {
+        .form-group select:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: var(--svgml-red, #2a9d8f);
             box-shadow: 0 0 0 3px rgba(42, 157, 143, 0.1);
@@ -544,19 +543,15 @@ function svgml_render_manual_data_interface( $map_id ) {
         function loadPolygonData(polygonId) {
             $('#polygon_id').val(polygonId);
 
-            if (manualData && manualData[polygonId]) {
-                var data = manualData[polygonId];
-                $('#polygon_title').val(data.title || '');
-                $('#polygon_status').val(data.status || '');
-                $('#polygon_size').val(data.size || '');
-                console.log('✓ Loaded manual data for polygon:', polygonId, data);
-            } else {
-                // Clear the form if no data exists
-                $('#polygon_title').val('');
-                $('#polygon_status').val('');
-                $('#polygon_size').val('');
-                console.log('ℹ️  No manual data for polygon:', polygonId);
-            }
+            // Loop through all manual fields and populate
+            $('.svgml-manual-field').each(function() {
+                var key = $(this).data('manual-key');
+                var value = '';
+                if (manualData && manualData[polygonId] && typeof manualData[polygonId][key] !== 'undefined') {
+                    value = manualData[polygonId][key];
+                }
+                $(this).val(value);
+            });
         }
 
         // Handle polygon selection
@@ -571,15 +566,14 @@ function svgml_render_manual_data_interface( $map_id ) {
             loadPolygonData(polygonId);
         });
 
-        // Handle form submission
+        // Handle form submission validation
         $('#svgml-manual-form').on('submit', function(e) {
             var polygonId = $('#polygon_id').val();
             if (!polygonId) {
                 e.preventDefault();
-                console.warn('❌ No polygon selected');
+                console.warn('Geen polygoon geselecteerd');
                 return false;
             }
-            console.log('💾 Saving manual data for polygon:', polygonId);
         });
 
         // Trigger click on first polygon to load its data

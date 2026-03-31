@@ -32,35 +32,27 @@ function svgml_save_shortcut_script() {
 
         // ── SAVE FUNCTIONS ────────────────────────────────────────────────────
         function svgmlSavePage() {
-            var $form = $('.svgml-admin-wrap form[method="post"]').first();
-            if (!$form.length) {
-                console.log('[SVG Map Lite] Form not found');
-                return;
-            }
+            // Find the page-specific form by its nonce field, not by DOM position.
+            // This prevents accidentally submitting the rename form in the header.
+            var $form = $('[name="svgml_settings_nonce"]').closest('form');
+            if (!$form.length) $form = $('[name="svgml_mapping_nonce"]').closest('form');
+            if (!$form.length) $form = $('[name="svgml_manual_data_nonce"]').closest('form');
+            if (!$form.length) $form = $('[name="svgml_display_nonce"]').closest('form');
+            if (!$form.length) $form = $('[name="svgml_filters_nonce"]').closest('form');
+            if (!$form.length) $form = $('[name="svgml_panelbuilder_nonce"]').closest('form');
+            if (!$form.length) $form = $('[name="svgml_styles_nonce"]').closest('form');
 
-            console.log('[SVG Map Lite] Form submission triggered');
+            if (!$form.length) return;
 
-            // For Settings page: sync polygon data to hidden field before submit
-            if (typeof window.svgmlSyncLayersToHidden === 'function') {
-                console.log('[SVG Map Lite] Syncing polygon data before form submission...');
-                window.svgmlSyncLayersToHidden();
-                console.log('[SVG Map Lite] Sync complete');
-            }
-
-            // Log the hidden field values before submission
-            var layersJson = $form.find('#svgml_layers_json').val();
-            var imageId = $form.find('#svgml_image_attachment_id').val();
-            console.log('[SVG Map Lite] Form data:', {
-                layersJsonLength: (layersJson || '').length,
-                imageId: imageId,
-                nonce: $form.find('[name="svgml_settings_nonce"]').length > 0 ? 'present' : 'MISSING'
-            });
-
-            var $submit = $form.find('input[type="submit"], button[type="submit"]').first();
-            if ($submit.length) {
-                $submit.click();
+            // Click the form's own submit button — identical to what the user does
+            // when pressing the native button. This triggers the full browser submit
+            // pipeline: submit event fires (which runs syncLayersToHiddenField via
+            // the polygon-editor.js listener), then the POST is sent with all fields.
+            var $submitBtn = $form.find('input[type="submit"], button[type="submit"]').first();
+            if ($submitBtn.length) {
+                $submitBtn[0].click();
             } else {
-                $form.submit();
+                $form[0].submit(); // fallback: no submit button found
             }
         }
 
@@ -154,7 +146,9 @@ function svgml_admin_footer_scripts() {
     endif;
 
     // ── Panel Builder page ───────────────────────────────────────────────
-    if ( 'svg-map-lite_page_svgml-panel-builder' === $screen->id ) :
+    // Note: pages registered with null parent get the hook id 'admin_page_svgml-*',
+    // so we check $_GET['page'] instead of $screen->id for reliability.
+    if ( 'svgml-panel-builder' === $current_page ) :
     ?>
     <script>
     jQuery(document).ready(function($) {
@@ -420,18 +414,27 @@ function svgml_admin_footer_scripts() {
             var $preview = $('#svgml-live-preview');
             if (!$preview.length) return;
 
-            var raw = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.jsonData : null;
-            if (!raw) {
-                $preview.html('<p class="svgml-preview-empty">Geen JSON-data geladen.<br>' +
-                              '<small>Vul een JSON-URL in bij Instellingen.</small></p>');
-                return;
+            var isManual = (typeof svgmlAdmin !== 'undefined' && svgmlAdmin.mapMode === 'manual');
+            var obj;
+
+            if (isManual) {
+                // Manual mode: no JSON feed. Use a dummy object with the three
+                // hardcoded fields so the preview renders without crashing.
+                obj = { title: 'Voorbeeld naam', status: 'Beschikbaar', size: '120 m²' };
+            } else {
+                var raw = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.jsonData : null;
+                if (!raw) {
+                    $preview.html('<p class="svgml-preview-empty">Geen JSON-data geladen.<br>' +
+                                  '<small>Vul een JSON-URL in bij Instellingen.</small></p>');
+                    return;
+                }
+                var data = svgml_previewNormalizeToArray(raw);
+                if (!data || data.length === 0) {
+                    $preview.html('<p class="svgml-preview-empty">Geen objecten gevonden in de feed.</p>');
+                    return;
+                }
+                obj = data[0];
             }
-            var data = svgml_previewNormalizeToArray(raw);
-            if (!data || data.length === 0) {
-                $preview.html('<p class="svgml-preview-empty">Geen objecten gevonden in de feed.</p>');
-                return;
-            }
-            var obj = data[0];
 
             var blocks = svgml_readCurrentBlocks();
             if (blocks.length === 0) {
@@ -517,16 +520,28 @@ function svgml_admin_footer_scripts() {
             var $preview = $('#svgml-overview-live-preview');
             if (!$preview.length) return;
 
-            var raw = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.jsonData : null;
-            if (!raw) {
-                $preview.html('<p class="svgml-preview-empty">Geen JSON-data geladen.<br>' +
-                              '<small>Voer een JSON-URL in bij Instellingen.</small></p>');
-                return;
-            }
-            var data = svgml_previewNormalizeToArray(raw);
-            if (!data || data.length === 0) {
-                $preview.html('<p class="svgml-preview-empty">Geen objecten gevonden in de feed.</p>');
-                return;
+            var isManual = (typeof svgmlAdmin !== 'undefined' && svgmlAdmin.mapMode === 'manual');
+            var data;
+
+            if (isManual) {
+                // Manual mode: use dummy rows for overview preview
+                data = [
+                    { title: 'Voorbeeld naam 1', status: 'Beschikbaar', size: '120 m²' },
+                    { title: 'Voorbeeld naam 2', status: 'Verkocht',     size: '85 m²'  },
+                    { title: 'Voorbeeld naam 3', status: 'Onder optie',  size: '200 m²' },
+                ];
+            } else {
+                var raw = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.jsonData : null;
+                if (!raw) {
+                    $preview.html('<p class="svgml-preview-empty">Geen JSON-data geladen.<br>' +
+                                  '<small>Voer een JSON-URL in bij Instellingen.</small></p>');
+                    return;
+                }
+                data = svgml_previewNormalizeToArray(raw);
+                if (!data || data.length === 0) {
+                    $preview.html('<p class="svgml-preview-empty">Geen objecten gevonden in de feed.</p>');
+                    return;
+                }
             }
 
             var blocks = svgml_readOverviewBlocks();
@@ -680,7 +695,8 @@ function svgml_admin_footer_scripts() {
     endif;
 
     // ── Styles page: CodeMirror initialization + reset button ───────────────
-    if ( 'svg-map-lite_page_svgml-styles' === $screen->id ) :
+    // Note: null-parent pages use $_GET['page'] for detection (not $screen->id).
+    if ( 'svgml-styles' === $current_page ) :
     ?>
     <script>
     jQuery(document).ready(function($) {

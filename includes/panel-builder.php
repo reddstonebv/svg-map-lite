@@ -144,7 +144,13 @@ function svgml_render_panel_builder_page( $map_id ) {
     $overview_blocks   = get_post_meta( $map_id, '_svgml_overview_blocks', true );
     if ( ! is_array( $overview_blocks ) ) $overview_blocks = [];
 
-    $field_names       = svgml_get_json_field_names( $map_id ); // Auto-detect uit JSON
+    $map_mode    = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+    // In manual mode there is no JSON feed. Use the fixed manual data keys.
+    if ( 'manual' === $map_mode ) {
+        $field_names = [ 'title', 'status', 'size' ];
+    } else {
+        $field_names = svgml_get_json_field_names( $map_id ); // Auto-detect uit JSON
+    }
     $block_types       = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider' ];
     $block_type_labels = [
         'thumbnail' => '🖼️ Thumbnail',
@@ -229,7 +235,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                     <thead>
                         <tr>
                             <th style="width:28px">☰</th>
-                            <th style="width:22%">JSON Veld</th>
+                            <th style="width:22%"><?php echo ( 'manual' === $map_mode ) ? 'Veld' : 'JSON Veld'; ?></th>
                             <th style="width:18%">Type</th>
                             <th style="width:14%">Breedte</th>
                             <th style="width:20%">Label (optioneel)</th>
