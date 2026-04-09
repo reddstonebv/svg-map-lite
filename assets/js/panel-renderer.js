@@ -64,7 +64,23 @@ jQuery(document).ready(function($) {
         // Nothing to do if no status field is set
         if (!statusField) return;
 
-        // Get the normalized JSON array
+        if (svgmlData.mapMode === 'manual') {
+            // ── Manual mode: loop over manualData keyed by svgId ─────────────
+            var manualData = svgmlData.manualData || {};
+            if (!manualData || typeof manualData !== 'object') return;
+
+            $.each(manualData, function(svgId, obj) {
+                if (!obj) return;
+                var statusValue = String(obj[statusField] || '');
+                if (!statusValue) return;
+                var cssClass = statusColors[statusValue] || '';
+                if (!cssClass) return;
+                $svg.find('#' + svgId).addClass('svgml-status-' + cssClass);
+            });
+            return;
+        }
+
+        // ── JSON mode ────────────────────────────────────────────────────────
         var data = svgml.normalizeToArray(svgmlData.jsonData);
         if (!data) return;
 
@@ -72,7 +88,6 @@ jQuery(document).ready(function($) {
         var mapping  = svgmlData.mapping || {};
 
         // Build a fast lookup table: json-object-id → object
-        // This way we don't need to search through the entire array for each SVG region.
         var jsonLookup = {};
         $.each(data, function(i, obj) {
             var objId = String(obj[idField] || '');
@@ -84,18 +99,14 @@ jQuery(document).ready(function($) {
         // Loop through all SVG→JSON mappings
         $.each(mapping, function(svgId, jsonId) {
             var obj = jsonLookup[String(jsonId)];
-            if (!obj) return; // No object found – continue
+            if (!obj) return;
 
             var statusValue = String(obj[statusField] || '');
-            if (!statusValue) return; // No status value
+            if (!statusValue) return;
 
-            // Find the CSS class that belongs to this status value
             var cssClass = statusColors[statusValue] || '';
             if (!cssClass) return;
 
-            // Add the status class to the SVG element
-            // The class is applied as 'svgml-status-{cssClass}'
-            // so it's easy to style via CSS.
             $svg.find('#' + svgId).addClass('svgml-status-' + cssClass);
         });
     }
@@ -131,6 +142,7 @@ jQuery(document).ready(function($) {
                 .removeAttr('aria-hidden')
                 .stop(true, true)
                 .fadeIn(200);
+            $standalonePanel.find('.svgml-panel-close-standalone').css('display', 'flex');
         }
     });
 
@@ -148,6 +160,7 @@ jQuery(document).ready(function($) {
 
     // Click on the close button of the standalone panel
     $(document).on('click', '.svgml-panel-close-standalone', function() {
+        $(this).hide();
         if (svgmlData.overviewEnabled) {
             // Return to overview
             $standalonePanel.find('#svgml-panel-content-standalone').html(
@@ -185,10 +198,13 @@ jQuery(document).ready(function($) {
             var type  = block.type  || 'text';
             var field = block.field || '';
             var label = block.label || '';
-            // Width as percentage: 100, 75, 50, 33, 25
-            // We store this as 'width' in the block object (e.g., 50 for 50%).
-            // In CSS this is applied as flex-basis.
             var width = parseInt(block.width || 100, 10);
+
+            // In manual mode the block has no JSON field key; derive it from
+            // the block's array index, which matches the backend storage key.
+            if (svgmlData.mapMode === 'manual' && field === '') {
+                field = 'manual_field_' + i;
+            }
 
             // Get the value from the JSON object
             // Divider doesn't need a field value
@@ -400,6 +416,7 @@ jQuery(document).ready(function($) {
         if ($standalonePanel.length) {
             $standalonePanel.find('#svgml-panel-content-standalone').html(html);
             $standalonePanel.removeAttr('aria-hidden').show();
+            $standalonePanel.find('.svgml-panel-close-standalone').hide();
         }
     }
 
@@ -411,73 +428,100 @@ jQuery(document).ready(function($) {
      * @returns {string} – HTML string
      */
     function svgml_buildOverviewHtml() {
-        var overviewBlocks = svgmlData.overviewBlocks || [];
-        var mapping        = svgmlData.mapping || {};
-        var data           = svgml.normalizeToArray(svgmlData.jsonData);
-        var idField        = svgmlData.jsonIdField || 'id';
-
-        if (!data || data.length === 0) {
-            return '<p class="svgml-panel-empty">Geen objecten beschikbaar.</p>';
-        }
-
-        // Build a fast lookup: json-id → json-object
-        var jsonLookup = {};
-        $.each(data, function(i, obj) {
-            var objId = String(obj[idField] || '');
-            if (objId) jsonLookup[objId] = obj;
-        });
-
-        // Refresh the mapping: SVG-id → JSON-id → object
-        // We also create a reverse lookup: json-id → svg-id
-        var jsonIdToSvgId = {};
-        $.each(mapping, function(svgId, jsonId) {
-            jsonIdToSvgId[String(jsonId)] = svgId;
-        });
-
-        var html = '<div class="svgml-overview-list">';
-
-        // If there are overview blocks, render each row with those blocks
-        // Otherwise: simple list with all fields of the first JSON object
+        var overviewBlocks    = svgmlData.overviewBlocks || [];
         var hasOverviewBlocks = (overviewBlocks.length > 0);
+        var html              = '<div class="svgml-overview-list">';
 
-        $.each(mapping, function(svgId, jsonId) {
-            var obj = jsonLookup[String(jsonId)];
-            if (!obj) return; // No object found for this SVG ID – skip
-
-            var rowHtml = '';
-            if (hasOverviewBlocks) {
-                // Render with the configured overview blocks
-                $.each(overviewBlocks, function(i, block) {
-                    var field = block.field || '';
-                    var type  = block.type  || 'text';
-                    var label = block.label || '';
-                    var value = (field && obj.hasOwnProperty(field)) ? obj[field] : null;
-                    if (value === null || value === undefined || value === '') return;
-                    var isHtml = !!(block.html);
-                    rowHtml += svgml_renderOverviewBlock(type, field, value, label, obj, isHtml);
-                });
-            } else {
-                // Fallback: show the first string value we find as label
-                var firstVal = '';
-                $.each(obj, function(k, v) {
-                    if (!firstVal && typeof v === 'string' && v.length > 0 && k !== idField) {
-                        firstVal = v;
-                    }
-                });
-                rowHtml = '<span class="svgml-overview-title">' + svgml.escapeHtml(firstVal || String(jsonId)) + '</span>';
+        if (svgmlData.mapMode === 'manual') {
+            // ── Manual mode: iterate manualData keyed by svgId ───────────────
+            var manualData = svgmlData.manualData || {};
+            if (!manualData || typeof manualData !== 'object' || Object.keys(manualData).length === 0) {
+                return '<p class="svgml-panel-empty">Geen objecten beschikbaar.</p>';
             }
 
-            // Each row is clickable and triggers the region-click event
-            html += '<div class="svgml-overview-item" ' +
-                    'data-svg-id="' + svgml.escapeHtml(svgId) + '" ' +
-                    'data-json-id="' + svgml.escapeHtml(String(jsonId)) + '">' +
-                    rowHtml +
-                    '</div>';
-        });
+            $.each(manualData, function(svgId, obj) {
+                if (!obj) return;
+                var rowHtml = '';
+                if (hasOverviewBlocks) {
+                    $.each(overviewBlocks, function(i, block) {
+                        var field = block.field || '';
+                        var type  = block.type  || 'text';
+                        var label = block.label || '';
+                        var value = (field && obj.hasOwnProperty(field)) ? obj[field] : null;
+                        if (value === null || value === undefined || value === '') return;
+                        var isHtml = !!(block.html);
+                        rowHtml += svgml_renderOverviewBlock(type, field, value, label, obj, isHtml);
+                    });
+                } else {
+                    // Fallback: first non-empty value in the object
+                    var firstVal = '';
+                    $.each(obj, function(k, v) {
+                        if (!firstVal && typeof v === 'string' && v.length > 0) {
+                            firstVal = v;
+                        }
+                    });
+                    rowHtml = '<span class="svgml-overview-title">' + svgml.escapeHtml(firstVal || svgId) + '</span>';
+                }
+
+                // data-json-id = svgId in manual mode (no separate JSON ID)
+                html += '<div class="svgml-overview-item" ' +
+                        'data-svg-id="' + svgml.escapeHtml(svgId) + '" ' +
+                        'data-json-id="' + svgml.escapeHtml(svgId) + '">' +
+                        rowHtml +
+                        '</div>';
+            });
+
+        } else {
+            // ── JSON mode ────────────────────────────────────────────────────
+            var mapping = svgmlData.mapping || {};
+            var data    = svgml.normalizeToArray(svgmlData.jsonData);
+            var idField = svgmlData.jsonIdField || 'id';
+
+            if (!data || data.length === 0) {
+                return '<p class="svgml-panel-empty">Geen objecten beschikbaar.</p>';
+            }
+
+            var jsonLookup = {};
+            $.each(data, function(i, obj) {
+                var objId = String(obj[idField] || '');
+                if (objId) jsonLookup[objId] = obj;
+            });
+
+            $.each(mapping, function(svgId, jsonId) {
+                var obj = jsonLookup[String(jsonId)];
+                if (!obj) return;
+
+                var rowHtml = '';
+                if (hasOverviewBlocks) {
+                    $.each(overviewBlocks, function(i, block) {
+                        var field = block.field || '';
+                        var type  = block.type  || 'text';
+                        var label = block.label || '';
+                        var value = (field && obj.hasOwnProperty(field)) ? obj[field] : null;
+                        if (value === null || value === undefined || value === '') return;
+                        var isHtml = !!(block.html);
+                        rowHtml += svgml_renderOverviewBlock(type, field, value, label, obj, isHtml);
+                    });
+                } else {
+                    var firstVal = '';
+                    $.each(obj, function(k, v) {
+                        if (!firstVal && typeof v === 'string' && v.length > 0 && k !== idField) {
+                            firstVal = v;
+                        }
+                    });
+                    rowHtml = '<span class="svgml-overview-title">' + svgml.escapeHtml(firstVal || String(jsonId)) + '</span>';
+                }
+
+                html += '<div class="svgml-overview-item" ' +
+                        'data-svg-id="' + svgml.escapeHtml(svgId) + '" ' +
+                        'data-json-id="' + svgml.escapeHtml(String(jsonId)) + '">' +
+                        rowHtml +
+                        '</div>';
+            });
+        }
 
         html += '</div>';
 
-        // If nothing was rendered
         if (html === '<div class="svgml-overview-list"></div>') {
             html = '<p class="svgml-panel-empty">Geen objecten om weer te geven.</p>';
         }
@@ -535,19 +579,24 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.svgml-overview-item', function() {
         var svgId  = $(this).data('svg-id');
         var jsonId = $(this).data('json-id');
-
-        // Look up the JSON object
-        var data   = svgml.normalizeToArray(svgmlData.jsonData);
-        var idField = svgmlData.jsonIdField || 'id';
         var obj    = null;
 
-        if (data) {
-            $.each(data, function(i, item) {
-                if (String(item[idField] || '') === String(jsonId)) {
-                    obj = item;
-                    return false; // break
-                }
-            });
+        if (svgmlData.mapMode === 'manual') {
+            // ── Manual mode: look up directly by svgId ────────────────────────
+            var manualData = svgmlData.manualData || {};
+            obj = manualData[svgId] || null;
+        } else {
+            // ── JSON mode: search jsonData array ─────────────────────────────
+            var data    = svgml.normalizeToArray(svgmlData.jsonData);
+            var idField = svgmlData.jsonIdField || 'id';
+            if (data) {
+                $.each(data, function(i, item) {
+                    if (String(item[idField] || '') === String(jsonId)) {
+                        obj = item;
+                        return false; // break
+                    }
+                });
+            }
         }
 
         if (!obj) return;

@@ -16,6 +16,17 @@ add_shortcode( 'svg_map_panel', 'svgml_render_panel_shortcode' );
 add_shortcode( 'svg_map_lite', 'svgml_render_shortcode' );  // backward compat
 
 /**
+ * Enqueue all registered frontend assets on demand (called from shortcode callbacks).
+ */
+function svgml_enqueue_frontend_assets() {
+    wp_enqueue_style(  'svgml-frontend-css' );
+    wp_enqueue_script( 'svgml-utils-js' );
+    wp_enqueue_script( 'svgml-frontend-js' );
+    wp_enqueue_script( 'svgml-panel-renderer-js' );
+    wp_enqueue_script( 'svgml-filters-js' );
+}
+
+/**
  * Register custom CSS output hook
  */
 add_action( 'wp_head', 'svgml_output_custom_css' );
@@ -52,6 +63,9 @@ function svgml_render_shortcode( $atts ) {
             return '<p class="svgml-error">Geen SVG kaart geconfigureerd.' . $admin_link . '</p>';
         }
     }
+
+    // Enqueue frontend assets on demand (registered in svg-map-lite.php)
+    svgml_enqueue_frontend_assets();
 
     // Helper function to get post meta with fallback
     $get_meta = function( $key, $default = '' ) use ( $map_id ) {
@@ -140,13 +154,23 @@ function svgml_render_shortcode( $atts ) {
     }
 
     // ── JSON DATA OPHALEN ────────────────────────────────────────────────────
+    $map_mode     = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
     $json_data    = svgml_get_json_data( $map_id );
     $excluded_ids = $get_meta( 'excluded_ids', [] );
     if ( ! is_array( $excluded_ids ) ) $excluded_ids = [];
 
+    // In manual mode, pass the manually-entered region data so the frontend JS
+    // can look up a clicked region's data without a JSON feed.
+    $manual_data = [];
+    if ( 'manual' === $map_mode ) {
+        $manual_data = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
+        if ( ! is_array( $manual_data ) ) $manual_data = [];
+    }
+
     // ── DATA DOORGEVEN AAN JAVASCRIPT ───────────────────────────────────────
     $js_data = json_encode( [
         'mapId'           => $map_id,  // IMPORTANT: Include map ID for multi-map support
+        'mapMode'         => $map_mode,
         'sourceType'      => $source_type,
         'imageUrl'        => $image_url,
         'polygons'        => $polygons,
@@ -164,9 +188,17 @@ function svgml_render_shortcode( $atts ) {
         'overviewEnabled' => $overview_enabled,
         'overviewBlocks'  => $overview_blocks,
         'jsonArrayKey'    => $json_array_key,
+        'manualData'      => $manual_data,
     ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT );
 
     wp_add_inline_script( 'svgml-frontend-js', 'var svgmlData = ' . $js_data . ';' );
+
+    // ── HTML TRANSIENT CACHE ───────────────────────────────────────────────────
+    $transient_key = 'svgml_html_' . $map_id;
+    $cached_html   = get_transient( $transient_key );
+    if ( false !== $cached_html ) {
+        return $cached_html;
+    }
 
     // ── BUILD HTML WITH OUTPUT BUFFER ──────────────────────────────────────────
     ob_start();
@@ -348,7 +380,9 @@ function svgml_render_shortcode( $atts ) {
         </div><!-- .svgml-container -->
     </div><!-- .svgml-wrap -->
     <?php
-    return ob_get_clean();
+    $html = ob_get_clean();
+    set_transient( $transient_key, $html, 12 * HOUR_IN_SECONDS );
+    return $html;
 }
 
 /**
@@ -413,6 +447,7 @@ function svgml_render_panel_shortcode( $atts ) {
 function svgml_clear_json_cache( $map_id = 0 ) {
     if ( $map_id ) {
         delete_transient( 'svgml_json_cache_' . $map_id );
+        delete_transient( 'svgml_html_'       . $map_id );
     }
 }
 
@@ -489,6 +524,41 @@ function svgml_output_custom_css() {
             $css_output .= ".svgml-svg [id].svgml-region-dimmed,"
                          . ".svgml-svg [id].svgml-region-dimmed *"
                          . " { fill: {$filter_dim_color} !important; opacity: 1 !important; }\n";
+        }
+
+        // Panel & Filter Styling
+        $panel_bg_color      = $get_meta( 'panel_bg_color',      '' );
+        $panel_text_color    = $get_meta( 'panel_text_color',     '' );
+        $panel_border_radius = $get_meta( 'panel_border_radius',  '' );
+        $filter_bg_color     = $get_meta( 'filter_bg_color',      '' );
+        $filter_text_color   = $get_meta( 'filter_text_color',    '' );
+        $panel_border_color  = $get_meta( 'panel_border_color',   '' );
+        $panel_border_width  = $get_meta( 'panel_border_width',   '' );
+        $slider_accent_color = $get_meta( 'slider_accent_color',  '' );
+
+        if ( ! empty( $panel_bg_color ) && sanitize_hex_color( $panel_bg_color ) ) {
+            $css_output .= ".svgml-panel-inner { background-color: {$panel_bg_color} !important; }\n";
+        }
+        if ( ! empty( $panel_text_color ) && sanitize_hex_color( $panel_text_color ) ) {
+            $css_output .= ".svgml-panel-inner, .svgml-panel-inner * { color: {$panel_text_color} !important; }\n";
+        }
+        if ( '' !== $panel_border_radius ) {
+            $radius = max( 0, min( 50, intval( $panel_border_radius ) ) );
+            $css_output .= ".svgml-panel-inner { border-radius: {$radius}px !important; }\n";
+        }
+        if ( ! empty( $filter_bg_color ) && sanitize_hex_color( $filter_bg_color ) ) {
+            $css_output .= ".svgml-filters-bar { background-color: {$filter_bg_color} !important; }\n";
+        }
+        if ( ! empty( $filter_text_color ) && sanitize_hex_color( $filter_text_color ) ) {
+            $css_output .= ".svgml-filters-bar, .svgml-filter-label { color: {$filter_text_color} !important; }\n";
+        }
+        if ( ! empty( $panel_border_color ) && sanitize_hex_color( $panel_border_color ) && '' !== $panel_border_width && intval( $panel_border_width ) > 0 ) {
+            $bw = intval( $panel_border_width );
+            $css_output .= ".svgml-panel-inner { border: {$bw}px solid {$panel_border_color} !important; }\n";
+        }
+        if ( ! empty( $slider_accent_color ) && sanitize_hex_color( $slider_accent_color ) ) {
+            $css_output .= ".svgml-range-slider .noUi-connect { background-color: {$slider_accent_color} !important; }\n";
+            $css_output .= ".svgml-range-slider .noUi-handle { border-color: {$slider_accent_color} !important; }\n";
         }
 
         // Polygon stroke styling

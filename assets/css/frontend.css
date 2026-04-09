@@ -368,6 +368,11 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 
+/* Close button only appears when a detail view is open, not on the overview */
+.svgml-panel-standalone .svgml-panel-close-standalone {
+    display: none;
+}
+
 /* ── PANEL: BINNENSTE WRAPPER ───────────────────────────────────────────── */
 .svgml-panel-inner {
     position: relative;

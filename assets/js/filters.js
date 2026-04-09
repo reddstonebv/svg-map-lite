@@ -34,24 +34,39 @@ jQuery(document).ready(function($) {
     var hasNoUiSlider = (typeof noUiSlider !== 'undefined');
 
     // ── PREPARE DATA ─────────────────────────────────────────────────────────
+    var isManual     = (svgmlData.mapMode === 'manual');
     var $svg         = $('.svgml-svg');
     var idField      = svgmlData.jsonIdField || 'id';
     var mapping      = svgmlData.mapping     || {};
     var filterFields = svgmlData.filterFields;
 
-    // Normalize the JSON to an array (same logic as in frontend.js)
-    var jsonData = svgml.normalizeToArray(svgmlData.jsonData);
-    if (!jsonData) return; // No usable data
+    // dataObjects: flat array used by all value-collection loops (dropdown, range, search, buttons)
+    var dataObjects  = [];
+    // regionLookup: { svgId → dataObject } used by svgml_applyFilters()
+    var regionLookup = {};
 
-    // Build a fast lookup table: json-object-id → object
-    // This way we can quickly find the corresponding JSON object for each SVG region.
-    var jsonLookup = {};
-    $.each(jsonData, function(i, obj) {
-        var objId = String(obj[idField] || '');
-        if (objId) {
-            jsonLookup[objId] = obj;
-        }
-    });
+    if (isManual) {
+        var manualData = svgmlData.manualData || {};
+        $.each(manualData, function(svgId, obj) {
+            dataObjects.push(obj);
+            regionLookup[svgId] = obj;
+        });
+        if (dataObjects.length === 0) return; // No manual data → nothing to filter
+    } else {
+        var jsonData = svgml.normalizeToArray(svgmlData.jsonData);
+        if (!jsonData) return; // No JSON data → nothing to filter
+        var jsonLookup = {};
+        $.each(jsonData, function(i, obj) {
+            var objId = String(obj[idField] || '');
+            if (objId) jsonLookup[objId] = obj;
+            dataObjects.push(obj);
+        });
+        // Build regionLookup via mapping → jsonLookup
+        $.each(mapping, function(svgId, jsonId) {
+            var obj = jsonLookup[String(jsonId)];
+            if (obj) regionLookup[svgId] = obj;
+        });
+    }
 
     // Store the current filter state: { fieldname: active-value }
     // For dropdowns the value is a string, for ranges it is an array [min, max].
@@ -97,7 +112,7 @@ jQuery(document).ready(function($) {
 
         // Collect all unique non-empty values for this field
         var values = [];
-        $.each(jsonData, function(i, obj) {
+        $.each(dataObjects, function(i, obj) {
             var val = obj[field];
             if (val !== null && val !== undefined && val !== '' && values.indexOf(String(val)) === -1) {
                 values.push(String(val));
@@ -150,7 +165,7 @@ jQuery(document).ready(function($) {
 
         // Collect all numeric values for this field
         var values = [];
-        $.each(jsonData, function(i, obj) {
+        $.each(dataObjects, function(i, obj) {
             var raw = obj[field];
             // parseFloat() converts a string to a number (e.g. "4921.00" → 4921)
             var num = parseFloat(String(raw).replace(/[^0-9.,]/g, '').replace(',', '.'));
@@ -270,7 +285,7 @@ jQuery(document).ready(function($) {
 
         // Collect all unique values for this field
         var allValues = [];
-        $.each(jsonData, function(i, obj) {
+        $.each(dataObjects, function(i, obj) {
             var val = obj[field];
             if (val !== null && val !== undefined && val !== '' && allValues.indexOf(String(val)) === -1) {
                 allValues.push(String(val));
@@ -383,8 +398,8 @@ jQuery(document).ready(function($) {
             values = $.map(customVals.split(','), function(v) { return $.trim(v); });
             values = $.grep(values, function(v) { return v !== ''; });
         } else {
-            // Auto: collect all unique values from the JSON
-            $.each(jsonData, function(i, obj) {
+            // Auto: collect all unique values from the data
+            $.each(dataObjects, function(i, obj) {
                 var val = obj[field];
                 if (val !== null && val !== undefined && val !== '' && values.indexOf(String(val)) === -1) {
                     values.push(String(val));
@@ -396,7 +411,7 @@ jQuery(document).ready(function($) {
         // Count the number of objects per value (for the optional counter)
         var counts = {};
         if (showCount) {
-            $.each(jsonData, function(i, obj) {
+            $.each(dataObjects, function(i, obj) {
                 var val = String(obj[field] || '');
                 if (val) counts[val] = (counts[val] || 0) + 1;
             });
@@ -486,8 +501,8 @@ jQuery(document).ready(function($) {
     function svgml_applyFilters() {
         var hasActiveFilters = Object.keys(filterState).length > 0;
 
-        // Loop through all mapped SVG regions
-        $.each(mapping, function(svgId, jsonId) {
+        // Loop through all regions that have a data object (works for both JSON and manual mode)
+        $.each(regionLookup, function(svgId, obj) {
             var $region = $svg.find('#' + svgId);
             if (!$region.length) return; // Region not in SVG – skip
 
@@ -500,10 +515,8 @@ jQuery(document).ready(function($) {
                 return;
             }
 
-            // Get the JSON object for this region
-            var obj = jsonLookup[String(jsonId)];
             if (!obj) {
-                // No JSON object found → dim (because we cannot check)
+                // No data object found → dim (because we cannot check)
                 $region.addClass('svgml-region-dimmed');
                 return;
             }

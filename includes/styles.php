@@ -20,6 +20,7 @@ function svgml_render_styles_page( $map_id ) {
             update_post_meta( $map_id, '_svgml_custom_css', $custom_css );
 
             delete_transient( 'svgml_json_cache_' . $map_id );
+            delete_transient( 'svgml_html_'       . $map_id );
 
             echo '<div class="notice notice-success is-dismissible"><p>CSS opgeslagen!</p></div>';
         }

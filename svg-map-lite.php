@@ -425,19 +425,16 @@ function svgml_render_editor_wrapper() {
     $current_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : 'svgml-settings';
 
     // Get map mode to conditionally set tab labels
-    $map_mode = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'manual';
-    
-    // Determine mapping tab label based on mode
-    $mapping_label = ( 'json' === $map_mode ) ? 'Regio Koppeling' : 'Region Data';
+    $map_mode = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
 
     // Tab definitions: slug => [ label, include_file, render_function ]
     $tabs = [
-        'svgml-settings'      => [ 'Instellingen',    'settings.php',      'svgml_render_settings_page' ],
-        'svgml-mapping'       => [ $mapping_label,    'mapping.php',       'svgml_render_mapping_page' ],
-        'svgml-display'       => [ 'Weergave',        'display.php',       'svgml_render_display_page' ],
-        'svgml-panel-builder' => [ 'Panel Builder',    'panel-builder.php', 'svgml_render_panel_builder_page' ],
-        'svgml-filters'       => [ 'Filters',          'filters.php',      'svgml_render_filters_page' ],
-        'svgml-styles'        => [ 'Stijlen & CSS',    'styles.php',       'svgml_render_styles_page' ],
+        'svgml-settings'      => [ 'Afbeelding & Koppeling', 'settings.php',      'svgml_render_settings_page' ],
+        'svgml-mapping'       => [ 'Data per Vlak',          'mapping.php',       'svgml_render_mapping_page' ],
+        'svgml-panel-builder' => [ 'Paneel Bouwer',          'panel-builder.php', 'svgml_render_panel_builder_page' ],
+        'svgml-display'       => [ 'Weergave',               'display.php',       'svgml_render_display_page' ],
+        'svgml-filters'       => [ 'Filters',                'filters.php',       'svgml_render_filters_page' ],
+        'svgml-styles'        => [ 'Stijlen & CSS',          'styles.php',        'svgml_render_styles_page' ],
     ];
 
     // Handle inline title editing (quick rename via the header)
@@ -664,14 +661,7 @@ function svgml_admin_enqueue( $hook ) {
 add_action( 'wp_enqueue_scripts', 'svgml_frontend_enqueue' );
 
 function svgml_frontend_enqueue() {
-    // Only load on pages with our shortcodes
-    global $post;
-    if ( ! is_a( $post, 'WP_Post' ) ) return;
-    if ( ! has_shortcode( $post->post_content, 'svg_map' )
-      && ! has_shortcode( $post->post_content, 'svg_map_lite' )
-      && ! has_shortcode( $post->post_content, 'svg_map_panel' ) ) {
-        return;
-    }
+    // Register all frontend assets — enqueued on demand when shortcode renders.
 
     // noUiSlider (local vendor preferred, CDN fallback)
     if ( file_exists( SVGML_PATH . 'assets/css/vendor/nouislider.min.css' ) ) {
@@ -685,14 +675,13 @@ function svgml_frontend_enqueue() {
         $noui_js = 'https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js';
     }
 
-    wp_enqueue_style( 'nouislider-css', $noui_css, [], '15.8.1' );
-    wp_enqueue_script( 'nouislider-js', $noui_js, [], '15.8.1', true );
-    wp_enqueue_style( 'svgml-frontend-css', SVGML_URL . 'assets/css/frontend.css', [ 'nouislider-css' ], SVGML_VERSION );
-
-    wp_enqueue_script( 'svgml-utils-js', SVGML_URL . 'assets/js/utils.js', [], SVGML_VERSION, true );
-    wp_enqueue_script( 'svgml-frontend-js', SVGML_URL . 'assets/js/frontend.js', [ 'jquery', 'svgml-utils-js' ], SVGML_VERSION, true );
-    wp_enqueue_script( 'svgml-panel-renderer-js', SVGML_URL . 'assets/js/panel-renderer.js', [ 'jquery', 'svgml-utils-js', 'svgml-frontend-js' ], SVGML_VERSION, true );
-    wp_enqueue_script( 'svgml-filters-js', SVGML_URL . 'assets/js/filters.js', [ 'jquery', 'nouislider-js', 'svgml-utils-js', 'svgml-frontend-js' ], SVGML_VERSION, true );
+    wp_register_style(  'nouislider-css',         $noui_css, [], '15.8.1' );
+    wp_register_script( 'nouislider-js',           $noui_js,  [], '15.8.1', true );
+    wp_register_style(  'svgml-frontend-css',      SVGML_URL . 'assets/css/frontend.css',       [ 'nouislider-css' ],                                       SVGML_VERSION );
+    wp_register_script( 'svgml-utils-js',          SVGML_URL . 'assets/js/utils.js',            [],                                                         SVGML_VERSION, true );
+    wp_register_script( 'svgml-frontend-js',       SVGML_URL . 'assets/js/frontend.js',         [ 'jquery', 'svgml-utils-js' ],                             SVGML_VERSION, true );
+    wp_register_script( 'svgml-panel-renderer-js', SVGML_URL . 'assets/js/panel-renderer.js',   [ 'jquery', 'svgml-utils-js', 'svgml-frontend-js' ],        SVGML_VERSION, true );
+    wp_register_script( 'svgml-filters-js',        SVGML_URL . 'assets/js/filters.js',          [ 'jquery', 'nouislider-js', 'svgml-utils-js', 'svgml-frontend-js' ], SVGML_VERSION, true );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

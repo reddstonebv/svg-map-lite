@@ -52,7 +52,34 @@ function svgml_render_display_page( $map_id ) {
             update_post_meta( $map_id, '_svgml_status_colors',     $status_colors );
             update_post_meta( $map_id, '_svgml_status_hex_colors', $status_hex_colors );
             update_post_meta( $map_id, '_svgml_status_opacity',    $status_opacity );
+
+            // ── Layer Switcher Style ─────────────────────────────────────────
+            if ( isset( $_POST['svgml_layer_switcher'] ) ) {
+                $switcher = sanitize_text_field( $_POST['svgml_layer_switcher'] );
+                if ( ! in_array( $switcher, [ 'buttons', 'dropdown', 'custom' ] ) ) $switcher = 'buttons';
+                update_post_meta( $map_id, '_svgml_layer_switcher', $switcher );
+            }
+
+            // ── Panel & Filter Styling ───────────────────────────────────────────────
+            $panel_bg_color       = sanitize_hex_color( $_POST['svgml_panel_bg_color']    ?? '' ) ?: '';
+            $panel_text_color     = sanitize_hex_color( $_POST['svgml_panel_text_color']  ?? '' ) ?: '';
+            $panel_border_radius  = max( 0, min( 50, intval( $_POST['svgml_panel_border_radius'] ?? 8 ) ) );
+            $filter_bg_color      = sanitize_hex_color( $_POST['svgml_filter_bg_color']   ?? '' ) ?: '';
+            $filter_text_color    = sanitize_hex_color( $_POST['svgml_filter_text_color'] ?? '' ) ?: '';
+            update_post_meta( $map_id, '_svgml_panel_bg_color',      $panel_bg_color );
+            update_post_meta( $map_id, '_svgml_panel_text_color',     $panel_text_color );
+            update_post_meta( $map_id, '_svgml_panel_border_radius',  (string) $panel_border_radius );
+            update_post_meta( $map_id, '_svgml_filter_bg_color',      $filter_bg_color );
+            update_post_meta( $map_id, '_svgml_filter_text_color',    $filter_text_color );
+            $panel_border_color  = sanitize_hex_color( $_POST['svgml_panel_border_color']  ?? '' ) ?: '';
+            $panel_border_width  = max( 0, min( 20, intval( $_POST['svgml_panel_border_width']  ?? 0 ) ) );
+            $slider_accent_color = sanitize_hex_color( $_POST['svgml_slider_accent_color'] ?? '' ) ?: '';
+            update_post_meta( $map_id, '_svgml_panel_border_color',  $panel_border_color );
+            update_post_meta( $map_id, '_svgml_panel_border_width',  (string) $panel_border_width );
+            update_post_meta( $map_id, '_svgml_slider_accent_color', $slider_accent_color );
+
             delete_transient( 'svgml_json_cache_' . $map_id );
+            delete_transient( 'svgml_html_'       . $map_id );
 
             echo '<div class="notice notice-success is-dismissible"><p>Statuskleuren opgeslagen!</p></div>';
         }
@@ -64,6 +91,18 @@ function svgml_render_display_page( $map_id ) {
     $status_hex_colors = get_post_meta( $map_id, '_svgml_status_hex_colors', true ) ?: [];
     $status_opacity    = get_post_meta( $map_id, '_svgml_status_opacity', true ) ?: [];
     $field_names       = svgml_get_json_field_names( $map_id );
+    $map_mode          = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+    $layer_switcher    = get_post_meta( $map_id, '_svgml_layer_switcher', true ) ?: 'buttons';
+    $panel_bg_color      = get_post_meta( $map_id, '_svgml_panel_bg_color',      true ) ?: '#ffffff';
+    $panel_text_color    = get_post_meta( $map_id, '_svgml_panel_text_color',     true ) ?: '#333333';
+    $panel_border_radius = get_post_meta( $map_id, '_svgml_panel_border_radius',  true );
+    $panel_border_radius = ( '' === $panel_border_radius ) ? 8 : intval( $panel_border_radius );
+    $filter_bg_color     = get_post_meta( $map_id, '_svgml_filter_bg_color',      true ) ?: '#f5f5f5';
+    $filter_text_color   = get_post_meta( $map_id, '_svgml_filter_text_color',    true ) ?: '#333333';
+    $panel_border_color  = get_post_meta( $map_id, '_svgml_panel_border_color',  true ) ?: '#cccccc';
+    $panel_border_width  = get_post_meta( $map_id, '_svgml_panel_border_width',  true );
+    $panel_border_width  = ( '' === $panel_border_width ) ? 0 : intval( $panel_border_width );
+    $slider_accent_color = get_post_meta( $map_id, '_svgml_slider_accent_color', true ) ?: '#2a9d8f';
 
     // Standaard vastgoed-statussen als er nog niets is ingesteld
     if ( empty( $status_colors ) ) {
@@ -88,7 +127,9 @@ function svgml_render_display_page( $map_id ) {
             <div class="svgml-section">
                 <h2>Welk veld bevat de status?</h2>
                 <p class="svgml-description">
-                    Selecteer het JSON-veld dat de beschikbaarheidsstatus van elk object bevat.
+                    <?php echo ( 'manual' === $map_mode )
+                        ? 'Selecteer het veld dat de beschikbaarheidsstatus bevat.'
+                        : 'Selecteer het JSON-veld dat de beschikbaarheidsstatus van elk object bevat.'; ?>
                 </p>
                 <table class="form-table">
                     <tr>
@@ -108,8 +149,12 @@ function svgml_render_display_page( $map_id ) {
                                 <?php endif; ?>
                             </select>
                             <p class="description">
-                                Voorbeeld: <code>rental_status</code>, <code>status</code>, <code>availability</code>.
-                                Dit veld moet in elk JSON-object voorkomen.
+                                <?php if ( 'manual' === $map_mode ) : ?>
+                                    Voorbeeld: <code>Status</code>, <code>Beschikbaarheid</code>.
+                                <?php else : ?>
+                                    Voorbeeld: <code>rental_status</code>, <code>status</code>, <code>availability</code>.
+                                    Dit veld moet in elk JSON-object voorkomen.
+                                <?php endif; ?>
                             </p>
                         </td>
                     </tr>
@@ -129,7 +174,7 @@ function svgml_render_display_page( $map_id ) {
                 <table class="wp-list-table widefat fixed striped" id="svgml-status-table">
                     <thead>
                         <tr>
-                            <th>Statuswaarde (exact uit JSON)</th>
+                            <th><?php echo ( 'manual' === $map_mode ) ? 'Statuswaarde (exact ingevuld)' : 'Statuswaarde (exact uit JSON)'; ?></th>
                             <th style="width:90px">Kleur</th>
                             <th style="width:130px">Opacity %</th>
                             <th style="width:200px">Preview</th>
@@ -194,9 +239,194 @@ function svgml_render_display_page( $map_id ) {
                 </p>
             </div>
 
+            <!-- ─── PANEL & FILTER STYLING ──────────────────────────────── -->
+            <div class="svgml-section">
+                <h2>Paneel & Filter Styling</h2>
+                <div style="display:flex; gap:32px; align-items:center; padding:0 24px 0 0;">
+
+                    <!-- Left: settings table -->
+                    <div style="flex:1; min-width:280px;">
+                        <table class="form-table" style="margin:0;">
+                            <tr>
+                                <th>Paneel achtergrond</th>
+                                <td>
+                                    <input type="color" name="svgml_panel_bg_color"
+                                           value="<?php echo esc_attr( $panel_bg_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Paneel tekstkleur</th>
+                                <td>
+                                    <input type="color" name="svgml_panel_text_color"
+                                           value="<?php echo esc_attr( $panel_text_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Paneel hoekradius (px)</th>
+                                <td>
+                                    <input type="number" name="svgml_panel_border_radius"
+                                           value="<?php echo esc_attr( $panel_border_radius ); ?>"
+                                           min="0" max="50" step="1" class="small-text">
+                                    <p class="description">Standaard: 8px</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Filterbalk achtergrond</th>
+                                <td>
+                                    <input type="color" name="svgml_filter_bg_color"
+                                           value="<?php echo esc_attr( $filter_bg_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Filterbalk tekstkleur</th>
+                                <td>
+                                    <input type="color" name="svgml_filter_text_color"
+                                           value="<?php echo esc_attr( $filter_text_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Paneel randkleur</th>
+                                <td>
+                                    <input type="color" name="svgml_panel_border_color"
+                                           value="<?php echo esc_attr( $panel_border_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Paneel randbreedte (px)</th>
+                                <td>
+                                    <input type="number" name="svgml_panel_border_width"
+                                           value="<?php echo esc_attr( $panel_border_width ); ?>"
+                                           min="0" max="20" step="1" class="small-text">
+                                    <p class="description">0 = geen rand</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Slider accentkleur</th>
+                                <td>
+                                    <input type="color" name="svgml_slider_accent_color"
+                                           value="<?php echo esc_attr( $slider_accent_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Right: live preview -->
+                    <div style="flex:1; min-width:240px;">
+                        <p style="font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:#888; margin:0 0 10px;">Live preview</p>
+
+                        <!-- Filter bar mockup -->
+                        <div id="svgml-preview-filter-bar" style="padding:10px 14px; border-radius:6px; margin-bottom:14px; display:flex; gap:8px; flex-wrap:wrap; background-color:<?php echo esc_attr( $filter_bg_color ); ?>; color:<?php echo esc_attr( $filter_text_color ); ?>;">
+                            <span style="background:rgba(0,0,0,.08); padding:4px 12px; border-radius:20px; font-size:13px; color:<?php echo esc_attr( $filter_text_color ); ?>;">Type ▾</span>
+                            <span style="background:rgba(0,0,0,.08); padding:4px 12px; border-radius:20px; font-size:13px; color:<?php echo esc_attr( $filter_text_color ); ?>;">Status ▾</span>
+                            <div style="width:100%; margin-top:6px; padding:4px 2px;">
+                                <div style="position:relative; height:4px; border-radius:2px; background:rgba(0,0,0,.15);">
+                                    <div id="svgml-preview-slider-connect" style="position:absolute; left:20%; right:30%; top:0; bottom:0; border-radius:2px; background-color:<?php echo esc_attr( $slider_accent_color ); ?>;"></div>
+                                    <div id="svgml-preview-slider-handle" style="position:absolute; left:20%; top:50%; transform:translate(-50%,-50%); width:14px; height:14px; border-radius:50%; background:#fff; border:2px solid <?php echo esc_attr( $slider_accent_color ); ?>; box-shadow:0 1px 4px rgba(0,0,0,.2);"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel mockup -->
+                        <div id="svgml-preview-panel" style="padding:20px; border-radius:<?php echo esc_attr( $panel_border_radius ); ?>px; background-color:<?php echo esc_attr( $panel_bg_color ); ?>; color:<?php echo esc_attr( $panel_text_color ); ?>; box-shadow:0 2px 12px rgba(0,0,0,.12); position:relative;">
+                            <div style="font-weight:600; font-size:15px; margin-bottom:10px; border-bottom:1px solid rgba(0,0,0,.08); padding-bottom:8px;">Regio naam</div>
+                            <div style="font-size:13px; line-height:1.8; opacity:.75;">Veld 1: Waarde A<br>Veld 2: Waarde B<br>Status: Beschikbaar</div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                (function($) {
+                    function svgml_updatePreview() {
+                        var panelBg          = $('[name="svgml_panel_bg_color"]').val();
+                        var panelText        = $('[name="svgml_panel_text_color"]').val();
+                        var panelRadius      = parseInt( $('[name="svgml_panel_border_radius"]').val(), 10 ) || 0;
+                        var panelBorderColor = $('[name="svgml_panel_border_color"]').val();
+                        var panelBorderWidth = parseInt( $('[name="svgml_panel_border_width"]').val(), 10 ) || 0;
+                        var filterBg         = $('[name="svgml_filter_bg_color"]').val();
+                        var filterText       = $('[name="svgml_filter_text_color"]').val();
+                        var sliderAccent     = $('[name="svgml_slider_accent_color"]').val();
+
+                        $('#svgml-preview-panel').css({
+                            'background-color': panelBg,
+                            'color':            panelText,
+                            'border-radius':    panelRadius + 'px',
+                            'border':           panelBorderWidth > 0 ? panelBorderWidth + 'px solid ' + panelBorderColor : 'none'
+                        });
+                        $('#svgml-preview-filter-bar').css({
+                            'background-color': filterBg,
+                            'color':            filterText
+                        });
+                        $('#svgml-preview-filter-bar span').css('color', filterText);
+                        $('#svgml-preview-slider-connect').css('background-color', sliderAccent);
+                        $('#svgml-preview-slider-handle').css('border-color', sliderAccent);
+                    }
+                    $(document).ready(function() {
+                        $('[name^="svgml_panel_"], [name^="svgml_filter_"], [name^="svgml_slider_"]').on('input change', svgml_updatePreview);
+                    });
+                })(jQuery);
+                </script>
+            </div>
+
+            <!-- ─── LAYER SWITCHER ──────────────────────────────────────── -->
+            <div class="svgml-section">
+                <h2>Layer Switcher Stijl</h2>
+                <p class="svgml-description">
+                    Kies hoe bezoekers kunnen schakelen tussen lagen op de kaart.
+                </p>
+                <table class="form-table">
+                    <tr>
+                        <th>Weergave stijl</th>
+                        <td>
+                            <div class="svgml-layer-switcher-options">
+                                <label style="display:inline-flex; align-items:center; gap:6px; margin-right:16px; cursor:pointer;">
+                                    <input type="radio" name="svgml_layer_switcher" value="buttons"
+                                           <?php checked( $layer_switcher, 'buttons' ); ?>>
+                                    Knoppen
+                                </label>
+                                <label style="display:inline-flex; align-items:center; gap:6px; margin-right:16px; cursor:pointer;">
+                                    <input type="radio" name="svgml_layer_switcher" value="dropdown"
+                                           <?php checked( $layer_switcher, 'dropdown' ); ?>>
+                                    Dropdown
+                                </label>
+                                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                    <input type="radio" name="svgml_layer_switcher" value="custom"
+                                           <?php checked( $layer_switcher, 'custom' ); ?>>
+                                    Custom (via CSS/JS)
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
             <!-- ─── UITLEG ─────────────────────────────────────────────── -->
             <div class="svgml-section">
                 <h2>Hoe werkt dit?</h2>
+                <?php if ( 'manual' === $map_mode ) : ?>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px; padding:20px 24px;">
+                    <div style="background:#f9f9f9; border-radius:10px; padding:16px 18px;">
+                        <strong style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#888">Stap 1 — Data per Vlak</strong>
+                        <p style="margin:8px 0 0; font-size:13px; color:#333; line-height:1.5">
+                            Vul per regio de statuswaarde in via het tabblad <strong>Data per Vlak</strong>.
+                            Gebruik dezelfde waarden die je hieronder als statussen instelt, bijv. <code>Beschikbaar</code>.
+                        </p>
+                    </div>
+                    <div style="background:#f9f9f9; border-radius:10px; padding:16px 18px;">
+                        <strong style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#888">Stap 2 — Kleuren instellen</strong>
+                        <p style="margin:8px 0 0; font-size:13px; color:#333; line-height:1.5">
+                            Kies hierboven welke kleur bij <code>Beschikbaar</code> hoort (groen),
+                            en welke bij <code>Onder Optie</code> (oranje) en <code>Verkocht</code> (rood).
+                        </p>
+                    </div>
+                    <div style="background:#f9f9f9; border-radius:10px; padding:16px 18px;">
+                        <strong style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#888">Stap 3 — Op de kaart</strong>
+                        <p style="margin:8px 0 0; font-size:13px; color:#333; line-height:1.5">
+                            De kaart kleurt elke regio automatisch op basis van de waarde die je handmatig hebt ingevoerd.
+                            Filters dimmen regio's die niet voldoen.
+                        </p>
+                    </div>
+                </div>
+                <?php else : ?>
                 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px; padding:20px 24px;">
                     <div style="background:#f9f9f9; border-radius:10px; padding:16px 18px;">
                         <strong style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#888">Stap 1 — JSON-feed</strong>
@@ -220,6 +450,7 @@ function svgml_render_display_page( $map_id ) {
                         </p>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
 
             <?php submit_button( 'Statuskleuren opslaan' ); ?>

@@ -350,6 +350,23 @@ function svgml_admin_footer_scripts() {
             }
 
             var value = (field && obj.hasOwnProperty(field)) ? obj[field] : null;
+
+            // Manual-mode fallback: if the block has no field key or the key isn't in the
+            // dummy object, generate a type-appropriate placeholder so the preview is never blank.
+            if ( (value === null || value === undefined || value === '') &&
+                 (typeof svgmlAdmin !== 'undefined' && svgmlAdmin.mapMode === 'manual') ) {
+                var manualDefaults = {
+                    'heading'   : label || 'Voorbeeld Titel',
+                    'badge'     : label || 'Beschikbaar',
+                    'price'     : '€ 125.000',
+                    'text'      : label || 'Voorbeeld tekst',
+                    'link'      : 'https://example.com',
+                    'html'      : label || '<em>HTML inhoud</em>',
+                    'thumbnail' : '',
+                };
+                value = ( manualDefaults[ type ] !== undefined ) ? manualDefaults[ type ] : ( label || 'Voorbeeld waarde' );
+            }
+
             if (value === null || value === undefined || value === '') return '';
             var strVal = String(value);
 
@@ -483,6 +500,20 @@ function svgml_admin_footer_scripts() {
             var isHtml = !!block.html;
 
             var value = (field && obj.hasOwnProperty(field)) ? obj[field] : null;
+
+            // Manual-mode fallback: same logic as svgml_renderPreviewBlock above.
+            if ( (value === null || value === undefined || value === '') &&
+                 (typeof svgmlAdmin !== 'undefined' && svgmlAdmin.mapMode === 'manual') ) {
+                var ovManualDefaults = {
+                    'heading' : label || 'Voorbeeld Titel',
+                    'badge'   : label || 'Beschikbaar',
+                    'price'   : '€ 125.000',
+                    'text'    : label || 'Voorbeeld tekst',
+                    'link'    : 'https://example.com',
+                };
+                value = ( ovManualDefaults[ type ] !== undefined ) ? ovManualDefaults[ type ] : ( label || 'Voorbeeld waarde' );
+            }
+
             if (value === null || value === undefined || value === '') return '';
             var strVal = String(value);
 
@@ -593,10 +624,26 @@ function svgml_admin_footer_scripts() {
     <script>
     jQuery(document).ready(function($) {
 
+        // ── DRAG-AND-DROP SORTING ───────────────────────────────────────────────
+        $('#svgml-filters-tbody').sortable({
+            handle:      '.svgml-drag-handle',
+            axis:        'y',
+            placeholder: 'svgml-sort-placeholder',
+            helper: function(e, ui) {
+                ui.children().each(function() {
+                    $(this).width($(this).width());
+                });
+                return ui;
+            },
+            opacity:   0.85,
+            tolerance: 'pointer'
+        }).disableSelection();
+
         $('#svgml-add-filter').on('click', function() {
             var $template = $('#svgml-filter-row-template');
             var $newRow   = $( $template.html() );
             $('#svgml-filters-tbody').append( $newRow );
+            $('#svgml-filters-tbody').sortable('refresh');
         });
 
         $(document).on('click', '.svgml-remove-filter', function() {

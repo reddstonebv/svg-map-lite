@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 function svgml_render_mapping_page( $map_id ) {
 
     // Get map mode to determine which interface to show
-    $map_mode = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'manual';
+    $map_mode = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
 
     // Show JSON mapping interface for JSON mode
     if ( 'json' === $map_mode ) {

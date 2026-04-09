@@ -13,6 +13,9 @@ function svgml_render_panel_builder_page( $map_id ) {
             $valid_types  = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider' ];
             $valid_widths = [ 25, 33, 50, 75, 100 ];
 
+            $map_mode  = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+            $is_manual = ( 'manual' === $map_mode );
+
             // ── Primary path: JSON from hidden field (panel-builder.js) ──────
             // assets/js/panel-builder.js serialises the current DOM order into
             // #svgml_panel_blocks before the POST fires, so this field always
@@ -33,7 +36,7 @@ function svgml_render_panel_builder_page( $map_id ) {
 
                     if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
                     if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
-                    if ( 'divider' !== $clean_type && empty( $clean_field ) ) continue;
+                    if ( ! $is_manual && 'divider' !== $clean_type && empty( $clean_field ) ) continue;
 
                     $blocks[] = [
                         'field' => $clean_field,
@@ -63,7 +66,7 @@ function svgml_render_panel_builder_page( $map_id ) {
 
                     if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
                     if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
-                    if ( 'divider' !== $clean_type && empty( $clean_field ) ) continue;
+                    if ( ! $is_manual && 'divider' !== $clean_type && empty( $clean_field ) ) continue;
 
                     $blocks[] = [
                         'field' => $clean_field,
@@ -120,7 +123,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                 if ( ! in_array( $clean_type, $valid_types ) ) {
                     $clean_type = 'text';
                 }
-                if ( empty( $clean_field ) ) continue;
+                if ( ! $is_manual && empty( $clean_field ) ) continue;
 
                 $overview_blocks[] = [
                     'field' => $clean_field,
@@ -132,6 +135,7 @@ function svgml_render_panel_builder_page( $map_id ) {
             update_post_meta( $map_id, '_svgml_overview_blocks', $overview_blocks );
 
             delete_transient( 'svgml_json_cache_' . $map_id );
+            delete_transient( 'svgml_html_'       . $map_id );
 
             echo '<div class="notice notice-success is-dismissible"><p>Panel Builder opgeslagen!</p></div>';
         }
@@ -161,11 +165,47 @@ function svgml_render_panel_builder_page( $map_id ) {
     if ( ! is_array( $overview_blocks ) ) $overview_blocks = [];
 
     $map_mode    = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+    $is_manual   = ( 'manual' === $map_mode );
     // In manual mode there is no JSON feed. Use the fixed manual data keys.
     if ( 'manual' === $map_mode ) {
         $field_names = [ 'title', 'status', 'size' ];
     } else {
         $field_names = svgml_get_json_field_names( $map_id ); // Auto-detect uit JSON
+    }
+
+    // ── Overview field options ───────────────────────────────────────────────
+    // In manual mode, data keys are manual_field_0, manual_field_1, … (index-based).
+    // The label shown to the user is the panel block's own label (or a type fallback).
+    // In JSON mode, mirror the same $field_names used by the main panel block selects.
+    if ( 'manual' === $map_mode ) {
+        $ov_type_fallbacks = [
+            'thumbnail' => 'Afbeelding', 'heading' => 'Koptekst', 'badge'  => 'Badge',
+            'price'     => 'Prijs',      'text'    => 'Tekst',    'html'   => 'HTML',
+            'link'      => 'Link',
+        ];
+        $overview_field_options = [];
+        foreach ( $panel_blocks as $i => $pb ) {
+            if ( ( $pb['type'] ?? '' ) === 'divider' ) continue;
+            $pb_label = ! empty( $pb['label'] )
+                ? $pb['label']
+                : ( $ov_type_fallbacks[ $pb['type'] ?? 'text' ] ?? 'Veld' ) . ' ' . ( $i + 1 );
+            $overview_field_options[] = [
+                'value' => 'manual_field_' . $i,
+                'label' => $pb_label,
+            ];
+        }
+        if ( empty( $overview_field_options ) ) {
+            $overview_field_options = [
+                [ 'value' => 'manual_field_0', 'label' => 'Veld 1' ],
+                [ 'value' => 'manual_field_1', 'label' => 'Veld 2' ],
+                [ 'value' => 'manual_field_2', 'label' => 'Veld 3' ],
+            ];
+        }
+    } else {
+        $overview_field_options = array_map(
+            fn( $fn ) => [ 'value' => $fn, 'label' => $fn ],
+            $field_names
+        );
     }
     $block_types       = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider' ];
     $block_type_labels = [
@@ -250,8 +290,10 @@ function svgml_render_panel_builder_page( $map_id ) {
                 <table class="wp-list-table widefat fixed striped" id="svgml-blocks-table">
                     <thead>
                         <tr>
-                            <th style="width:28px">☰</th>
-                            <th style="width:22%"><?php echo ( 'manual' === $map_mode ) ? 'Veld' : 'JSON Veld'; ?></th>
+                            <th style="width:28px">☰</th>                 
+                            <?php if ( ! $is_manual ) : ?>
+                            <th style="width:22%">JSON Veld</th>
+                            <?php endif; ?>
                             <th style="width:18%">Type</th>
                             <th style="width:14%">Breedte</th>
                             <th style="width:20%">Label (optioneel)</th>
@@ -270,6 +312,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                         ?>
                         <tr class="svgml-block-row">
                             <td class="svgml-drag-handle" title="Versleep om volgorde te wijzigen">⠿</td>
+                            <?php if ( ! $is_manual ) : ?>
                             <td>
                                 <?php if ( 'divider' === $b_type ) : ?>
                                     <input type="hidden" name="svgml_block_field[]" value="">
@@ -291,6 +334,9 @@ function svgml_render_panel_builder_page( $map_id ) {
                                 </select>
                                 <?php endif; ?>
                             </td>
+                            <?php else : ?>
+                            <input type="hidden" name="svgml_block_field[]" value="">
+                            <?php endif; ?>
                             <td>
                                 <select name="svgml_block_type[]" class="svgml-block-type-select">
                                     <?php foreach ( $block_type_labels as $bt_val => $bt_label ) : ?>
@@ -360,7 +406,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                 <!-- Live voorbeeld panel: rendert het eerste JSON-object met de huidige blokken -->
                 <div class="svgml-preview-outer">
                     <h3>Voorbeeld panel</h3>
-                    <p class="svgml-preview-label">Op basis van het eerste object uit je JSON-feed.</p>
+                    <p class="svgml-preview-label"><?php echo $is_manual ? 'Op basis van je ingevulde vlakken.' : 'Op basis van het eerste object uit je JSON-feed.'; ?></p>
                     <div id="svgml-live-preview">
                         <p class="svgml-preview-empty">Voeg blokken toe om het voorbeeld te zien.</p>
                     </div>
@@ -432,7 +478,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                     <thead>
                         <tr>
                             <th style="width:28px">☰</th>
-                            <th style="width:30%">JSON Veld</th>
+                            <th style="width:30%"><?php echo ( 'manual' === $map_mode ) ? 'Veld' : 'JSON Veld'; ?></th>
                             <th style="width:25%">Type</th>
                             <th>Label (optioneel)</th>
                             <th style="width:60px" title="Waarde bevat HTML-opmaak">HTML</th>
@@ -460,13 +506,15 @@ function svgml_render_panel_builder_page( $map_id ) {
                             <td>
                                 <select name="svgml_overview_field[]" class="svgml-overview-field-select">
                                     <option value="">— kies veld —</option>
-                                    <?php foreach ( $field_names as $fn ) : ?>
-                                        <option value="<?php echo esc_attr( $fn ); ?>"
-                                            <?php selected( $ob_field, $fn ); ?>>
-                                            <?php echo esc_html( $fn ); ?>
+                                    <?php foreach ( $overview_field_options as $ov_opt ) : ?>
+                                        <option value="<?php echo esc_attr( $ov_opt['value'] ); ?>"
+                                            <?php selected( $ob_field, $ov_opt['value'] ); ?>>
+                                            <?php echo esc_html( $ov_opt['label'] ); ?>
                                         </option>
                                     <?php endforeach; ?>
-                                    <?php if ( ! in_array( $ob_field, $field_names ) && ! empty( $ob_field ) ) : ?>
+                                    <?php
+                                    $ov_known_values = array_column( $overview_field_options, 'value' );
+                                    if ( ! in_array( $ob_field, $ov_known_values, true ) && ! empty( $ob_field ) ) : ?>
                                         <option value="<?php echo esc_attr( $ob_field ); ?>" selected>
                                             <?php echo esc_html( $ob_field ); ?>
                                         </option>
@@ -519,7 +567,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                 <!-- Live voorbeeld: toont hoe één rij in de overzichtslijst eruitziet -->
                 <div class="svgml-preview-outer">
                     <h3>Voorbeeld overzichtsrij</h3>
-                    <p class="svgml-preview-label">Op basis van het eerste object uit je JSON-feed.</p>
+                    <p class="svgml-preview-label"><?php echo $is_manual ? 'Op basis van je ingevulde vlakken.' : 'Op basis van het eerste object uit je JSON-feed.'; ?></p>
                     <div id="svgml-overview-live-preview">
                         <p class="svgml-preview-empty">Voeg blokken toe om het voorbeeld te zien.</p>
                     </div>
@@ -574,6 +622,7 @@ function svgml_render_panel_builder_page( $map_id ) {
         <template id="svgml-block-row-template">
             <tr class="svgml-block-row">
                 <td class="svgml-drag-handle" title="Versleep om volgorde te wijzigen">⠿</td>
+                <?php if ( ! $is_manual ) : ?>
                 <td>
                     <select name="svgml_block_field[]" class="svgml-block-field-select">
                         <option value="">— kies veld —</option>
@@ -582,6 +631,9 @@ function svgml_render_panel_builder_page( $map_id ) {
                         <?php endforeach; ?>
                     </select>
                 </td>
+                <?php else : ?>
+                <input type="hidden" name="svgml_block_field[]" value="">
+                <?php endif; ?>
                 <td>
                     <select name="svgml_block_type[]" class="svgml-block-type-select">
                         <?php foreach ( $block_type_labels as $bt_val => $bt_label ) : ?>
@@ -618,8 +670,8 @@ function svgml_render_panel_builder_page( $map_id ) {
                 <td>
                     <select name="svgml_overview_field[]" class="svgml-overview-field-select">
                         <option value="">— kies veld —</option>
-                        <?php foreach ( $field_names as $fn ) : ?>
-                            <option value="<?php echo esc_attr( $fn ); ?>"><?php echo esc_html( $fn ); ?></option>
+                        <?php foreach ( $overview_field_options as $ov_opt ) : ?>
+                            <option value="<?php echo esc_attr( $ov_opt['value'] ); ?>"><?php echo esc_html( $ov_opt['label'] ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </td>

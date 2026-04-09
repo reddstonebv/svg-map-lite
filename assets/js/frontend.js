@@ -71,20 +71,29 @@ jQuery(document).ready(function($) {
             return; // Excluded – do not show panel, do nothing
         }
 
-        // Check if this SVG id has a mapping
-        if (!svgmlData.mapping.hasOwnProperty(svgId)) {
-            // No mapping for this element – do nothing
-            return;
+        var jsonObject = null;
+
+        if (svgmlData.mapMode === 'manual') {
+            // ── Manual mode: look up data directly by SVG id ──────────────────
+            // No JSON feed or mapping table. The SVG id is the data key.
+            var manualData = svgmlData.manualData || {};
+            if (!manualData.hasOwnProperty(svgId)) {
+                // Region has no manual data entered yet – do nothing
+                return;
+            }
+            jsonObject = manualData[svgId];
+        } else {
+            // ── JSON mode: mapping table → JSON dataset lookup ────────────────
+            if (!svgmlData.mapping.hasOwnProperty(svgId)) {
+                // No mapping for this element – do nothing
+                return;
+            }
+            var jsonObjectId = svgmlData.mapping[svgId];
+            jsonObject = findJsonObject(jsonObjectId);
         }
 
-        // Get the JSON object ID from the mapping
-        var jsonObjectId = svgmlData.mapping[svgId];
-
-        // Look up the corresponding JSON object in the dataset
-        var jsonObject = findJsonObject(jsonObjectId);
-
         if (!jsonObject) {
-            // No JSON object found for this ID
+            // No data found for this region
             $panelContent.html(
                 '<p class="svgml-panel-not-found">' +
                 'No data found for ID: <em>' + svgId + '</em>' +
@@ -103,7 +112,6 @@ jQuery(document).ready(function($) {
 
         // Emit a custom event so panel-renderer.js (and other scripts)
         // can respond to the click without direct coupling.
-        // $.Event() creates a jQuery event object; trigger() fires it.
         $(document).trigger('svgmlRegionClick', [{
             jsonObject: jsonObject,  // The complete JSON object of the region
             svgId:      svgId,       // The SVG id of the clicked region

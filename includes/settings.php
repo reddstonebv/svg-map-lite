@@ -45,6 +45,7 @@ function svgml_render_settings_page( $map_id ) {
             update_post_meta( $map_id, '_svgml_json_array_key', $array_key );
             // Clear cache so new array key takes effect immediately
             delete_transient( 'svgml_json_cache_' . $map_id );
+            delete_transient( 'svgml_html_'       . $map_id );
 
             // ── Source type: 'svg' or 'image' (image + polygons) ─────────────
             // Determines which mode the plugin uses: an SVG file or an
@@ -165,13 +166,6 @@ function svgml_render_settings_page( $map_id ) {
                 update_post_meta( $map_id, '_svgml_poly_stroke_width', (string) $stroke_width );
             }
 
-            // ── Layer Switcher Style ─────────────────────────────────────────────
-            if ( isset( $_POST['svgml_layer_switcher'] ) ) {
-                $switcher = sanitize_text_field( $_POST['svgml_layer_switcher'] );
-                if ( ! in_array( $switcher, [ 'buttons', 'dropdown', 'custom' ] ) ) $switcher = 'buttons';
-                update_post_meta( $map_id, '_svgml_layer_switcher', $switcher );
-            }
-
             // ── CONFIRMATION LOGGING ──────────────────────────────────────────
             // Verify data was persisted to database
             $saved_layers = get_post_meta( $map_id, '_svgml_layers', true );
@@ -203,6 +197,7 @@ function svgml_render_settings_page( $map_id ) {
     $poly_stroke_width   = get_post_meta( $map_id, '_svgml_poly_stroke_width', true ) ?: '1';
     $layers              = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
     $layer_switcher      = get_post_meta( $map_id, '_svgml_layer_switcher', true ) ?: 'buttons';
+    $map_mode            = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
 
     ?>
     <div class="wrap svgml-admin-wrap">
@@ -317,7 +312,7 @@ function svgml_render_settings_page( $map_id ) {
                     <h3 style="margin:0 0 8px">Afbeelding + Polygonen</h3>
                     <p class="svgml-description" style="margin-top:0">
                         Upload een afbeelding (JPG, PNG of WebP) en teken interactieve polygonen.
-                        Geef elk vlak een uniek ID dat je later koppelt aan de JSON feed.
+                        <?php echo ( 'manual' === $map_mode ) ? 'Geef elk vlak een logische naam of uniek ID.' : 'Geef elk vlak een uniek ID dat je later koppelt aan de JSON feed.'; ?>
                     </p>
 
                     <!-- Knop om een verdieping/viewpoint toe te voegen -->
@@ -432,6 +427,21 @@ function svgml_render_settings_page( $map_id ) {
                                         Klik op een <em>rand</em> van een polygon in bewerk-modus om een nieuw punt in te voegen.
                                     </p>
                                 </div>
+
+                                <?php if ( ! empty( $polygons ) ) :
+                                    $poly_count = count( array_filter( array_map( function( $p ) { return $p['id'] ?? ''; }, $polygons ) ) );
+                                ?>
+                                <div id="svgml-polygon-ids-status" class="svgml-ids-status" style="margin-top:12px">
+                                    <div class="svgml-status-box svgml-status-success">
+                                        <strong>✓ <?php echo $poly_count; ?> vlakken getekend</strong>
+                                        <?php if ( 'manual' === $map_mode ) : ?>
+                                            <p style="margin:6px 0 0; font-size:12px; color:#444; line-height:1.4">
+                                                Ga hierna naar de <strong>Paneel Bouwer</strong> om de invulvelden te configureren.
+                                            </p>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
                             </div>
 
                             <div class="svgml-polygon-editor-main">
@@ -487,51 +497,11 @@ function svgml_render_settings_page( $map_id ) {
                                name="svgml_poly_stroke_width"
                                value="<?php echo esc_attr( get_post_meta( $map_id, '_svgml_poly_stroke_width', true ) ?: '1' ); ?>">
 
-                        <!-- ── Layer Switcher Stijl Selector ────────────────────────── -->
-                        <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--svgml-border);">
-                            <h4 style="margin:0 0 10px; color:var(--svgml-dark)">Layer Switcher Stijl (frontend)</h4>
-                            <p style="color:var(--svgml-muted); font-size:12px; margin:0 0 8px">
-                                Kies hoe gebruikers kunnen schakelen tussen lagen:
-                            </p>
-                            <div class="svgml-layer-switcher-options">
-                                <label>
-                                    <input type="radio" name="svgml_layer_switcher" value="buttons"
-                                           <?php checked( $layer_switcher, 'buttons' ); ?>>
-                                    Knoppen
-                                </label>
-                                <label>
-                                    <input type="radio" name="svgml_layer_switcher" value="dropdown"
-                                           <?php checked( $layer_switcher, 'dropdown' ); ?>>
-                                    Dropdown
-                                </label>
-                                <label>
-                                    <input type="radio" name="svgml_layer_switcher" value="custom"
-                                           <?php checked( $layer_switcher, 'custom' ); ?>>
-                                    Custom (via CSS/JS)
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Polygon-IDs status (zoals SVG-IDs status) -->
-                        <div id="svgml-polygon-ids-status" class="svgml-ids-status" style="margin-top:12px">
-                            <?php if ( ! empty( $polygons ) ) :
-                                $poly_ids = array_map( function( $p ) { return $p['id'] ?? ''; }, $polygons );
-                                $poly_ids = array_filter( $poly_ids );
-                            ?>
-                                <div class="svgml-status-box svgml-status-success">
-                                    <strong>✓ <?php echo count( $poly_ids ); ?> vlakken getekend:</strong>
-                                    <code><?php echo esc_html( implode( ', ', $poly_ids ) ); ?></code>
-                                    <br>
-                                    <a href="<?php echo admin_url( 'admin.php?page=svgml-mapping&map_id=' . $map_id ); ?>">
-                                        → Ga naar Regio Koppeling
-                                    </a>
-                                </div>
-                            <?php endif; ?>
-                        </div>
                     </div>
                 </div>
             </div>
 
+            <?php if ( 'json' === $map_mode ) : ?>
             <!-- ─── SECTIE 2: JSON FEED ────────────────────────────────── -->
             <div class="svgml-section">
                 <h2>2. JSON Feed</h2>
@@ -596,20 +566,11 @@ function svgml_render_settings_page( $map_id ) {
                     </tr>
                 </table>
             </div>
+            <?php endif; ?>
 
             <?php submit_button( 'Instellingen opslaan' ); ?>
         </form>
 
-        <!-- ─── SHORTCODE INFO ─────────────────────────────────────────── -->
-        <div class="svgml-section svgml-shortcode-info">
-            <h2>Shortcode</h2>
-            <p>Gebruik de volgende shortcode om de SVG-kaart op een pagina of post te plaatsen:</p>
-            <code class="svgml-shortcode-display">[svg_map id="<?php echo $map_id; ?>"]</code>
-            <p class="description">
-                Zorg dat stap 1 en 2 volledig zijn ingesteld, en dat je in
-                <em>Regio Koppeling</em> de SVG-ID's aan JSON-objecten hebt gekoppeld.
-            </p>
-        </div>
     </div>
 
     <?php

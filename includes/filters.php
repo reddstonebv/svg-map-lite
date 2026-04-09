@@ -59,6 +59,7 @@ function svgml_render_filters_page( $map_id ) {
             update_post_meta( $map_id, '_svgml_filter_dim_color',   $dim_color   ?? '' );
 
             delete_transient( 'svgml_json_cache_' . $map_id );
+            delete_transient( 'svgml_html_'       . $map_id );
 
             echo '<div class="notice notice-success is-dismissible"><p>Filters opgeslagen!</p></div>';
         }
@@ -72,13 +73,35 @@ function svgml_render_filters_page( $map_id ) {
     $filter_dim_color   = get_post_meta( $map_id, '_svgml_filter_dim_color', true ) ?: '';
     $field_names        = svgml_get_json_field_names( $map_id ); // Auto-detect uit JSON
 
+    $map_mode     = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+    $panel_blocks = ( 'manual' === $map_mode )
+        ? ( get_post_meta( $map_id, '_svgml_panel_blocks', true ) ?: [] )
+        : [];
+
+    $filter_field_options = [];
+    if ( 'manual' === $map_mode ) {
+        foreach ( $panel_blocks as $i => $pb ) {
+            if ( ( $pb['type'] ?? '' ) === 'divider' ) continue;
+            $filter_field_options[] = [
+                'value' => 'manual_field_' . $i,
+                'label' => ! empty( $pb['label'] ) ? $pb['label'] : ( $pb['type'] ?? 'Veld ' . $i ),
+            ];
+        }
+    } else {
+        foreach ( $field_names as $fn ) {
+            $filter_field_options[] = [ 'value' => $fn, 'label' => $fn ];
+        }
+    }
+
     ?>
     <div class="wrap svgml-admin-wrap">
         <h1><span class="dashicons dashicons-filter"></span> SVG Map Lite – Filters</h1>
 
         <p class="svgml-description">
             Configureer de filterbalk die boven de SVG-kaart verschijnt.
-            Kies voor elk filter een JSON-veld en een filtertype (keuzelijst of schuifregelaar).
+            <?php echo ( 'manual' === $map_mode )
+                ? 'Kies voor elk filter een veld en een filtertype.'
+                : 'Kies voor elk filter een JSON-veld en een filtertype (keuzelijst of schuifregelaar).'; ?>
         </p>
 
         <form method="post" action="">
@@ -90,7 +113,8 @@ function svgml_render_filters_page( $map_id ) {
                 <table class="wp-list-table widefat fixed striped" id="svgml-filters-table">
                     <thead>
                         <tr>
-                            <th style="width:25%">JSON Veld</th>
+                            <th style="width:30px"></th>
+                            <th style="width:25%"><?php echo ( 'manual' === $map_mode ) ? 'Paneel Veld' : 'JSON Veld'; ?></th>
                             <th style="width:20%">Type</th>
                             <th style="width:25%">Label</th>
                             <th style="width:20%">Opties</th>
@@ -107,16 +131,19 @@ function svgml_render_filters_page( $map_id ) {
                             $fb_val = $filter['button_custom_values'] ?? '';
                         ?>
                         <tr class="svgml-filter-row">
+                            <td class="svgml-drag-handle" style="cursor:grab; text-align:center; color:#999; width:30px;">
+                                <span class="dashicons dashicons-sort"></span>
+                            </td>
                             <td>
                                 <select name="svgml_filter_field[]" class="svgml-filter-field-select">
                                     <option value="">— kies veld —</option>
-                                    <?php foreach ( $field_names as $fn ) : ?>
-                                        <option value="<?php echo esc_attr( $fn ); ?>"
-                                            <?php selected( $ff, $fn ); ?>>
-                                            <?php echo esc_html( $fn ); ?>
+                                    <?php foreach ( $filter_field_options as $fo ) : ?>
+                                        <option value="<?php echo esc_attr( $fo['value'] ); ?>"
+                                            <?php selected( $ff, $fo['value'] ); ?>>
+                                            <?php echo esc_html( $fo['label'] ); ?>
                                         </option>
                                     <?php endforeach; ?>
-                                    <?php if ( ! in_array( $ff, $field_names ) && ! empty( $ff ) ) : ?>
+                                    <?php if ( ! in_array( $ff, array_column( $filter_field_options, 'value' ), true ) && ! empty( $ff ) ) : ?>
                                         <option value="<?php echo esc_attr( $ff ); ?>" selected>
                                             <?php echo esc_html( $ff ); ?>
                                         </option>
@@ -194,8 +221,13 @@ function svgml_render_filters_page( $map_id ) {
                 </div>
 
                 <p class="description" style="padding:4px 24px 18px; margin:0;">
-                    <strong>Keuzelijst:</strong> Haalt automatisch unieke waarden op uit de JSON (bijv. voor Type, Stad).<br>
-                    <strong>Schuifregelaar:</strong> Detecteert automatisch min/max waarden (bijv. voor Prijs, Oppervlak).<br>
+                    <?php if ( 'manual' === $map_mode ) : ?>
+                        <strong>Keuzelijst/Knoppen:</strong> Haalt automatisch de unieke waarden op uit de handmatig ingevoerde data.<br>
+                        <strong>Schuifregelaar:</strong> Detecteert automatisch de min/max waarden uit de ingevoerde data.<br>
+                    <?php else : ?>
+                        <strong>Keuzelijst:</strong> Haalt automatisch unieke waarden op uit de JSON (bijv. voor Type, Stad).<br>
+                        <strong>Schuifregelaar:</strong> Detecteert automatisch min/max waarden (bijv. voor Prijs, Oppervlak).<br>
+                    <?php endif; ?>
                     Regio's die niet aan de actieve filters voldoen worden gedempt op de kaart.
                 </p>
             </div>
@@ -298,11 +330,14 @@ function svgml_render_filters_page( $map_id ) {
         <!-- Template voor nieuwe filterrij -->
         <template id="svgml-filter-row-template">
             <tr class="svgml-filter-row">
+                <td class="svgml-drag-handle" style="cursor:grab; text-align:center; color:#999; width:30px;">
+                    <span class="dashicons dashicons-sort"></span>
+                </td>
                 <td>
                     <select name="svgml_filter_field[]" class="svgml-filter-field-select">
                         <option value="">— kies veld —</option>
-                        <?php foreach ( $field_names as $fn ) : ?>
-                            <option value="<?php echo esc_attr( $fn ); ?>"><?php echo esc_html( $fn ); ?></option>
+                        <?php foreach ( $filter_field_options as $fo ) : ?>
+                            <option value="<?php echo esc_attr( $fo['value'] ); ?>"><?php echo esc_html( $fo['label'] ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </td>
