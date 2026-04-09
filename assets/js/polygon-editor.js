@@ -1164,9 +1164,8 @@ jQuery(document).ready(function($) {
         if (obj.svgmlEditPt) return;
         if (!obj.svgmlId) return;
 
-        // If we're already in edit mode and the hover preview is active,
-        // do nothing — the user is trying to add a point.
-        if (isEditing && hoverPreviewCircle) return;
+        // Focus lock: if editing, ignore any other polygon click entirely.
+        if (isEditing) return;
 
         // Deselect the previously selected polygon before selecting the new one
         if (selectedPoly && selectedPoly !== obj) {
@@ -1180,9 +1179,9 @@ jQuery(document).ready(function($) {
         $polygonList.find('tr').removeClass('svgml-poly-row-active');
         $polygonList.find('tr[data-poly-id="' + obj.svgmlId + '"]').addClass('svgml-poly-row-active');
 
-        // Go directly to edit mode if we're not already drawing or editing
+        // Direct edit: single click immediately enters edit mode
         if (!isDrawing && !isEditing) {
-            updateStatus('Vlak "' + obj.svgmlId + '" geselecteerd. Klik op Bewerk punten om te bewerken.');
+            enterEditMode(obj.svgmlId);
         }
     }
 
@@ -1538,6 +1537,12 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
         $('.svgml-layer-tab').removeClass('svgml-layer-tab-active');
         $('.svgml-layer-tab[data-layer-idx="' + idx + '"]').addClass('svgml-layer-tab-active');
 
+        // Persist active layer in sessionStorage so reload restores it
+        var _mapId = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
+        if (_mapId) {
+            sessionStorage.setItem('svgml_active_layer_' + _mapId, idx);
+        }
+
         // Load the new layer (image + polygons)
         loadLayer(idx);
     }
@@ -1736,6 +1741,8 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
 
                 // Switch to the new layer
                 activeLayerIndex = layers.length - 1;
+                if (canvas) canvas.clear(); // wipe visual Fabric objects before clearing data
+                polygons = [];  // prevent ghost polygons: new layer must start empty
                 renderLayerTabs();
                 syncLayersToHiddenField();
                 loadLayer(activeLayerIndex);
@@ -1752,8 +1759,15 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
             renderLayerTabs();
         }
 
-        // Load the first layer on the canvas
-        loadLayer(0);
+        // Load the first layer (or restore previously active layer from sessionStorage)
+        var _mapId = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
+        var _savedLayer = _mapId ? parseInt(sessionStorage.getItem('svgml_active_layer_' + _mapId), 10) : NaN;
+        var _startLayer = (!isNaN(_savedLayer) && _savedLayer > 0 && _savedLayer < layers.length) ? _savedLayer : 0;
+        if (_startLayer > 0) {
+            switchToLayer(_startLayer);
+        } else {
+            loadLayer(0);
+        }
     })();
 
     // ════════════════════════════════════════════════════════════════════

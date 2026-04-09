@@ -30,8 +30,25 @@ function svgml_save_shortcut_script() {
     <script>
     jQuery(document).ready(function($) {
 
+        // ── SCROLL RESTORE ────────────────────────────────────────────────────
+        var _mapId = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
+        var _scrollKey = _mapId ? 'svgml_scroll_' + _mapId : null;
+        if (_scrollKey) {
+            var _savedScroll = sessionStorage.getItem(_scrollKey);
+            if (_savedScroll !== null) {
+                sessionStorage.removeItem(_scrollKey);
+                window.scrollTo(0, parseInt(_savedScroll, 10));
+            }
+        }
+
         // ── SAVE FUNCTIONS ────────────────────────────────────────────────────
         function svgmlSavePage() {
+            // Save scroll position so it can be restored after the reload
+            var _mid = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
+            if (_mid) {
+                sessionStorage.setItem('svgml_scroll_' + _mid, window.scrollY);
+            }
+
             // Find the page-specific form by its nonce field, not by DOM position.
             // This prevents accidentally submitting the rename form in the header.
             var $form = $('[name="svgml_settings_nonce"]').closest('form');

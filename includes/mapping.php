@@ -286,19 +286,28 @@ function svgml_render_manual_data_interface( $map_id ) {
         if ( ! wp_verify_nonce( $_POST['svgml_manual_data_nonce'], 'svgml_save_manual_data' ) ) {
             echo '<div class="notice notice-error"><p>Beveiligingsfout. Probeer opnieuw.</p></div>';
         } else {
-            // Process and save manual region data
-            $polygon_id = isset( $_POST['polygon_id'] ) ? sanitize_text_field( $_POST['polygon_id'] ) : '';
-            if ( ! empty( $polygon_id ) ) {
-                // Get existing manual data
-                $manual_data = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
-                $block_data = [];
-                foreach ( $panel_config as $i => $block ) {
-                    $field_key = 'manual_field_' . $i;
-                    $block_data[ $field_key ] = isset( $_POST[ $field_key ] ) ? sanitize_text_field( $_POST[ $field_key ] ) : '';
+            // Process and save all region data from JSON payload
+            $json_all = isset( $_POST['svgml_manual_data_all'] ) ? wp_unslash( $_POST['svgml_manual_data_all'] ) : '';
+            if ( ! empty( $json_all ) ) {
+                $decoded = json_decode( $json_all, true );
+                if ( is_array( $decoded ) ) {
+                    $existing = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
+                    foreach ( $decoded as $poly_id => $fields ) {
+                        $clean_id = sanitize_text_field( $poly_id );
+                        if ( ! $clean_id ) continue;
+                        $clean_fields = [];
+                        foreach ( $panel_config as $i => $block ) {
+                            $field_key = 'manual_field_' . $i;
+                            $clean_fields[ $field_key ] = isset( $fields[ $field_key ] )
+                                ? sanitize_text_field( $fields[ $field_key ] )
+                                : '';
+                        }
+                        $existing[ $clean_id ] = $clean_fields;
+                    }
+                    update_post_meta( $map_id, '_svgml_manual_data', $existing );
+                    delete_transient( 'svgml_html_' . $map_id );
+                    echo '<div class="notice notice-success is-dismissible"><p>Regio gegevens opgeslagen!</p></div>';
                 }
-                $manual_data[ $polygon_id ] = $block_data;
-                update_post_meta( $map_id, '_svgml_manual_data', $manual_data );
-                echo '<div class="notice notice-success is-dismissible"><p>Regio gegevens opgeslagen!</p></div>';
             }
         }
     }
@@ -375,6 +384,7 @@ function svgml_render_manual_data_interface( $map_id ) {
                     <?php wp_nonce_field( 'svgml_save_manual_data', 'svgml_manual_data_nonce' ); ?>
                     
                     <input type="hidden" name="polygon_id" id="polygon_id" value="<?php echo isset( $all_polygons[0] ) ? esc_attr( $all_polygons[0]['id'] ) : ''; ?>">
+                    <input type="hidden" name="svgml_manual_data_all" id="svgml_manual_data_all" value="">
                     
                     <?php if ( empty( $panel_config ) ) : ?>
                         <div class="form-group" style="padding:24px 12px;color:#b00;background:#fff3f3;border:1px solid #f5cccc;border-radius:6px;text-align:center;font-weight:600;">
@@ -534,8 +544,21 @@ function svgml_render_manual_data_interface( $map_id ) {
 
     <script>
     jQuery(document).ready(function($) {
-        // Manual data from the database (passed as JSON in data attribute)
+        // Manual data from the database — kept in memory and updated as the user edits
         var manualData = <?php echo wp_json_encode( $manual_data ); ?>;
+
+        /**
+         * Save the currently visible form fields into manualData before switching region
+         */
+        function saveCurrentToManualData() {
+            var currentId = $('#polygon_id').val();
+            if (!currentId) return;
+            var data = {};
+            $('.svgml-manual-field').each(function() {
+                data[$(this).data('manual-key')] = $(this).val();
+            });
+            manualData[currentId] = data;
+        }
 
         /**
          * Load polygon data from manualData and populate the form
@@ -543,7 +566,6 @@ function svgml_render_manual_data_interface( $map_id ) {
         function loadPolygonData(polygonId) {
             $('#polygon_id').val(polygonId);
 
-            // Loop through all manual fields and populate
             $('.svgml-manual-field').each(function() {
                 var key = $(this).data('manual-key');
                 var value = '';
@@ -556,28 +578,39 @@ function svgml_render_manual_data_interface( $map_id ) {
 
         // Handle polygon selection
         $('.svgml-polygon-item').on('click', function() {
-            // Remove active class from all items
+            // Save current region's edits before switching
+            saveCurrentToManualData();
+
             $('.svgml-polygon-item').removeClass('active');
-            // Add active class to clicked item
             $(this).addClass('active');
 
-            // Get polygon ID and load its data
-            const polygonId = $(this).data('polygon-id');
+            var polygonId = $(this).data('polygon-id');
             loadPolygonData(polygonId);
-        });
 
-        // Handle form submission validation
-        $('#svgml-manual-form').on('submit', function(e) {
-            var polygonId = $('#polygon_id').val();
-            if (!polygonId) {
-                e.preventDefault();
-                console.warn('Geen polygoon geselecteerd');
-                return false;
+            // Persist active region tab in sessionStorage
+            var _mapId = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
+            if (_mapId) {
+                sessionStorage.setItem('svgml_active_region_tab_' + _mapId, polygonId);
             }
         });
 
-        // Trigger click on first polygon to load its data
-        $('.svgml-polygon-item').first().click();
+        // Serialize entire manualData object into hidden field before POST
+        $('#svgml-manual-form').on('submit', function() {
+            saveCurrentToManualData();
+            $('#svgml_manual_data_all').val(JSON.stringify(manualData));
+        });
+
+        // Restore previously active region tab, or default to first
+        var _mapId = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
+        var _savedRegion = _mapId ? sessionStorage.getItem('svgml_active_region_tab_' + _mapId) : null;
+        var $target = _savedRegion
+            ? $('.svgml-polygon-item[data-polygon-id="' + CSS.escape(_savedRegion) + '"]')
+            : null;
+        if ($target && $target.length) {
+            $target.click();
+        } else {
+            $('.svgml-polygon-item').first().click();
+        }
     });
     </script>
     <?php
