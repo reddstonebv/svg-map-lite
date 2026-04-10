@@ -191,6 +191,7 @@ $editor_pages = [
         'svgml-panel-builder' => [ 'Panel Builder',     'svgml_render_editor_wrapper' ],
         'svgml-filters'       => [ 'Filters',           'svgml_render_editor_wrapper' ],
         'svgml-styles'        => [ 'Stijlen & CSS',     'svgml_render_editor_wrapper' ],
+        'svgml-ai-assistant'  => [ 'AI Assistent',      'svgml_render_editor_wrapper' ],
     ];
 
     foreach ( $editor_pages as $slug => $info ) {
@@ -435,6 +436,7 @@ function svgml_render_editor_wrapper() {
         'svgml-display'       => [ 'Weergave',               'display.php',       'svgml_render_display_page' ],
         'svgml-filters'       => [ 'Filters',                'filters.php',       'svgml_render_filters_page' ],
         'svgml-styles'        => [ 'Stijlen & CSS',          'styles.php',        'svgml_render_styles_page' ],
+        'svgml-ai-assistant'  => [ '🤖 AI Assistent',        'ai-assistant.php',  'svgml_render_ai_assistant_page' ],
     ];
 
     // Handle inline title editing (quick rename via the header)
@@ -533,6 +535,7 @@ function svgml_admin_enqueue( $hook ) {
         'svgml-panel-builder',
         'svgml-filters',
         'svgml-styles',
+        'svgml-ai-assistant',
     ];
 
     // Stop if we're not on one of our pages

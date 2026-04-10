@@ -20,7 +20,7 @@ function svgml_save_shortcut_script() {
     // All editor pages (not the overview)
     $editor_pages = [
         'svgml-settings', 'svgml-mapping', 'svgml-display',
-        'svgml-panel-builder', 'svgml-filters', 'svgml-styles',
+        'svgml-panel-builder', 'svgml-filters', 'svgml-styles', 'svgml-ai-assistant',
     ];
 
     if ( ! in_array( $current_page, $editor_pages, true ) ) {

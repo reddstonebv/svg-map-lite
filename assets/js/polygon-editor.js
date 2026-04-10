@@ -1299,7 +1299,7 @@ jQuery(document).ready(function($) {
 
     // Focus on polygon
     $(document).on('click', '.svgml-poly-focus', function() {
-        var poly = findPolyById($(this).data('poly-id'));
+        var poly = findPolyById($(this).attr('data-poly-id'));
         if (poly && poly.fabricObj) {
             canvas.setActiveObject(poly.fabricObj);
             canvas.renderAll();
@@ -1310,7 +1310,7 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.svgml-poly-edit-btn', function() {
         if (isEditing) exitEditMode();
         if (isDrawing) return;
-        var id = $(this).data('poly-id');
+        var id = $(this).attr('data-poly-id');
         // Select the polygon first
         var poly = findPolyById(id);
         if (poly && poly.fabricObj) {
@@ -1322,7 +1322,7 @@ jQuery(document).ready(function($) {
 
     // Delete from list
     $(document).on('click', '.svgml-poly-remove', function() {
-        var id = $(this).data('poly-id');
+        var id = $(this).attr('data-poly-id');
         if (!confirm('Weet je zeker dat je vlak "' + id + '" wilt verwijderen?')) return;
         if (isEditing && editPolyRef && editPolyRef.id === id) exitEditMode();
         deletePolygon(id);

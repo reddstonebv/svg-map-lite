@@ -137,6 +137,61 @@ function svgml_render_settings_page( $map_id ) {
 
             update_post_meta( $map_id, '_svgml_layers', $clean_layers );
 
+            // ── NATIVE AUTO-SYNC POLYGONS TO JSON FEED ───────────────────────
+            $map_mode_sync = get_post_meta( $map_id, '_svgml_map_mode', true );
+            if ( 'json' === $map_mode_sync && function_exists( 'svgml_get_json_data' ) ) {
+                $raw_feed = svgml_get_json_data( $map_id );
+                if ( ! empty( $raw_feed ) ) {
+                    $id_key_sync = get_post_meta( $map_id, '_svgml_json_id_field', true ) ?: 'id';
+                    $id_mapping  = get_post_meta( $map_id, '_svgml_id_mapping', true ) ?: [];
+
+                    // Recursively extract every object/array that contains the ID key
+                    $flat_items   = [];
+                    $extract_items = function( $data ) use ( &$extract_items, &$flat_items, $id_key_sync ) {
+                        if ( is_object( $data ) ) $data = (array) $data;
+                        if ( ! is_array( $data ) ) return;
+                        if ( isset( $data[ $id_key_sync ] ) && (string) $data[ $id_key_sync ] !== '' ) {
+                            $flat_items[] = $data;
+                        }
+                        foreach ( $data as $value ) {
+                            if ( is_array( $value ) || is_object( $value ) ) {
+                                $extract_items( $value );
+                            }
+                        }
+                    };
+                    $extract_items( $raw_feed );
+
+                    // Build lookup: normalised id-property value → raw value
+                    $feed_by_prop = [];
+                    foreach ( $flat_items as $item_arr ) {
+                        $prop_val = (string) $item_arr[ $id_key_sync ];
+                        $feed_by_prop[ strtolower( $prop_val ) ] = $prop_val;
+                    }
+
+                    // Match polygons against feed
+                    $new_mappings = [];
+                    foreach ( $clean_layers as $layer ) {
+                        foreach ( ( $layer['polygons'] ?? [] ) as $poly ) {
+                            $poly_id = (string) ( $poly['id'] ?? '' );
+                            if ( $poly_id === '' ) continue;
+                            $norm = strtolower( $poly_id );
+                            if ( isset( $feed_by_prop[ $norm ] ) ) {
+                                $new_mappings[ $poly_id ] = $feed_by_prop[ $norm ];
+                            }
+                        }
+                    }
+
+                    if ( ! empty( $new_mappings ) ) {
+                        $merged = $id_mapping;
+                        foreach ( $new_mappings as $poly_key => $mapped_val ) {
+                            $merged[ $poly_key ] = $mapped_val;
+                        }
+                        update_post_meta( $map_id, '_svgml_id_mapping', $merged );
+                        error_log( '[SVG Map Lite] Auto-mapped ' . count( $new_mappings ) . ' polygons to JSON feed.' );
+                    }
+                }
+            }
+
             // Also save single-layer options for backward compatibility
             if ( ! empty( $clean_layers ) ) {
                 $first = $clean_layers[0];

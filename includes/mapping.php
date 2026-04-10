@@ -6,6 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Extracted from svg-map-lite.php with multi-map support
  */
 
+
 function svgml_render_mapping_page( $map_id ) {
 
     // Get map mode to determine which interface to show
@@ -288,13 +289,19 @@ function svgml_render_manual_data_interface( $map_id ) {
         } else {
             // Process and save all region data from JSON payload
             $json_all = isset( $_POST['svgml_manual_data_all'] ) ? wp_unslash( $_POST['svgml_manual_data_all'] ) : '';
-            if ( ! empty( $json_all ) ) {
+            if ( ! isset( $_POST['svgml_manual_data_all'] ) ) {
+                echo '<div class="notice notice-error"><p>Geen gegevens ontvangen (veld ontbreekt). Probeer opnieuw.</p></div>';
+            } elseif ( empty( $panel_config ) ) {
+                echo '<div class="notice notice-error"><p>Geen paneel-velden geconfigureerd. Stel eerst de Panel Builder in.</p></div>';
+            } else {
                 $decoded = json_decode( $json_all, true );
-                if ( is_array( $decoded ) ) {
+                if ( ! is_array( $decoded ) ) {
+                    echo '<div class="notice notice-error"><p>Ongeldige JSON ontvangen. Probeer opnieuw.</p></div>';
+                } else {
                     $existing = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
                     foreach ( $decoded as $poly_id => $fields ) {
-                        $clean_id = sanitize_text_field( $poly_id );
-                        if ( ! $clean_id ) continue;
+                        $clean_id = sanitize_text_field( (string) $poly_id );
+                        if ( ! $clean_id || ! is_array( $fields ) ) continue;
                         $clean_fields = [];
                         foreach ( $panel_config as $i => $block ) {
                             $field_key = 'manual_field_' . $i;
@@ -545,72 +552,70 @@ function svgml_render_manual_data_interface( $map_id ) {
     <script>
     jQuery(document).ready(function($) {
         // Manual data from the database — kept in memory and updated as the user edits
-        var manualData = <?php echo wp_json_encode( $manual_data ); ?>;
+        var manualData = <?php echo wp_json_encode( empty( $manual_data ) ? new stdClass() : $manual_data ); ?>;
+        if (Array.isArray(manualData)) { manualData = {}; }
 
         /**
-         * Save the currently visible form fields into manualData before switching region
+         * Save the currently visible form fields into manualData before switching region.
+         * Must be called BEFORE changing #polygon_id or clearing the fields.
          */
         function saveCurrentToManualData() {
             var currentId = $('#polygon_id').val();
             if (!currentId) return;
             var data = {};
             $('.svgml-manual-field').each(function() {
-                data[$(this).data('manual-key')] = $(this).val();
+                data[$(this).attr('data-manual-key')] = $(this).val();
             });
             manualData[currentId] = data;
         }
 
         /**
-         * Load polygon data from manualData and populate the form
+         * Load polygon data from manualData and populate the form.
+         * Does NOT call saveCurrentToManualData() — callers are responsible for that.
          */
         function loadPolygonData(polygonId) {
             $('#polygon_id').val(polygonId);
-
             $('.svgml-manual-field').each(function() {
-                var key = $(this).data('manual-key');
-                var value = '';
-                if (manualData && manualData[polygonId] && typeof manualData[polygonId][key] !== 'undefined') {
-                    value = manualData[polygonId][key];
-                }
+                var key = $(this).attr('data-manual-key');
+                var value = (manualData[polygonId] && typeof manualData[polygonId][key] !== 'undefined')
+                    ? manualData[polygonId][key]
+                    : '';
                 $(this).val(value);
             });
         }
 
-        // Handle polygon selection
+        // Handle polygon selection: save current edits, then load the new region.
         $('.svgml-polygon-item').on('click', function() {
-            // Save current region's edits before switching
             saveCurrentToManualData();
-
             $('.svgml-polygon-item').removeClass('active');
             $(this).addClass('active');
-
-            var polygonId = $(this).data('polygon-id');
+            var polygonId = $(this).attr('data-polygon-id');
             loadPolygonData(polygonId);
-
-            // Persist active region tab in sessionStorage
             var _mapId = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
             if (_mapId) {
                 sessionStorage.setItem('svgml_active_region_tab_' + _mapId, polygonId);
             }
         });
 
-        // Serialize entire manualData object into hidden field before POST
+        // Serialize entire manualData object into hidden field before POST.
         $('#svgml-manual-form').on('submit', function() {
             saveCurrentToManualData();
             $('#svgml_manual_data_all').val(JSON.stringify(manualData));
         });
 
-        // Restore previously active region tab, or default to first
+        // Initialise: restore previously active region tab or default to first.
+        // Use loadPolygonData() directly — NOT .click() — to avoid saveCurrentToManualData()
+        // clobbering manualData with empty strings before any fields are populated.
         var _mapId = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
         var _savedRegion = _mapId ? sessionStorage.getItem('svgml_active_region_tab_' + _mapId) : null;
-        var $target = _savedRegion
+        var $initial = _savedRegion
             ? $('.svgml-polygon-item[data-polygon-id="' + CSS.escape(_savedRegion) + '"]')
-            : null;
-        if ($target && $target.length) {
-            $target.click();
-        } else {
-            $('.svgml-polygon-item').first().click();
+            : $('.svgml-polygon-item').first();
+        if (!$initial.length) {
+            $initial = $('.svgml-polygon-item').first();
         }
+        $initial.addClass('active');
+        loadPolygonData($initial.attr('data-polygon-id'));
     });
     </script>
     <?php
