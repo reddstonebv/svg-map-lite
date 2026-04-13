@@ -302,7 +302,7 @@
 
 /* Uitgesloten regio: geen pointer, geen hover */
 .svgml-svg [id].svgml-region-excluded {
-    cursor: default !important;
+    cursor: default;
     pointer-events: none;
 }
 
@@ -322,19 +322,19 @@
 /* Standaard status-klassen. Override via Custom CSS voor eigen kleuren. */
 /* De fill-kleur wordt ingesteld op de SVG-paden zelf. */
 .svgml-svg [id].svgml-status-available {
-    fill: #4caf50 !important;
+    fill: #4caf50;
 }
 
 .svgml-svg [id].svgml-status-rented {
-    fill: #e53935 !important;
+    fill: #e53935;
 }
 
 .svgml-svg [id].svgml-status-reserved {
-    fill: #ff9800 !important;
+    fill: #ff9800;
 }
 
 .svgml-svg [id].svgml-status-sold {
-    fill: #9e9e9e !important;
+    fill: #9e9e9e;
 }
 
 /* ── INFO PANEL ───────────────────────────────────────────────────────── */
@@ -565,8 +565,6 @@
 .svgml-link-btn {
     display: inline-block;
     background: var(--svgml-accent);
-    color: #fff !important;
-    text-decoration: none !important;
     padding: 8px 16px;
     border-radius: 4px;
     font-size: 13px;
@@ -574,8 +572,14 @@
     transition: background 0.15s;
 }
 
-.svgml-link-btn:hover {
-    background: #a80000 !important;
+/* Prefix with parent to beat theme a:link/a:visited pseudo-class specificity */
+.svgml-block-link .svgml-link-btn {
+    color: #fff;
+    text-decoration: none;
+}
+
+.svgml-block-link .svgml-link-btn:hover {
+    background: #a80000;
 }
 
 /* ── BLOK: SCHEIDINGSLIJN ───────────────────────────────────────────────── */
@@ -731,10 +735,10 @@
     flex: 1 1 100%;
 }
 
-/* Badge in de rij (kleiner dan het detail-panel) */
-.svgml-ov-badge {
-    font-size: 10px !important;
-    padding: 2px 8px !important;
+/* Badge in de rij (kleiner dan het detail-panel) — chained selector beats .svgml-badge alone */
+.svgml-badge.svgml-ov-badge {
+    font-size: 10px;
+    padding: 2px 8px;
 }
 
 /* Prijs in de rij */
@@ -786,9 +790,10 @@
 }
 
 @media (max-width: 640px) {
-    /* Op kleine schermen: kaart en panel onder elkaar */
-    .svgml-container {
-        flex-direction: column !important;
+    /* Op kleine schermen: kaart en panel onder elkaar — target position classes to beat (0,2,0) specificity */
+    .svgml-container.svgml-panel-pos-right,
+    .svgml-container.svgml-panel-pos-left {
+        flex-direction: column;
     }
 
     .svgml-panel-pos-right .svgml-panel,

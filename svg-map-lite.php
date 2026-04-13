@@ -33,6 +33,7 @@ define( 'SVGML_URL',     plugin_dir_url( __FILE__ ) );
 require_once SVGML_PATH . 'includes/ajax.php';
 require_once SVGML_PATH . 'includes/frontend.php';
 require_once SVGML_PATH . 'includes/admin-footer.php';
+require_once SVGML_PATH . 'includes/import-export.php';
 // Admin page files are loaded on-demand inside the render wrapper functions below.
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -242,6 +243,25 @@ function svgml_render_overview_page() {
                 <span class="dashicons dashicons-plus-alt2"></span>
                 Nieuwe kaart
             </a>
+            <button type="button" class="button button-secondary" id="svgml-import-toggle">
+                <span class="dashicons dashicons-upload"></span>
+                Importeer kaart
+            </button>
+            <form id="svgml-import-form"
+                  method="post"
+                  enctype="multipart/form-data"
+                  action="<?php echo esc_url( admin_url( 'admin.php?page=svgml-overview&action=import' ) ); ?>"
+                  style="display:none; align-items:center; gap:8px; margin-top:8px;">
+                <?php wp_nonce_field( 'svgml_import_map' ); ?>
+                <input type="file" name="svgml_import_file" accept=".json" required>
+                <button type="submit" class="button button-primary">Importeren</button>
+            </form>
+            <script>
+            document.getElementById('svgml-import-toggle').addEventListener('click', function() {
+                var f = document.getElementById('svgml-import-form');
+                f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+            });
+            </script>
         </div>
 
         <?php if ( isset( $_GET['deleted'] ) ) : ?>
@@ -288,6 +308,10 @@ function svgml_render_overview_page() {
                     $source_type = get_post_meta( $map_id, '_svgml_source_type', true ) ?: 'image';
                     $json_url    = get_post_meta( $map_id, '_svgml_json_url', true );
                     $edit_url    = admin_url( 'admin.php?page=svgml-settings&map_id=' . $map_id );
+                    $export_url  = wp_nonce_url(
+                        admin_url( 'admin.php?page=svgml-overview&action=export&map_id=' . $map_id ),
+                        'svgml_export_map_' . $map_id
+                    );
                     $delete_url  = wp_nonce_url(
                         admin_url( 'admin.php?page=svgml-overview&action=delete&map_id=' . $map_id ),
                         'svgml_delete_map_' . $map_id
@@ -335,6 +359,9 @@ function svgml_render_overview_page() {
                         <div class="svgml-map-card-actions">
                             <a href="<?php echo esc_url( $edit_url ); ?>" class="button button-primary button-small">
                                 <span class="dashicons dashicons-edit"></span> Bewerken
+                            </a>
+                            <a href="<?php echo esc_url( $export_url ); ?>" class="button button-secondary button-small">
+                                <span class="dashicons dashicons-download"></span> Exporteer
                             </a>
                             <a href="<?php echo esc_url( $delete_url ); ?>"
                                class="button button-link-delete button-small"

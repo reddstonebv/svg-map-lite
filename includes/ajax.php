@@ -21,21 +21,29 @@ function svgml_ajax_get_default_css() {
         return;
     }
     $default_css = <<<'CSS'
-/* ── SVG Map Lite – Standaard panel-stijlen ────────────────────────────
+/* ── SVG Map Lite – Standaard aanpasbare stijlen ───────────────────────
    Pas deze CSS aan om het info-panel en de kaart op je eigen site te stylen.
    Alle beschikbare klassen staan in het menu Stijlen & CSS → Klassen Referentie.
 ──────────────────────────────────────────────────────────────────────── */
 
-/* Accentkleur (knoppen, actieve regio rand, range-slider) */
+/* ── CSS VARIABELEN ─────────────────────────────────────────────────── */
 :root {
-    --svgml-accent: #cc0000;
+    --svgml-accent:      #cc0000;     /* Accentkleur (rode knoppen, actieve regio's) */
+    --svgml-panel-bg:    #ffffff;     /* Achtergrond van het info-panel */
+    --svgml-panel-w:     300px;       /* Breedte van het panel naast de kaart */
+    --svgml-thumb-ratio: 56.25%;      /* Verhouding thumbnail (56.25% = 16:9) */
+
+    /* Status kleuren – pas aan voor eigen statuskleuren */
+    --svgml-status-available-color: #00a32a;
+    --svgml-status-rented-color:    #cc0000;
+    --svgml-status-reserved-color:  #f0a500;
 }
 
-/* Info-panel achtergrond en breedte */
+/* ── INFO-PANEL ─────────────────────────────────────────────────────── */
 .svgml-panel {
-    background: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+    background: var(--svgml-panel-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
     overflow: hidden;
 }
 
@@ -43,47 +51,104 @@ function svgml_ajax_get_default_css() {
 .svgml-panel-title {
     font-size: 14px;
     font-weight: 700;
-    color: #2b2b2b;
-    padding: 14px 18px 0;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    color: #1a1a1a;
+    letter-spacing: -0.2px;
 }
 
-/* Koptekst-blok */
-.svgml-block-heading h3 {
+/* ── BLOK: KOPTEKST ─────────────────────────────────────────────────── */
+.svgml-heading-value {
     font-size: 16px;
     font-weight: 700;
-    margin: 0;
     color: #1a1a1a;
+    line-height: 1.3;
 }
 
-/* Prijs-blok */
-.svgml-block-price .svgml-price {
+/* ── BLOK: PRIJS ────────────────────────────────────────────────────── */
+.svgml-price-value {
     font-size: 18px;
     font-weight: 700;
     color: #1a1a1a;
+    line-height: 1.2;
 }
 
-/* Link-knop */
-.svgml-block-link a {
+/* ── BLOK: LINK-KNOP ────────────────────────────────────────────────── */
+.svgml-link-btn {
     display: inline-block;
     background: var(--svgml-accent);
-    color: #fff;
-    padding: 8px 20px;
-    border-radius: 50px;
+    padding: 8px 16px;
+    border-radius: 4px;
     font-size: 13px;
     font-weight: 600;
+    transition: background 0.15s;
+}
+
+.svgml-block-link .svgml-link-btn {
+    color: #fff;
     text-decoration: none;
 }
 
-/* Overzicht-rij (lijst van alle objecten) */
+.svgml-block-link .svgml-link-btn:hover {
+    background: #a80000;
+}
+
+/* ── STATUS BADGES ──────────────────────────────────────────────────── */
+.svgml-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #e8e8e8;
+    color: #444;
+}
+
+.svgml-badge.svgml-badge-available,
+.svgml-badge-beschikbaar {
+    background: #e6f4ea;
+    color: #00650d;
+}
+
+.svgml-badge.svgml-badge-rented,
+.svgml-badge-verhuurd {
+    background: #fce8e8;
+    color: #8a1515;
+}
+
+.svgml-badge.svgml-badge-reserved,
+.svgml-badge-gereserveerd {
+    background: #fff4e5;
+    color: #8a5c00;
+}
+
+.svgml-badge.svgml-badge-sold,
+.svgml-badge-verkocht {
+    background: #f0f0f0;
+    color: #555;
+}
+
+/* ── OVERZICHT LIJST ────────────────────────────────────────────────── */
 .svgml-overview-item {
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.13s;
 }
+
 .svgml-overview-item:hover {
     background: #fdf5f5;
+}
+
+.svgml-ov-heading {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1a1a1a;
+}
+
+.svgml-ov-price {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
 }
 CSS;
     wp_send_json_success( [ 'css' => $default_css ] );
