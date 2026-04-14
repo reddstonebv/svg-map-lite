@@ -4,18 +4,6 @@
  * Aanpasbaar via custom CSS in het Stijlen-menu, of via de CSS-variabelen hieronder.
  */
 
-/* ── CSS VARIABELEN ─────────────────────────────────────────────────────────── */
-:root {
-    --svgml-accent:      #cc0000;     /* Accentkleur (rode knoppen, actieve regio's) */
-    --svgml-panel-bg:    #ffffff;     /* Achtergrond van het info-panel */
-    --svgml-panel-w:     300px;       /* Breedte van het panel naast de kaart */
-    --svgml-thumb-ratio: 56.25%;      /* Verhouding thumbnail (56.25% = 16:9) */
-
-    /* Status kleuren – override via Custom CSS als gewenst */
-    --svgml-status-available-color: #00a32a;
-    --svgml-status-rented-color:    #cc0000;
-    --svgml-status-reserved-color:  #f0a500;
-}
 
 /* ── BUITENSTE WRAPPER (wrap + filters) ─────────────────────────────────── */
 .svgml-wrap {
@@ -272,10 +260,6 @@
     font-family: inherit;
 }
 
-.svgml-container.svgml-panel-pos-right  { flex-direction: row; }
-.svgml-container.svgml-panel-pos-left   { flex-direction: row-reverse; }
-.svgml-container.svgml-panel-pos-bottom { flex-direction: column; }
-
 /* ── SVG MAP WRAPPER ──────────────────────────────────────────────────── */
 .svgml-map-wrap {
     flex: 1 1 auto;
@@ -345,20 +329,6 @@
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
     overflow: hidden;
-}
-
-/* Panel naast de kaart */
-.svgml-panel-pos-right .svgml-panel,
-.svgml-panel-pos-left .svgml-panel {
-    flex: 0 0 var(--svgml-panel-w);
-    max-width: 340px;
-    min-width: 240px;
-    align-self: flex-start;
-}
-
-/* Panel onder de kaart */
-.svgml-panel-pos-bottom .svgml-panel {
-    width: 100%;
 }
 
 /* Standalone panel [svg_map_panel] */
@@ -790,19 +760,6 @@
 }
 
 @media (max-width: 640px) {
-    /* Op kleine schermen: kaart en panel onder elkaar — target position classes to beat (0,2,0) specificity */
-    .svgml-container.svgml-panel-pos-right,
-    .svgml-container.svgml-panel-pos-left {
-        flex-direction: column;
-    }
-
-    .svgml-panel-pos-right .svgml-panel,
-    .svgml-panel-pos-left .svgml-panel {
-        flex: none;
-        max-width: 100%;
-        width: 100%;
-    }
-
     /* Filters op telefoon: volledig breed */
     .svgml-filter-item {
         flex: 1 1 calc(50% - 12px);

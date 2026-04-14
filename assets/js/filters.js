@@ -91,6 +91,8 @@ jQuery(document).ready(function($) {
             svgml_initRangeFallback(field);
         } else if (type === 'search') {
             svgml_initSearch(field);
+        } else if (type === 'input') {
+            svgml_initInput(field, filter);
         } else if (type === 'buttons') {
             svgml_initButtons(field, filter);
         }
@@ -166,9 +168,7 @@ jQuery(document).ready(function($) {
         // Collect all numeric values for this field
         var values = [];
         $.each(dataObjects, function(i, obj) {
-            var raw = obj[field];
-            // parseFloat() converts a string to a number (e.g. "4921.00" → 4921)
-            var num = parseFloat(String(raw).replace(/[^0-9.,]/g, '').replace(',', '.'));
+            var num = svgml_parseNumeric(obj[field]);
             if (!isNaN(num)) {
                 values.push(num);
             }
@@ -374,6 +374,58 @@ jQuery(document).ready(function($) {
     }
 
 
+    // ── INPUT FILTER (single text / min-max) ──────────────────────────────────
+
+    /**
+     * Initialize an input filter.
+     * mode 'single': single text field, exact/contains match.
+     * mode 'minmax': two fields (Min, Max), numeric range match via svgml_parseNumeric.
+     *
+     * @param {string} field        – The field name in the JSON object
+     * @param {object} filterConfig – Filter configuration from PHP (input_mode, etc.)
+     */
+    function svgml_initInput(field, filterConfig) {
+        var mode = filterConfig.input_mode || 'single';
+        var $wrap = $('#svgml-input-' + field);
+        if (!$wrap.length) return;
+
+        if (mode === 'minmax') {
+            var $min = $wrap.find('.svgml-filter-input-min');
+            var $max = $wrap.find('.svgml-filter-input-max');
+
+            function updateMinMax() {
+                var minVal = $min.val().trim();
+                var maxVal = $max.val().trim();
+                if (!minVal && !maxVal) {
+                    delete filterState[field];
+                } else {
+                    filterState[field] = { type: 'input-minmax', min: minVal, max: maxVal };
+                }
+                svgml_applyFilters();
+            }
+
+            $min.on('input', updateMinMax);
+            $max.on('input', updateMinMax);
+
+            // Store reference for reset
+            $wrap.data('inputMode', 'minmax');
+
+        } else {
+            $wrap.on('input', function() {
+                var val = $(this).val().trim();
+                if (!val) {
+                    delete filterState[field];
+                } else {
+                    filterState[field] = { type: 'input-single', value: val };
+                }
+                svgml_applyFilters();
+            });
+
+            $wrap.data('inputMode', 'single');
+        }
+    }
+
+
     // ── BUTTONS FILTER ─────────────────────────────────────────────────────
 
     /**
@@ -477,6 +529,12 @@ jQuery(document).ready(function($) {
             }
         });
 
+        // Reset input filters (single + minmax)
+        $('#svgml-filters-bar .svgml-filter-input-single').val('');
+        $('#svgml-filters-bar .svgml-input-minmax').each(function() {
+            $(this).find('.svgml-filter-input-min, .svgml-filter-input-max').val('');
+        });
+
         // Reset search fields
         $('#svgml-filters-bar .svgml-filter-search').val('');
         $('#svgml-filters-bar .svgml-autocomplete-list').hide().empty();
@@ -556,8 +614,7 @@ jQuery(document).ready(function($) {
                 }
 
             } else if (filter.type === 'range') {
-                // Convert the value to a number for comparison
-                var num = parseFloat(String(value).replace(/[^0-9.,]/g, '').replace(',', '.'));
+                var num = svgml_parseNumeric(value);
                 if (isNaN(num)) return false;
                 if (num < filter.min || num > filter.max) return false;
 
@@ -578,6 +635,18 @@ jQuery(document).ready(function($) {
                 if (String(value).toLowerCase().indexOf(filter.value.toLowerCase()) === -1) {
                     return false;
                 }
+
+            } else if (filter.type === 'input-single') {
+                // Contains match (case-insensitive)
+                if (String(value).toLowerCase().indexOf(filter.value.toLowerCase()) === -1) {
+                    return false;
+                }
+
+            } else if (filter.type === 'input-minmax') {
+                var num = svgml_parseNumeric(value);
+                if (isNaN(num)) return false;
+                if (filter.min !== '' && num < svgml_parseNumeric(filter.min)) return false;
+                if (filter.max !== '' && num > svgml_parseNumeric(filter.max)) return false;
             }
         }
 
@@ -586,6 +655,50 @@ jQuery(document).ready(function($) {
 
 
     // ── HELPER FUNCTIONS ──────────────────────────────────────────────────────────
+
+    /**
+     * Parse a raw value (possibly with currency symbols, thousand separators,
+     * or European comma-decimal format) into a JavaScript float.
+     *
+     * Handles:
+     *   "€ 1.234,56"  → 1234.56  (EU: dot = thousands, comma = decimal)
+     *   "$1,234.56"   → 1234.56  (US: comma = thousands, dot = decimal)
+     *   "4921.00"     → 4921     (plain float)
+     *   "45 m²"       → 45       (trailing unit)
+     *
+     * @param {*} raw – Any value (string, number, …)
+     * @returns {number} – Parsed float, or NaN if not numeric
+     */
+    function svgml_parseNumeric(raw) {
+        // Keep only digits, comma, dot and leading minus
+        var s = String(raw).replace(/[^0-9.,-]/g, '');
+        if (!s || s === '-') return NaN;
+
+        var lastDot   = s.lastIndexOf('.');
+        var lastComma = s.lastIndexOf(',');
+
+        if (lastDot !== -1 && lastComma !== -1) {
+            // Both separators present: whichever comes last is the decimal separator
+            if (lastDot > lastComma) {
+                // US format: "1,234.56" → remove commas
+                s = s.replace(/,/g, '');
+            } else {
+                // EU format: "1.234,56" → remove dots, replace comma with dot
+                s = s.replace(/\./g, '').replace(',', '.');
+            }
+        } else if (lastComma !== -1) {
+            // Only comma: if exactly 3 digits follow, treat as thousands separator
+            var afterComma = s.substring(lastComma + 1);
+            if (/^\d{3}$/.test(afterComma)) {
+                s = s.replace(/,/g, '');
+            } else {
+                s = s.replace(',', '.');
+            }
+        }
+        // Only dot (or neither): parseFloat handles it directly
+
+        return parseFloat(s);
+    }
 
     /**
      * Format a number with periods as thousand separators.

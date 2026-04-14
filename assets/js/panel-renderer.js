@@ -34,11 +34,8 @@ jQuery(document).ready(function($) {
     }
 
     // ── DOM REFERENCES ───────────────────────────────────────────────────────
-    // There can be two panels: the inline panel (#svgml-panel)
-    // and the standalone panel (#svgml-panel-standalone).
-    var $inlinePanel    = $('#svgml-panel');
-    var $standalonePanel = $('#svgml-panel-standalone');
-    var $svg            = $('.svgml-svg');
+    var $panel = $('.svgml-panel');   // Single panel instance
+    var $svg   = $('.svgml-svg');
 
     // ── STATUS CLASSES ON SVG REGIONS ────────────────────────────────────────
     // When the page loads, we assign status to each SVG region right away.
@@ -129,20 +126,13 @@ jQuery(document).ready(function($) {
         // Build the panel content
         var html = svgml_buildPanelHtml(jsonObject, svgId);
 
-        // Update the inline panel (if it's on the page)
-        if ($inlinePanel.length) {
-            $inlinePanel.find('#svgml-panel-content').html(html);
-        }
-
-        // Also update the standalone panel (if that's on the page)
-        if ($standalonePanel.length) {
-            $standalonePanel.find('#svgml-panel-content-standalone').html(html);
-            // Make sure the standalone panel is visible
-            $standalonePanel
+        if ($panel.length) {
+            $panel.find('.svgml-panel-content').html(html);
+            $panel
                 .removeAttr('aria-hidden')
                 .stop(true, true)
                 .fadeIn(200);
-            $standalonePanel.find('.svgml-panel-close-standalone').css('display', 'flex');
+            $panel.find('.svgml-panel-close-standalone').css('display', 'flex');
         }
     });
 
@@ -162,14 +152,9 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.svgml-panel-close-standalone', function() {
         $(this).hide();
         if (svgmlData.overviewEnabled) {
-            // Return to overview
-            $standalonePanel.find('#svgml-panel-content-standalone').html(
-                svgml_buildOverviewHtml()
-            );
+            $panel.find('.svgml-panel-content').html(svgml_buildOverviewHtml());
         } else {
-            $standalonePanel
-                .attr('aria-hidden', 'true')
-                .fadeOut(200);
+            $panel.attr('aria-hidden', 'true').fadeOut(200);
         }
     });
 
@@ -404,19 +389,10 @@ jQuery(document).ready(function($) {
     function svgml_renderOverview() {
         var html = svgml_buildOverviewHtml();
 
-        // Show in the inline panel
-        if ($inlinePanel.length) {
-            // Remove the placeholder and show the overview list
-            $inlinePanel.find('#svgml-panel-content').html(html);
-            // Make sure the panel is visible (remove aria-hidden)
-            $inlinePanel.removeAttr('aria-hidden');
-        }
-
-        // Also show in the standalone panel if it's on the page
-        if ($standalonePanel.length) {
-            $standalonePanel.find('#svgml-panel-content-standalone').html(html);
-            $standalonePanel.removeAttr('aria-hidden').show();
-            $standalonePanel.find('.svgml-panel-close-standalone').hide();
+        if ($panel.length) {
+            $panel.find('.svgml-panel-content').html(html);
+            $panel.removeAttr('aria-hidden').show();
+            $panel.find('.svgml-panel-close-standalone').hide();
         }
     }
 

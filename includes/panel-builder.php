@@ -84,13 +84,6 @@ function svgml_render_panel_builder_page( $map_id ) {
             $panel_title = sanitize_text_field( $_POST['svgml_panel_title'] ?? '' );
             update_post_meta( $map_id, '_svgml_panel_title', $panel_title );
 
-            $panel_pos = sanitize_text_field( $_POST['svgml_panel_position'] ?? 'right' );
-            // 'standalone' = panel only via [svg_map_panel] shortcode, not in the map itself
-            if ( ! in_array( $panel_pos, [ 'right', 'bottom', 'left', 'standalone' ] ) ) {
-                $panel_pos = 'right';
-            }
-            update_post_meta( $map_id, '_svgml_panel_position', $panel_pos );
-
             // ── Save legacy fields (advanced) ────────────────────────────────
             $raw_fields_legacy = sanitize_textarea_field( $_POST['svgml_display_fields'] ?? '' );
             $fields_array      = array_values( array_filter(
@@ -146,7 +139,6 @@ function svgml_render_panel_builder_page( $map_id ) {
     if ( ! is_array( $panel_blocks ) ) $panel_blocks = [];
 
     $panel_title       = get_post_meta( $map_id, '_svgml_panel_title', true ) ?: '';
-    $panel_position    = get_post_meta( $map_id, '_svgml_panel_position', true ) ?: 'right';
 
     $display_fields    = get_post_meta( $map_id, '_svgml_display_fields', true );
     if ( ! is_array( $display_fields ) ) $display_fields = [];
@@ -258,22 +250,6 @@ function svgml_render_panel_builder_page( $map_id ) {
                                    placeholder="Bijv. Object Info">
                             <p class="description">
                                 Optionele vaste koptekst boven het info-panel. Laat leeg om geen titel te tonen.
-                            </p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><label for="svgml_panel_position">Positie</label></th>
-                        <td>
-                            <select id="svgml_panel_position" name="svgml_panel_position">
-                                <option value="right"      <?php selected( $panel_position, 'right' );      ?>>Rechts van de kaart</option>
-                                <option value="bottom"     <?php selected( $panel_position, 'bottom' );     ?>>Onder de kaart</option>
-                                <option value="left"       <?php selected( $panel_position, 'left' );       ?>>Links van de kaart</option>
-                                <option value="standalone" <?php selected( $panel_position, 'standalone' ); ?>>Alleen via shortcode (geen inline panel)</option>
-                            </select>
-                            <p class="description">
-                                Kies <strong>Alleen via shortcode</strong> om het panel helemaal los van de kaart te plaatsen.
-                                Gebruik dan <code>[svg_map_panel]</code> op een andere plek op de pagina (of zelfs in een andere kolom/sidebar).
-                                Bij deze optie is <em>geen</em> panel zichtbaar naast of onder de kaart.
                             </p>
                         </td>
                     </tr>

@@ -54,7 +54,7 @@
     color: var(--svgml-dark);
     margin-bottom: 24px;
     padding-bottom: 16px;
-    border-bottom: 2px solid var(--svgml-border);
+    border-bottom: 0;
     letter-spacing: -0.3px;
 }
 
@@ -575,6 +575,7 @@ tr.svgml-row-excluded .svgml-exclude-label {
     margin: 18px 0 6px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--svgml-border);
+    padding: 5px 10px; 
 }
 
 .svgml-css-reference h3:first-child {
@@ -583,7 +584,7 @@ tr.svgml-row-excluded .svgml-exclude-label {
 
 .svgml-class-list {
     margin: 0 0 8px;
-    padding: 0;
+    padding: 5px 15px;
 }
 
 .svgml-class-list dt {
@@ -1943,3 +1944,67 @@ tr.svgml-row-excluded .svgml-exclude-label {
         flex-direction: column;
     }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CODEMIRROR – One Dark Pro theme, scoped to our admin pages
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Height */
+.svgml-admin-wrap .CodeMirror {
+    height: 70vh;
+    min-height: 500px;
+}
+
+/* Base */
+.svgml-admin-wrap .CodeMirror {
+    background: #282c34 !important;
+    color: #abb2bf !important;
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+.svgml-admin-wrap .CodeMirror-gutters {
+    background: #21252b !important;
+    border-right: 1px solid #181a1f !important;
+}
+
+.svgml-admin-wrap .CodeMirror-linenumber {
+    color: #636d83 !important;
+}
+
+.svgml-admin-wrap .CodeMirror-cursor {
+    border-left: 2px solid #528bff !important;
+}
+
+.svgml-admin-wrap .CodeMirror-selected {
+    background: rgba(97, 175, 239, 0.2) !important;
+}
+
+.svgml-admin-wrap .CodeMirror-activeline-background {
+    background: #2c313c !important;
+}
+
+.svgml-admin-wrap .CodeMirror-matchingbracket {
+    text-decoration: underline;
+    color: #98c379 !important;
+}
+
+/* Syntax tokens */
+.svgml-admin-wrap .cm-keyword       { color: #c678dd !important; }
+.svgml-admin-wrap .cm-atom,
+.svgml-admin-wrap .cm-number        { color: #d19a66 !important; }
+.svgml-admin-wrap .cm-def           { color: #61afef !important; }
+.svgml-admin-wrap .cm-variable      { color: #e06c75 !important; }
+.svgml-admin-wrap .cm-variable-2    { color: #d19a66 !important; }
+.svgml-admin-wrap .cm-variable-3,
+.svgml-admin-wrap .cm-property,
+.svgml-admin-wrap .cm-operator      { color: #56b6c2 !important; }
+.svgml-admin-wrap .cm-comment       { color: #5c6370 !important; font-style: italic; }
+.svgml-admin-wrap .cm-string        { color: #98c379 !important; }
+.svgml-admin-wrap .cm-string-2      { color: #56b6c2 !important; }
+.svgml-admin-wrap .cm-meta,
+.svgml-admin-wrap .cm-bracket       { color: #abb2bf !important; }
+.svgml-admin-wrap .cm-tag           { color: #e06c75 !important; }
+.svgml-admin-wrap .cm-attribute     { color: #d19a66 !important; }
+.svgml-admin-wrap .cm-qualifier     { color: #56b6c2 !important; }
+.svgml-admin-wrap .cm-builtin       { color: #e6c07b !important; }
+.svgml-admin-wrap .cm-error         { color: #ffffff !important; background-color: #e06c75 !important; }

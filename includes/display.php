@@ -78,6 +78,22 @@ function svgml_render_display_page( $map_id ) {
             update_post_meta( $map_id, '_svgml_panel_border_width',  (string) $panel_border_width );
             update_post_meta( $map_id, '_svgml_slider_accent_color', $slider_accent_color );
 
+            // ── Input Field Styling ──────────────────────────────────────────────
+            $input_bg_color     = sanitize_hex_color( $_POST['svgml_input_bg_color']     ?? '' ) ?: '';
+            $input_text_color   = sanitize_hex_color( $_POST['svgml_input_text_color']   ?? '' ) ?: '';
+            $input_border_color = sanitize_hex_color( $_POST['svgml_input_border_color'] ?? '' ) ?: '';
+            $input_focus_color  = sanitize_hex_color( $_POST['svgml_input_focus_color']  ?? '' ) ?: '';
+            update_post_meta( $map_id, '_svgml_input_bg_color',     $input_bg_color );
+            update_post_meta( $map_id, '_svgml_input_text_color',   $input_text_color );
+            update_post_meta( $map_id, '_svgml_input_border_color', $input_border_color );
+            update_post_meta( $map_id, '_svgml_input_focus_color',  $input_focus_color );
+
+            // ── Polygon Stroke ───────────────────────────────────────────────────
+            $poly_stroke_color = sanitize_hex_color( $_POST['svgml_poly_stroke_color'] ?? '' ) ?: '#2a9d8f';
+            $poly_stroke_width = max( 0, min( 10, intval( $_POST['svgml_poly_stroke_width'] ?? 1 ) ) );
+            update_post_meta( $map_id, '_svgml_poly_stroke_color', $poly_stroke_color );
+            update_post_meta( $map_id, '_svgml_poly_stroke_width', (string) $poly_stroke_width );
+
             delete_transient( 'svgml_json_cache_' . $map_id );
             delete_transient( 'svgml_html_'       . $map_id );
 
@@ -103,6 +119,13 @@ function svgml_render_display_page( $map_id ) {
     $panel_border_width  = get_post_meta( $map_id, '_svgml_panel_border_width',  true );
     $panel_border_width  = ( '' === $panel_border_width ) ? 0 : intval( $panel_border_width );
     $slider_accent_color = get_post_meta( $map_id, '_svgml_slider_accent_color', true ) ?: '#2a9d8f';
+    $input_bg_color      = get_post_meta( $map_id, '_svgml_input_bg_color',     true ) ?: '#ffffff';
+    $input_text_color    = get_post_meta( $map_id, '_svgml_input_text_color',   true ) ?: '#333333';
+    $input_border_color  = get_post_meta( $map_id, '_svgml_input_border_color', true ) ?: '#cccccc';
+    $input_focus_color   = get_post_meta( $map_id, '_svgml_input_focus_color',  true ) ?: '#2a9d8f';
+    $poly_stroke_color   = get_post_meta( $map_id, '_svgml_poly_stroke_color',  true ) ?: '#2a9d8f';
+    $poly_stroke_width_v = get_post_meta( $map_id, '_svgml_poly_stroke_width',  true );
+    $poly_stroke_width_v = ( '' === $poly_stroke_width_v ) ? 1 : intval( $poly_stroke_width_v );
 
     // Standaard vastgoed-statussen als er nog niets is ingesteld
     if ( empty( $status_colors ) ) {
@@ -307,6 +330,38 @@ function svgml_render_display_page( $map_id ) {
                                            value="<?php echo esc_attr( $slider_accent_color ); ?>" class="svgml-color-input">
                                 </td>
                             </tr>
+                            <tr>
+                                <th colspan="2" style="padding-top:18px; font-size:13px; font-weight:600; color:#1d2327; border-top:1px solid #ddd;">Invoerveld styling</th>
+                            </tr>
+                            <tr>
+                                <th>Input achtergrondkleur</th>
+                                <td>
+                                    <input type="color" name="svgml_input_bg_color"
+                                           value="<?php echo esc_attr( $input_bg_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Input tekstkleur</th>
+                                <td>
+                                    <input type="color" name="svgml_input_text_color"
+                                           value="<?php echo esc_attr( $input_text_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Input randkleur</th>
+                                <td>
+                                    <input type="color" name="svgml_input_border_color"
+                                           value="<?php echo esc_attr( $input_border_color ); ?>" class="svgml-color-input">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Input focus kleur</th>
+                                <td>
+                                    <input type="color" name="svgml_input_focus_color"
+                                           value="<?php echo esc_attr( $input_focus_color ); ?>" class="svgml-color-input">
+                                    <p class="description">Randkleur bij focus/klik op het invoerveld</p>
+                                </td>
+                            </tr>
                         </table>
                     </div>
 
@@ -324,6 +379,14 @@ function svgml_render_display_page( $map_id ) {
                                     <div id="svgml-preview-slider-handle" style="position:absolute; left:20%; top:50%; transform:translate(-50%,-50%); width:14px; height:14px; border-radius:50%; background:#fff; border:2px solid <?php echo esc_attr( $slider_accent_color ); ?>; box-shadow:0 1px 4px rgba(0,0,0,.2);"></div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Input field mockup -->
+                        <div style="padding:10px 14px 12px; background-color:<?php echo esc_attr( $filter_bg_color ); ?>; margin-bottom:14px; border-radius:6px;" id="svgml-preview-input-bar">
+                            <label class="svgml-filter-label" style="display:block; margin-bottom:5px; font-size:12px; color:<?php echo esc_attr( $filter_text_color ); ?>;">Zoeken</label>
+                            <input type="text" class="svgml-filter-input-single" id="svgml-preview-input"
+                                   placeholder="Typ een waarde..."
+                                   style="width:100%; padding:6px 10px; border-radius:4px; font-size:13px; box-sizing:border-box; background-color:<?php echo esc_attr( $input_bg_color ); ?>; color:<?php echo esc_attr( $input_text_color ); ?>; border:1px solid <?php echo esc_attr( $input_border_color ); ?>; outline:none;" readonly>
                         </div>
 
                         <!-- Panel mockup -->
@@ -345,6 +408,9 @@ function svgml_render_display_page( $map_id ) {
                         var filterBg         = $('[name="svgml_filter_bg_color"]').val();
                         var filterText       = $('[name="svgml_filter_text_color"]').val();
                         var sliderAccent     = $('[name="svgml_slider_accent_color"]').val();
+                        var inputBg          = $('[name="svgml_input_bg_color"]').val();
+                        var inputText        = $('[name="svgml_input_text_color"]').val();
+                        var inputBorder      = $('[name="svgml_input_border_color"]').val();
 
                         $('#svgml-preview-panel').css({
                             'background-color': panelBg,
@@ -359,12 +425,44 @@ function svgml_render_display_page( $map_id ) {
                         $('#svgml-preview-filter-bar span').css('color', filterText);
                         $('#svgml-preview-slider-connect').css('background-color', sliderAccent);
                         $('#svgml-preview-slider-handle').css('border-color', sliderAccent);
+                        $('#svgml-preview-input-bar').css('background-color', filterBg);
+                        $('#svgml-preview-input').css({
+                            'background-color': inputBg,
+                            'color':            inputText,
+                            'border':           '1px solid ' + inputBorder
+                        });
                     }
                     $(document).ready(function() {
-                        $('[name^="svgml_panel_"], [name^="svgml_filter_"], [name^="svgml_slider_"]').on('input change', svgml_updatePreview);
+                        $('[name^="svgml_panel_"], [name^="svgml_filter_"], [name^="svgml_slider_"], [name^="svgml_input_"], [name^="svgml_poly_"]').on('input change', svgml_updatePreview);
                     });
                 })(jQuery);
                 </script>
+            </div>
+
+            <!-- ─── POLYGOON WEERGAVE ──────────────────────────────────── -->
+            <div class="svgml-section">
+                <h2>Polygoon Weergave</h2>
+                <p class="svgml-description">
+                    Stel de lijnkleur en lijndikte in van de SVG-regio's (polygoongrenzen).
+                </p>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="svgml_poly_stroke_color">Lijnkleur</label></th>
+                        <td>
+                            <input type="color" id="svgml_poly_stroke_color" name="svgml_poly_stroke_color"
+                                   value="<?php echo esc_attr( $poly_stroke_color ); ?>" class="svgml-color-input">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="svgml_poly_stroke_width">Lijndikte</label></th>
+                        <td>
+                            <input type="number" id="svgml_poly_stroke_width" name="svgml_poly_stroke_width"
+                                   value="<?php echo esc_attr( $poly_stroke_width_v ); ?>"
+                                   min="0" max="10" step="1" class="small-text">
+                            <p class="description">Standaard: 1 (relatief aan de SVG viewBox)</p>
+                        </td>
+                    </tr>
+                </table>
             </div>
 
             <!-- ─── LAYER SWITCHER ──────────────────────────────────────── -->

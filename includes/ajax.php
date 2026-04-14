@@ -312,7 +312,7 @@ function svgml_ajax_create_map() {
         'json_url'            => '',
         'id_mapping'          => [],
         'display_fields'      => [],
-        'panel_position'      => 'right',
+        'panel_position'      => 'shortcode',
         'panel_title'         => '',
         'json_id_field'       => 'id',
         'panel_blocks'        => [],
@@ -331,6 +331,33 @@ function svgml_ajax_create_map() {
         'poly_stroke_width'   => '1',
         'filter_match_color'  => '',
         'filter_dim_color'    => '',
+        'panel_bg_color'      => '#ffffff',
+        'panel_text_color'    => '#333333',
+        'panel_border_radius' => '10',
+        'panel_border_color'  => '#cccccc',
+        'panel_border_width'  => '0',
+        'filter_bg_color'     => '#f5f5f5',
+        'filter_text_color'   => '#333333',
+        'slider_accent_color' => '#cc0000',
+        'input_bg_color'      => '#ffffff',
+        'input_text_color'    => '#333333',
+        'input_border_color'  => '#cccccc',
+        'input_focus_color'   => '#cc0000',
+        'status_hex_colors'   => [
+            'Beschikbaar' => '#00a32a',
+            'Verhuurd'    => '#cc0000',
+            'Gereserveerd'=> '#f0a500',
+        ],
+        'status_colors'       => [
+            'Beschikbaar'  => 'beschikbaar',
+            'Verhuurd'     => 'verhuurd',
+            'Gereserveerd' => 'gereserveerd',
+        ],
+        'status_opacity'      => [
+            'Beschikbaar'  => 100,
+            'Verhuurd'     => 100,
+            'Gereserveerd' => 100,
+        ],
     ];
 
     foreach ( $defaults as $key => $value ) {

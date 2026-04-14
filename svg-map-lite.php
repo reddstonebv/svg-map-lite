@@ -243,25 +243,17 @@ function svgml_render_overview_page() {
                 <span class="dashicons dashicons-plus-alt2"></span>
                 Nieuwe kaart
             </a>
-            <button type="button" class="button button-secondary" id="svgml-import-toggle">
-                <span class="dashicons dashicons-upload"></span>
-                Importeer kaart
-            </button>
             <form id="svgml-import-form"
                   method="post"
                   enctype="multipart/form-data"
-                  action="<?php echo esc_url( admin_url( 'admin.php?page=svgml-overview&action=import' ) ); ?>"
-                  style="display:none; align-items:center; gap:8px; margin-top:8px;">
+                  action="<?php echo esc_url( admin_url( 'admin.php?page=svgml-overview&action=import' ) ); ?>">
                 <?php wp_nonce_field( 'svgml_import_map' ); ?>
-                <input type="file" name="svgml_import_file" accept=".json" required>
-                <button type="submit" class="button button-primary">Importeren</button>
+                <input type="file" name="svgml_import_file" id="svgml-import-file" accept=".json" style="display:none;" required>
+                <label for="svgml-import-file" class="button button-secondary" style="cursor:pointer;">
+                    <span class="dashicons dashicons-upload"></span>
+                    Importeer kaart
+                </label>
             </form>
-            <script>
-            document.getElementById('svgml-import-toggle').addEventListener('click', function() {
-                var f = document.getElementById('svgml-import-form');
-                f.style.display = f.style.display === 'none' ? 'flex' : 'none';
-            });
-            </script>
         </div>
 
         <?php if ( isset( $_GET['deleted'] ) ) : ?>
@@ -581,8 +573,18 @@ function svgml_admin_enqueue( $hook ) {
     // Teal background for our admin pages
     wp_add_inline_style( 'svgml-admin-css', 'body.wp-admin { background: #edf5f4 !important; }' );
 
-    // Overview page doesn't need the editor scripts
+    // Overview page: wire up import file input auto-submit, then bail
     if ( 'svgml-overview' === $current_page ) {
+        wp_add_inline_script( 'jquery', '
+            document.addEventListener("DOMContentLoaded", function() {
+                var input = document.getElementById("svgml-import-file");
+                if (input) {
+                    input.addEventListener("change", function() {
+                        if (this.files.length) { this.form.submit(); }
+                    });
+                }
+            });
+        ' );
         return;
     }
 
@@ -627,7 +629,13 @@ function svgml_admin_enqueue( $hook ) {
 
     // CodeMirror on Styles page
     if ( 'svgml-styles' === $current_page ) {
-        $cm_settings = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
+        $cm_settings = wp_enqueue_code_editor( [
+            'type'       => 'text/css',
+            'codemirror' => [
+                'matchBrackets'     => true,
+                'autoCloseBrackets' => true,
+            ],
+        ] );
     }
 
     // Panel Builder submit serializer (populates #svgml_panel_blocks before POST)

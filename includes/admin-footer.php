@@ -667,21 +667,14 @@ function svgml_admin_footer_scripts() {
             $(this).closest('tr').remove();
         });
 
-        function svgml_toggleButtonsOptions( $row ) {
-            var $typeSelect = $row.find('.svgml-filter-type-select');
-            var $optionsDiv = $row.find('.svgml-buttons-options');
-            var type = $typeSelect.val();
-
-            if ( type === 'buttons' ) {
-                $optionsDiv.show();
-            } else {
-                $optionsDiv.hide();
-            }
+        function svgml_toggleOptionsPanel( $row ) {
+            var type = $row.find('.svgml-filter-type-select').val();
+            $row.find('.svgml-buttons-options').toggle( type === 'buttons' );
+            $row.find('.svgml-input-options').toggle( type === 'input' );
         }
 
         $(document).on('change', '.svgml-filter-type-select', function() {
-            var $row = $(this).closest('tr');
-            svgml_toggleButtonsOptions( $row );
+            svgml_toggleOptionsPanel( $(this).closest('tr') );
         });
 
         function svgml_syncButtonsValues( $row ) {
@@ -713,8 +706,14 @@ function svgml_admin_footer_scripts() {
             svgml_syncButtonsValues( $row );
         });
 
+        // Sync input-mode hidden field when radio changes
+        $(document).on('change', '.svgml-input-mode-radio', function() {
+            var $row = $(this).closest('tr');
+            $row.find('.svgml-input-mode-val').val( $(this).val() );
+        });
+
         $('#svgml-filters-tbody tr').each(function() {
-            svgml_toggleButtonsOptions( $(this) );
+            svgml_toggleOptionsPanel( $(this) );
             svgml_syncButtonsValues( $(this) );
         });
 

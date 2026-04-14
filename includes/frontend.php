@@ -84,7 +84,6 @@ function svgml_render_shortcode( $atts ) {
     $json_url            = $get_meta( 'json_url', '' );
     $id_mapping          = $get_meta( 'id_mapping', [] );
     $display_fields      = $get_meta( 'display_fields', [] );
-    $panel_position      = $get_meta( 'panel_position', 'right' );
     $panel_title         = $get_meta( 'panel_title', '' );
     $json_id_field       = $get_meta( 'json_id_field', 'id' );
     $panel_blocks        = $get_meta( 'panel_blocks', [] );
@@ -179,7 +178,6 @@ function svgml_render_shortcode( $atts ) {
         'jsonIdField'     => $json_id_field,
         'displayFields'   => $display_fields,
         'panelBlocks'     => $panel_blocks,
-        'panelPosition'   => $panel_position,
         'panelTitle'      => $panel_title,
         'excludedIds'     => $excluded_ids,
         'statusField'     => $status_field,
@@ -215,6 +213,7 @@ function svgml_render_shortcode( $atts ) {
                     $f_field = sanitize_key( $filter['field'] ?? '' );
                     $f_type  = sanitize_text_field( $filter['type'] ?? 'dropdown' );
                     $f_label = sanitize_text_field( $filter['label'] ?? $f_field );
+                    $f_imode = sanitize_text_field( $filter['input_mode'] ?? 'single' );
 
                     if ( empty( $f_field ) ) continue;
                 ?>
@@ -229,6 +228,34 @@ function svgml_render_shortcode( $atts ) {
                             <span class="svgml-range-min"></span>
                             <span class="svgml-range-max"></span>
                         </div>
+
+                    <?php elseif ( 'input' === $f_type ) : ?>
+                        <?php if ( 'minmax' === $f_imode ) : ?>
+                            <div class="svgml-input-minmax"
+                                 id="svgml-input-<?php echo esc_attr( $f_field ); ?>"
+                                 data-field="<?php echo esc_attr( $f_field ); ?>"
+                                 data-mode="minmax"
+                                 style="display:flex; gap:6px;">
+                                <input type="text"
+                                       class="svgml-filter-input-min"
+                                       placeholder="Min"
+                                       autocomplete="off"
+                                       style="width:50%;">
+                                <input type="text"
+                                       class="svgml-filter-input-max"
+                                       placeholder="Max"
+                                       autocomplete="off"
+                                       style="width:50%;">
+                            </div>
+                        <?php else : ?>
+                            <input type="text"
+                                   class="svgml-filter-input-single"
+                                   id="svgml-input-<?php echo esc_attr( $f_field ); ?>"
+                                   data-field="<?php echo esc_attr( $f_field ); ?>"
+                                   data-mode="single"
+                                   placeholder="Zoek..."
+                                   autocomplete="off">
+                        <?php endif; ?>
 
                     <?php elseif ( 'search' === $f_type ) : ?>
                         <div class="svgml-search-wrap">
@@ -266,7 +293,7 @@ function svgml_render_shortcode( $atts ) {
         <?php endif; ?>
 
         <!-- ── MAP + PANEL CONTAINER ──────────────────────────────────────── -->
-        <div class="svgml-container svgml-panel-pos-<?php echo esc_attr( $panel_position ); ?>">
+        <div class="svgml-container">
 
             <!-- The map: SVG or image + polygons -->
             <div class="svgml-map-wrap">
@@ -356,28 +383,8 @@ function svgml_render_shortcode( $atts ) {
                 <?php endif; ?>
             </div>
 
-            <?php if ( 'standalone' !== $panel_position ) : ?>
-            <div class="svgml-panel" id="svgml-panel" aria-hidden="true">
-                <div class="svgml-panel-inner">
-
-                    <button class="svgml-panel-close" id="svgml-panel-close" aria-label="Sluit info panel">
-                        <span aria-hidden="true">×</span>
-                    </button>
-
-                    <?php if ( $panel_title ) : ?>
-                        <h3 class="svgml-panel-title">
-                            <?php echo esc_html( $panel_title ); ?>
-                        </h3>
-                    <?php endif; ?>
-
-                    <div class="svgml-panel-content" id="svgml-panel-content">
-                        <p class="svgml-panel-placeholder">Klik op een regio voor meer informatie.</p>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-
         </div><!-- .svgml-container -->
+
     </div><!-- .svgml-wrap -->
     <?php
     $html = ob_get_clean();
@@ -478,6 +485,9 @@ function svgml_output_custom_css() {
             return $result;
         };
 
+        // Specificity prefix — beats frontend.css single-class selectors without !important
+        $p = '.svgml-wrap';
+
         // Get map-specific colors and settings
         $status_colors     = $get_meta( 'status_colors', [] );
         $status_hex_colors = $get_meta( 'status_hex_colors', [] );
@@ -499,15 +509,15 @@ function svgml_output_custom_css() {
             $rgba_light = svgml_hex_to_rgba( $hex, 0.12 );
             $rgba_mid   = svgml_hex_to_rgba( $hex, 0.90 );
 
-            $css_output .= ".svgml-svg [id].svgml-status-{$css_class},"
-                         . ".svgml-svg [id].svgml-status-{$css_class} * { "
-                         . "fill: {$hex} !important; "
-                         . "fill-opacity: {$fill_opacity} !important; }\n";
+            $css_output .= "{$p} .svgml-svg [id].svgml-status-{$css_class},"
+                         . "{$p} .svgml-svg [id].svgml-status-{$css_class} * { "
+                         . "fill: {$hex}; "
+                         . "fill-opacity: {$fill_opacity}; }\n";
 
-            $css_output .= ".svgml-badge.svgml-badge-{$css_class} { "
-                         . "background-color: {$rgba_light} !important; "
-                         . "color: {$hex} !important; "
-                         . "border: 1px solid {$rgba_mid} !important; }\n";
+            $css_output .= "{$p} .svgml-badge.svgml-badge-{$css_class} { "
+                         . "background-color: {$rgba_light}; "
+                         . "color: {$hex}; "
+                         . "border: 1px solid {$rgba_mid}; }\n";
         }
 
         // Filter colors
@@ -515,15 +525,15 @@ function svgml_output_custom_css() {
         $filter_dim_color   = $get_meta( 'filter_dim_color', '' );
 
         if ( ! empty( $filter_match_color ) && sanitize_hex_color( $filter_match_color ) ) {
-            $css_output .= ".svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded),"
-                         . ".svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded) *"
-                         . " { fill: {$filter_match_color} !important; }\n";
+            $css_output .= "{$p} .svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded),"
+                         . "{$p} .svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded) *"
+                         . " { fill: {$filter_match_color}; }\n";
         }
 
         if ( ! empty( $filter_dim_color ) && sanitize_hex_color( $filter_dim_color ) ) {
-            $css_output .= ".svgml-svg [id].svgml-region-dimmed,"
-                         . ".svgml-svg [id].svgml-region-dimmed *"
-                         . " { fill: {$filter_dim_color} !important; opacity: 1 !important; }\n";
+            $css_output .= "{$p} .svgml-svg [id].svgml-region-dimmed,"
+                         . "{$p} .svgml-svg [id].svgml-region-dimmed *"
+                         . " { fill: {$filter_dim_color}; opacity: 1; }\n";
         }
 
         // Panel & Filter Styling
@@ -537,48 +547,70 @@ function svgml_output_custom_css() {
         $slider_accent_color = $get_meta( 'slider_accent_color',  '' );
 
         if ( ! empty( $panel_bg_color ) && sanitize_hex_color( $panel_bg_color ) ) {
-            $css_output .= ".svgml-panel-inner { background-color: {$panel_bg_color} !important; }\n";
+            $css_output .= "{$p} .svgml-panel-inner { background-color: {$panel_bg_color}; }\n";
         }
         if ( ! empty( $panel_text_color ) && sanitize_hex_color( $panel_text_color ) ) {
-            $css_output .= ".svgml-panel-inner, .svgml-panel-inner * { color: {$panel_text_color} !important; }\n";
+            $css_output .= "{$p} .svgml-panel-inner, {$p} .svgml-panel-inner * { color: {$panel_text_color}; }\n";
         }
         if ( '' !== $panel_border_radius ) {
             $radius = max( 0, min( 50, intval( $panel_border_radius ) ) );
-            $css_output .= ".svgml-panel-inner { border-radius: {$radius}px !important; }\n";
+            $css_output .= "{$p} .svgml-panel-inner { border-radius: {$radius}px; }\n";
         }
         if ( ! empty( $filter_bg_color ) && sanitize_hex_color( $filter_bg_color ) ) {
-            $css_output .= ".svgml-filters-bar { background-color: {$filter_bg_color} !important; }\n";
+            $css_output .= "{$p} .svgml-filters-bar { background-color: {$filter_bg_color}; }\n";
         }
         if ( ! empty( $filter_text_color ) && sanitize_hex_color( $filter_text_color ) ) {
-            $css_output .= ".svgml-filters-bar, .svgml-filter-label { color: {$filter_text_color} !important; }\n";
+            $css_output .= "{$p} .svgml-filters-bar, {$p} .svgml-filter-label { color: {$filter_text_color}; }\n";
         }
         if ( ! empty( $panel_border_color ) && sanitize_hex_color( $panel_border_color ) && '' !== $panel_border_width && intval( $panel_border_width ) > 0 ) {
             $bw = intval( $panel_border_width );
-            $css_output .= ".svgml-panel-inner { border: {$bw}px solid {$panel_border_color} !important; }\n";
+            $css_output .= "{$p} .svgml-panel-inner { border: {$bw}px solid {$panel_border_color}; }\n";
         }
         if ( ! empty( $slider_accent_color ) && sanitize_hex_color( $slider_accent_color ) ) {
-            $css_output .= ".svgml-range-slider .noUi-connect { background-color: {$slider_accent_color} !important; }\n";
-            $css_output .= ".svgml-range-slider .noUi-handle { border-color: {$slider_accent_color} !important; }\n";
+            $css_output .= "{$p} .svgml-range-slider .noUi-connect { background-color: {$slider_accent_color}; }\n";
+            $css_output .= "{$p} .svgml-range-slider .noUi-handle { border-color: {$slider_accent_color}; }\n";
+        }
+
+        // Input field styling
+        $input_bg_color     = $get_meta( 'input_bg_color',     '' );
+        $input_text_color   = $get_meta( 'input_text_color',   '' );
+        $input_border_color = $get_meta( 'input_border_color', '' );
+        $input_focus_color  = $get_meta( 'input_focus_color',  '' );
+
+        $input_selectors       = "{$p} .svgml-filter-input-single, {$p} .svgml-filter-input-min, {$p} .svgml-filter-input-max, {$p} .svgml-filter-search";
+        $input_focus_selectors = "{$p} .svgml-filter-input-single:focus, {$p} .svgml-filter-input-min:focus, {$p} .svgml-filter-input-max:focus, {$p} .svgml-filter-search:focus";
+
+        if ( ! empty( $input_bg_color ) && sanitize_hex_color( $input_bg_color ) ) {
+            $css_output .= "{$input_selectors} { background-color: {$input_bg_color}; }\n";
+        }
+        if ( ! empty( $input_text_color ) && sanitize_hex_color( $input_text_color ) ) {
+            $css_output .= "{$input_selectors} { color: {$input_text_color}; }\n";
+        }
+        if ( ! empty( $input_border_color ) && sanitize_hex_color( $input_border_color ) ) {
+            $css_output .= "{$input_selectors} { border-color: {$input_border_color}; }\n";
+        }
+        if ( ! empty( $input_focus_color ) && sanitize_hex_color( $input_focus_color ) ) {
+            $css_output .= "{$input_focus_selectors} { border-color: {$input_focus_color}; outline-color: {$input_focus_color}; }\n";
         }
 
         // Polygon stroke styling
         $poly_stroke_color = $get_meta( 'poly_stroke_color', '#2a9d8f' );
         $poly_stroke_width = $get_meta( 'poly_stroke_width', '1' );
 
-        $vb_stroke = round( floatval( $poly_stroke_width ) / 1000, 6 );
+        $vb_stroke        = round( floatval( $poly_stroke_width ) / 1000, 6 );
         $vb_stroke_hover  = round( $vb_stroke * 1.8, 6 );
         $vb_stroke_active = round( $vb_stroke * 2.2, 6 );
 
         $stroke_rgba_half = svgml_hex_to_rgba( $poly_stroke_color, 0.5 );
         $stroke_rgba_full = svgml_hex_to_rgba( $poly_stroke_color, 0.9 );
 
-        $css_output .= ".svgml-poly-region { "
+        $css_output .= "{$p} .svgml-poly-region { "
                      . "stroke: {$stroke_rgba_half}; "
                      . "stroke-width: {$vb_stroke}; }\n";
-        $css_output .= ".svgml-poly-region:hover { "
+        $css_output .= "{$p} .svgml-poly-region:hover { "
                      . "stroke: {$stroke_rgba_full}; "
                      . "stroke-width: {$vb_stroke_hover}; }\n";
-        $css_output .= ".svgml-poly-region.svgml-region-active { "
+        $css_output .= "{$p} .svgml-poly-region.svgml-region-active { "
                      . "stroke: {$poly_stroke_color}; "
                      . "stroke-width: {$vb_stroke_active}; }\n";
 
@@ -590,10 +622,32 @@ function svgml_output_custom_css() {
         }
     } // end foreach $maps
 
-    if ( empty( $css_output ) ) return;
+    // Build a :root block with CSS variables derived from the first (or only) published map.
+    // When multiple maps exist on the same page, the last map's values win for :root —
+    // per-map overrides are handled by the .svgml-wrap-prefixed rules above.
+    $root_css = '';
+    foreach ( $maps as $map ) {
+        $mid = $map->ID;
+
+        $accent  = get_post_meta( $mid, '_svgml_slider_accent_color', true ) ?: '#cc0000';
+        $panel_bg = get_post_meta( $mid, '_svgml_panel_bg_color',     true ) ?: '#ffffff';
+
+        if ( ! sanitize_hex_color( $accent ) )   $accent   = '#cc0000';
+        if ( ! sanitize_hex_color( $panel_bg ) ) $panel_bg = '#ffffff';
+
+        $root_css = ":root {\n"
+                  . "    --svgml-accent:   {$accent};\n"
+                  . "    --svgml-panel-bg: {$panel_bg};\n"
+                  . "    --svgml-panel-w:  300px;\n"
+                  . "    --svgml-thumb-ratio: 56.25%;\n"
+                  . "}\n";
+    }
+
+    if ( empty( $css_output ) && empty( $root_css ) ) return;
 
     echo "\n<style id=\"svgml-custom-css\">\n";
     echo "/* SVG Map Lite – Gegenereerd + Custom CSS */\n";
+    if ( $root_css ) echo $root_css;
     echo $css_output;
     echo "</style>\n";
 }

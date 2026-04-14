@@ -18,6 +18,7 @@ function svgml_render_filters_page( $map_id ) {
             $raw_button_sources       = $_POST['svgml_filter_button_source']       ?? [];
             $raw_button_show_counts   = $_POST['svgml_filter_button_show_count']   ?? [];
             $raw_button_custom_values = $_POST['svgml_filter_button_custom_values'] ?? [];
+            $raw_input_modes          = $_POST['svgml_filter_input_mode']           ?? [];
 
             $filters = [];
             foreach ( $raw_fields as $i => $field ) {
@@ -28,7 +29,7 @@ function svgml_render_filters_page( $map_id ) {
                 if ( empty( $clean_field ) ) continue;
 
                 // Geldige filtertypen: range (noUiSlider), dropdown, search (autocomplete), of buttons
-                if ( ! in_array( $clean_type, [ 'range', 'dropdown', 'search', 'buttons' ] ) ) {
+                if ( ! in_array( $clean_type, [ 'range', 'dropdown', 'search', 'buttons', 'input' ] ) ) {
                     $clean_type = 'dropdown';
                 }
 
@@ -43,6 +44,12 @@ function svgml_render_filters_page( $map_id ) {
                     $filter_data['button_source']        = sanitize_text_field( $raw_button_sources[ $i ] ?? 'auto' );
                     $filter_data['button_show_count']    = sanitize_text_field( $raw_button_show_counts[ $i ] ?? '0' );
                     $filter_data['button_custom_values'] = sanitize_text_field( $raw_button_custom_values[ $i ] ?? '' );
+                }
+
+                // Voeg input-specifieke opties toe (alleen relevant als type=search of input)
+                if ( in_array( $clean_type, [ 'search', 'input' ], true ) ) {
+                    $raw_mode = sanitize_text_field( $raw_input_modes[ $i ] ?? 'single' );
+                    $filter_data['input_mode'] = in_array( $raw_mode, [ 'single', 'minmax' ], true ) ? $raw_mode : 'single';
                 }
 
                 $filters[] = $filter_data;
@@ -123,12 +130,13 @@ function svgml_render_filters_page( $map_id ) {
                     </thead>
                     <tbody id="svgml-filters-tbody">
                         <?php foreach ( $filter_fields as $filter ) :
-                            $ff = $filter['field'] ?? '';
-                            $ft = $filter['type']  ?? 'dropdown';
-                            $fl = $filter['label'] ?? '';
-                            $fb_src = $filter['button_source'] ?? 'auto';
-                            $fb_cnt = $filter['button_show_count'] ?? '0';
-                            $fb_val = $filter['button_custom_values'] ?? '';
+                            $ff         = $filter['field'] ?? '';
+                            $ft         = $filter['type']  ?? 'dropdown';
+                            $fl         = $filter['label'] ?? '';
+                            $fb_src     = $filter['button_source'] ?? 'auto';
+                            $fb_cnt     = $filter['button_show_count'] ?? '0';
+                            $fb_val     = $filter['button_custom_values'] ?? '';
+                            $fi_mode    = $filter['input_mode'] ?? 'single';
                         ?>
                         <tr class="svgml-filter-row">
                             <td class="svgml-drag-handle" style="cursor:grab; text-align:center; color:#999; width:30px;">
@@ -155,6 +163,7 @@ function svgml_render_filters_page( $map_id ) {
                                     <option value="dropdown" <?php selected( $ft, 'dropdown' ); ?>>Keuzelijst (dropdown)</option>
                                     <option value="range"    <?php selected( $ft, 'range' ); ?>>Schuifregelaar (range)</option>
                                     <option value="search"   <?php selected( $ft, 'search' ); ?>>Zoekveld (autocomplete)</option>
+                                    <option value="input"    <?php selected( $ft, 'input' ); ?>>Invoerveld (input)</option>
                                     <option value="buttons"  <?php selected( $ft, 'buttons' ); ?>>Knoppen (buttons)</option>
                                 </select>
                             </td>
@@ -165,7 +174,7 @@ function svgml_render_filters_page( $map_id ) {
                                        class="regular-text">
                             </td>
                             <td>
-                                <!-- Hidden input velden voor buttons-opties (verborgen in tabel, gebruikt door JS) -->
+                                <!-- Hidden velden: buttons-opties -->
                                 <input type="hidden" name="svgml_filter_button_source[]"
                                        value="<?php echo esc_attr( $fb_src ); ?>"
                                        class="svgml-button-source-val">
@@ -175,6 +184,28 @@ function svgml_render_filters_page( $map_id ) {
                                 <input type="hidden" name="svgml_filter_button_custom_values[]"
                                        value="<?php echo esc_attr( $fb_val ); ?>"
                                        class="svgml-button-custom-values-val">
+
+                                <!-- Hidden veld: input-mode -->
+                                <input type="hidden" name="svgml_filter_input_mode[]"
+                                       value="<?php echo esc_attr( $fi_mode ); ?>"
+                                       class="svgml-input-mode-val">
+
+                                <!-- Configuratie-paneel: input-modus (zichtbaar als type=input) -->
+                                <div class="svgml-input-options" style="<?php echo 'input' !== $ft ? 'display:none;' : ''; ?>">
+                                    <label style="display:block; margin-bottom:4px;">
+                                        <input type="radio" class="svgml-input-mode-radio"
+                                               value="single" <?php checked( $fi_mode, 'single' ); ?>>
+                                        1 Veld (Tekst / Exact)
+                                    </label>
+                                    <label style="display:block; margin-bottom:4px;">
+                                        <input type="radio" class="svgml-input-mode-radio"
+                                               value="minmax" <?php checked( $fi_mode, 'minmax' ); ?>>
+                                        2 Velden (Min &amp; Max getallen)
+                                    </label>
+                                    <p class="description" style="margin:4px 0 0; font-size:11px;">
+                                        Kies 2 velden om te filteren op prijs of oppervlakte.
+                                    </p>
+                                </div>
 
                                 <!-- Configuratie-paneel: alleen zichtbaar als type=buttons -->
                                 <div class="svgml-buttons-options" style="<?php echo 'buttons' !== $ft ? 'display:none;' : ''; ?>">
@@ -346,6 +377,7 @@ function svgml_render_filters_page( $map_id ) {
                         <option value="dropdown">Keuzelijst (dropdown)</option>
                         <option value="range">Schuifregelaar (range)</option>
                         <option value="search">Zoekveld (autocomplete)</option>
+                        <option value="input">Invoerveld (input)</option>
                         <option value="buttons">Knoppen (buttons)</option>
                     </select>
                 </td>
@@ -355,7 +387,7 @@ function svgml_render_filters_page( $map_id ) {
                            class="regular-text">
                 </td>
                 <td>
-                    <!-- Hidden input velden voor buttons-opties (standaard waarden) -->
+                    <!-- Hidden velden: buttons-opties -->
                     <input type="hidden" name="svgml_filter_button_source[]"
                            value="auto"
                            class="svgml-button-source-val">
@@ -365,6 +397,26 @@ function svgml_render_filters_page( $map_id ) {
                     <input type="hidden" name="svgml_filter_button_custom_values[]"
                            value=""
                            class="svgml-button-custom-values-val">
+
+                    <!-- Hidden veld: input-mode -->
+                    <input type="hidden" name="svgml_filter_input_mode[]"
+                           value="single"
+                           class="svgml-input-mode-val">
+
+                    <!-- Configuratie-paneel: input-modus (zichtbaar als type=input) -->
+                    <div class="svgml-input-options" style="display:none;">
+                        <label style="display:block; margin-bottom:4px;">
+                            <input type="radio" class="svgml-input-mode-radio" value="single" checked>
+                            1 Veld (Tekst / Exact)
+                        </label>
+                        <label style="display:block; margin-bottom:4px;">
+                            <input type="radio" class="svgml-input-mode-radio" value="minmax">
+                            2 Velden (Min &amp; Max getallen)
+                        </label>
+                        <p class="description" style="margin:4px 0 0; font-size:11px;">
+                            Kies 2 velden om te filteren op prijs of oppervlakte.
+                        </p>
+                    </div>
 
                     <!-- Configuratie-paneel: alleen zichtbaar als type=buttons -->
                     <div class="svgml-buttons-options" style="display:none;">

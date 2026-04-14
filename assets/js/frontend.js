@@ -30,11 +30,11 @@ jQuery(document).ready(function($) {
     var excludedIds = svgmlData.excludedIds || [];
 
     // ── DOM REFERENCES ──────────────────────────────────────────────────────
-    var $container    = $('.svgml-container');   // The outer wrapper
-    var $svg          = $('.svgml-svg');          // The SVG element itself
-    var $panel        = $('#svgml-panel');        // The info panel
-    var $panelContent = $('#svgml-panel-content');// The content of the panel
-    var $closeBtn     = $('#svgml-panel-close'); // The close button
+    var $container    = $('.svgml-container');    // The outer wrapper
+    var $svg          = $('.svgml-svg');           // The SVG element itself
+    var $panel        = $('.svgml-panel');         // The info panel (single instance)
+    var $panelContent = $('.svgml-panel-content');// The content of the panel
+    var $closeBtn     = $('.svgml-panel-close');  // The close button
 
     // Store the actively selected region so we can deselect it
     var $activeRegion = null;
