@@ -503,7 +503,11 @@ function svgml_render_editor_wrapper() {
                 <?php endforeach; ?>
             </div>
             <div class="svgml-editor-tabs-right">
-                <code class="svgml-header-shortcode">[svg_map id="<?php echo $map_id; ?>"]</code>
+                <span class="svgml-shortcode-badges" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                    <code class="svgml-header-shortcode svgml-shortcode-badge" title="Kaart">[svg_map id="<?php echo $map_id; ?>"]</code>
+                    <code class="svgml-header-shortcode svgml-shortcode-badge" title="Paneel">[svg_map_panel id="<?php echo $map_id; ?>"]</code>
+                    <code class="svgml-header-shortcode svgml-shortcode-badge" title="Filters">[svg_map_filters id="<?php echo $map_id; ?>"]</code>
+                </span>
                 <button type="button" id="svgml-save-btn" class="button button-primary svgml-save-btn">
                     <span class="dashicons dashicons-saved"></span> Opslaan
                 </button>

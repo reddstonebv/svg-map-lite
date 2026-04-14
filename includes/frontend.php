@@ -11,9 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Register shortcodes
  */
-add_shortcode( 'svg_map', 'svgml_render_shortcode' );
-add_shortcode( 'svg_map_panel', 'svgml_render_panel_shortcode' );
-add_shortcode( 'svg_map_lite', 'svgml_render_shortcode' );  // backward compat
+add_shortcode( 'svg_map',         'svgml_render_shortcode' );
+add_shortcode( 'svg_map_panel',   'svgml_render_panel_shortcode' );
+add_shortcode( 'svg_map_filters', 'svgml_render_filters_shortcode' );
+add_shortcode( 'svg_map_lite',    'svgml_render_shortcode' );  // backward compat
 
 /**
  * Enqueue all registered frontend assets on demand (called from shortcode callbacks).
@@ -203,95 +204,6 @@ function svgml_render_shortcode( $atts ) {
     ?>
     <div class="svgml-wrap">
 
-        <?php
-        // ── FILTER BAR ──────────────────────────────────────────────────────
-        if ( ! empty( $filter_fields ) ) :
-        ?>
-        <div class="svgml-filters-bar" id="svgml-filters-bar">
-            <div class="svgml-filters-inner">
-                <?php foreach ( $filter_fields as $filter ) :
-                    $f_field = sanitize_key( $filter['field'] ?? '' );
-                    $f_type  = sanitize_text_field( $filter['type'] ?? 'dropdown' );
-                    $f_label = sanitize_text_field( $filter['label'] ?? $f_field );
-                    $f_imode = sanitize_text_field( $filter['input_mode'] ?? 'single' );
-
-                    if ( empty( $f_field ) ) continue;
-                ?>
-                <div class="svgml-filter-item svgml-filter-type-<?php echo esc_attr( $f_type ); ?>"
-                     data-field="<?php echo esc_attr( $f_field ); ?>"
-                     data-type="<?php echo esc_attr( $f_type ); ?>">
-                    <label class="svgml-filter-label"><?php echo esc_html( $f_label ); ?></label>
-
-                    <?php if ( 'range' === $f_type ) : ?>
-                        <div class="svgml-range-slider" id="svgml-range-<?php echo esc_attr( $f_field ); ?>"></div>
-                        <div class="svgml-range-values">
-                            <span class="svgml-range-min"></span>
-                            <span class="svgml-range-max"></span>
-                        </div>
-
-                    <?php elseif ( 'input' === $f_type ) : ?>
-                        <?php if ( 'minmax' === $f_imode ) : ?>
-                            <div class="svgml-input-minmax"
-                                 id="svgml-input-<?php echo esc_attr( $f_field ); ?>"
-                                 data-field="<?php echo esc_attr( $f_field ); ?>"
-                                 data-mode="minmax"
-                                 style="display:flex; gap:6px;">
-                                <input type="text"
-                                       class="svgml-filter-input-min"
-                                       placeholder="Min"
-                                       autocomplete="off"
-                                       style="width:50%;">
-                                <input type="text"
-                                       class="svgml-filter-input-max"
-                                       placeholder="Max"
-                                       autocomplete="off"
-                                       style="width:50%;">
-                            </div>
-                        <?php else : ?>
-                            <input type="text"
-                                   class="svgml-filter-input-single"
-                                   id="svgml-input-<?php echo esc_attr( $f_field ); ?>"
-                                   data-field="<?php echo esc_attr( $f_field ); ?>"
-                                   data-mode="single"
-                                   placeholder="Zoek..."
-                                   autocomplete="off">
-                        <?php endif; ?>
-
-                    <?php elseif ( 'search' === $f_type ) : ?>
-                        <div class="svgml-search-wrap">
-                            <input type="text"
-                                   class="svgml-filter-search"
-                                   id="svgml-search-<?php echo esc_attr( $f_field ); ?>"
-                                   placeholder="Search..."
-                                   autocomplete="off">
-                            <ul class="svgml-autocomplete-list" id="svgml-autocomplete-<?php echo esc_attr( $f_field ); ?>"></ul>
-                        </div>
-
-                    <?php elseif ( 'buttons' === $f_type ) : ?>
-                        <div class="svgml-filter-buttons"
-                             id="svgml-buttons-<?php echo esc_attr( $f_field ); ?>"
-                             data-source="<?php echo esc_attr( $filter['button_source'] ?? 'auto' ); ?>"
-                             data-show-count="<?php echo esc_attr( $filter['button_show_count'] ?? '0' ); ?>"
-                             data-custom-values="<?php echo esc_attr( $filter['button_custom_values'] ?? '' ); ?>">
-                        </div>
-
-                    <?php else : ?>
-                        <select class="svgml-filter-select" id="svgml-select-<?php echo esc_attr( $f_field ); ?>">
-                            <option value="">Alles</option>
-                        </select>
-                    <?php endif; ?>
-                </div>
-                <?php endforeach; ?>
-
-                <div class="svgml-filter-item svgml-filter-reset-wrap">
-                    <button type="button" class="svgml-filter-reset" id="svgml-filter-reset">
-                        ↺ Filters resetten
-                    </button>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <!-- ── MAP + PANEL CONTAINER ──────────────────────────────────────── -->
         <div class="svgml-container">
 
@@ -443,6 +355,123 @@ function svgml_render_panel_shortcode( $atts ) {
                 <p class="svgml-panel-placeholder">Klik op een regio op de kaart voor meer informatie.</p>
             </div>
         </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * SHORTCODE: [svg_map_filters id="123"]
+ * Renders the filter bar for a given map.
+ */
+function svgml_render_filters_shortcode( $atts ) {
+
+    $atts = shortcode_atts(
+        [ 'id' => '' ],
+        $atts,
+        'svg_map_filters'
+    );
+
+    $map_id = absint( $atts['id'] );
+
+    if ( ! $map_id ) {
+        $first_map = get_posts( [
+            'post_type'      => 'svgml_map',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+        ] );
+        if ( $first_map ) {
+            $map_id = $first_map[0]->ID;
+        }
+    }
+
+    if ( ! $map_id ) {
+        return '';
+    }
+
+    $filter_fields = get_post_meta( $map_id, '_svgml_filter_fields', true );
+    if ( ! is_array( $filter_fields ) || empty( $filter_fields ) ) {
+        return '';
+    }
+
+    ob_start();
+    ?>
+    <div class="svgml-wrap">
+    <div class="svgml-filters-bar" id="svgml-filters-bar">
+        <div class="svgml-filters-inner">
+            <?php foreach ( $filter_fields as $filter ) :
+                $f_field = sanitize_key( $filter['field'] ?? '' );
+                $f_type  = sanitize_text_field( $filter['type'] ?? 'dropdown' );
+                $f_label = sanitize_text_field( $filter['label'] ?? $f_field );
+                $f_imode = sanitize_text_field( $filter['input_mode'] ?? 'single' );
+
+                if ( empty( $f_field ) ) continue;
+            ?>
+            <div class="svgml-filter-item svgml-filter-type-<?php echo esc_attr( $f_type ); ?>"
+                 data-field="<?php echo esc_attr( $f_field ); ?>"
+                 data-type="<?php echo esc_attr( $f_type ); ?>">
+                <label class="svgml-filter-label"><?php echo esc_html( $f_label ); ?></label>
+
+                <?php if ( 'range' === $f_type ) : ?>
+                    <div class="svgml-range-slider" id="svgml-range-<?php echo esc_attr( $f_field ); ?>"></div>
+                    <div class="svgml-range-values">
+                        <span class="svgml-range-min"></span>
+                        <span class="svgml-range-max"></span>
+                    </div>
+
+                <?php elseif ( 'input' === $f_type ) : ?>
+                    <?php if ( 'minmax' === $f_imode ) : ?>
+                        <div class="svgml-input-minmax"
+                             id="svgml-input-<?php echo esc_attr( $f_field ); ?>"
+                             data-field="<?php echo esc_attr( $f_field ); ?>"
+                             data-mode="minmax"
+                             style="display:flex; gap:6px;">
+                            <input type="text" class="svgml-filter-input-min" placeholder="Min" autocomplete="off" style="width:50%;">
+                            <input type="text" class="svgml-filter-input-max" placeholder="Max" autocomplete="off" style="width:50%;">
+                        </div>
+                    <?php else : ?>
+                        <input type="text"
+                               class="svgml-filter-input-single"
+                               id="svgml-input-<?php echo esc_attr( $f_field ); ?>"
+                               data-field="<?php echo esc_attr( $f_field ); ?>"
+                               data-mode="single"
+                               placeholder="Zoek..."
+                               autocomplete="off">
+                    <?php endif; ?>
+
+                <?php elseif ( 'search' === $f_type ) : ?>
+                    <div class="svgml-search-wrap">
+                        <input type="text"
+                               class="svgml-filter-search"
+                               id="svgml-search-<?php echo esc_attr( $f_field ); ?>"
+                               placeholder="Search..."
+                               autocomplete="off">
+                        <ul class="svgml-autocomplete-list" id="svgml-autocomplete-<?php echo esc_attr( $f_field ); ?>"></ul>
+                    </div>
+
+                <?php elseif ( 'buttons' === $f_type ) : ?>
+                    <div class="svgml-filter-buttons"
+                         id="svgml-buttons-<?php echo esc_attr( $f_field ); ?>"
+                         data-source="<?php echo esc_attr( $filter['button_source'] ?? 'auto' ); ?>"
+                         data-show-count="<?php echo esc_attr( $filter['button_show_count'] ?? '0' ); ?>"
+                         data-custom-values="<?php echo esc_attr( $filter['button_custom_values'] ?? '' ); ?>">
+                    </div>
+
+                <?php else : ?>
+                    <select class="svgml-filter-select" id="svgml-select-<?php echo esc_attr( $f_field ); ?>">
+                        <option value="">Alles</option>
+                    </select>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+
+            <div class="svgml-filter-item svgml-filter-reset-wrap">
+                <button type="button" class="svgml-filter-reset" id="svgml-filter-reset">
+                    ↺ Filters resetten
+                </button>
+            </div>
+        </div>
+    </div>
     </div>
     <?php
     return ob_get_clean();

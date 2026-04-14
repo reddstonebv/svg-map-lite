@@ -3,6 +3,16 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 function svgml_render_filters_page( $map_id ) {
 
+    // ── Shortcode notice ─────────────────────────────────────────────────────
+    echo '<div class="notice notice-info inline" style="margin:12px 0 18px;">'
+       . '<p>'
+       . '<strong>Filters plaatsen:</strong> Gebruik de shortcode '
+       . '<code>[svg_map_filters id="' . absint( $map_id ) . '"]</code> '
+       . 'om de filterbalk op je pagina te plaatsen. '
+       . 'De filterbalk wordt <em>niet</em> automatisch met de kaart meegeleverd.'
+       . '</p>'
+       . '</div>';
+
     // ── Formulier verwerken ──────────────────────────────────────────────────
     if ( isset( $_POST['svgml_filters_nonce'] ) ) {
 
