@@ -31,6 +31,7 @@ function svgml_render_filters_page( $map_id ) {
             $raw_input_modes          = $_POST['svgml_filter_input_mode']           ?? [];
             $raw_prefixes             = $_POST['svgml_filter_prefix']               ?? [];
             $raw_suffixes             = $_POST['svgml_filter_suffix']               ?? [];
+            $raw_placeholders         = $_POST['svgml_filter_placeholder']          ?? [];
 
             $filters = [];
             foreach ( $raw_fields as $i => $field ) {
@@ -65,8 +66,9 @@ function svgml_render_filters_page( $map_id ) {
                 }
 
                 // Prefix / suffix (voor range slider labels)
-                $filter_data['prefix'] = sanitize_text_field( $raw_prefixes[ $i ] ?? '' );
-                $filter_data['suffix'] = sanitize_text_field( $raw_suffixes[ $i ] ?? '' );
+                $filter_data['prefix']      = sanitize_text_field( $raw_prefixes[ $i ]      ?? '' );
+                $filter_data['suffix']      = sanitize_text_field( $raw_suffixes[ $i ]      ?? '' );
+                $filter_data['placeholder'] = sanitize_text_field( $raw_placeholders[ $i ]  ?? 'Alles' );
 
                 $filters[] = $filter_data;
             }
@@ -153,8 +155,9 @@ function svgml_render_filters_page( $map_id ) {
                             $fb_cnt     = $filter['button_show_count'] ?? '0';
                             $fb_val     = $filter['button_custom_values'] ?? '';
                             $fi_mode    = $filter['input_mode'] ?? 'single';
-                            $f_prefix   = $filter['prefix'] ?? '';
-                            $f_suffix   = $filter['suffix'] ?? '';
+                            $f_prefix       = $filter['prefix']       ?? '';
+                            $f_suffix       = $filter['suffix']       ?? '';
+                            $f_placeholder  = $filter['placeholder']  ?? 'Alles';
                         ?>
                         <tr class="svgml-filter-row">
                             <td class="svgml-drag-handle" style="cursor:grab; text-align:center; color:#999; width:30px;">
@@ -262,6 +265,9 @@ function svgml_render_filters_page( $map_id ) {
                                 <input type="text" name="svgml_filter_suffix[]"
                                        value="<?php echo esc_attr( $f_suffix ); ?>"
                                        placeholder="m²" class="small-text" style="width:48px;" title="Suffix">
+                                <input type="text" name="svgml_filter_placeholder[]"
+                                       value="<?php echo esc_attr( $f_placeholder ); ?>"
+                                       placeholder="Alles" class="small-text" style="width:72px;" title="Dropdown standaardtekst">
                             </td>
                             <td>
                                 <button type="button" class="button svgml-remove-filter">✕</button>
@@ -475,6 +481,8 @@ function svgml_render_filters_page( $map_id ) {
                            placeholder="€" class="small-text" style="width:48px;" title="Prefix">
                     <input type="text" name="svgml_filter_suffix[]"
                            placeholder="m²" class="small-text" style="width:48px;" title="Suffix">
+                    <input type="text" name="svgml_filter_placeholder[]"
+                           placeholder="Alles" class="small-text" style="width:72px;" title="Dropdown standaardtekst">
                 </td>
                 <td>
                     <button type="button" class="button svgml-remove-filter">✕</button>

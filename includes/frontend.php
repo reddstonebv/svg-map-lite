@@ -457,9 +457,11 @@ function svgml_render_filters_shortcode( $atts ) {
                          data-custom-values="<?php echo esc_attr( $filter['button_custom_values'] ?? '' ); ?>">
                     </div>
 
-                <?php else : ?>
+                <?php else :
+                    $f_placeholder = $filter['placeholder'] ?? 'Alles';
+                ?>
                     <select class="svgml-filter-select" id="svgml-select-<?php echo esc_attr( $f_field ); ?>">
-                        <option value="">Alles</option>
+                        <option value=""><?php echo esc_html( $f_placeholder ); ?></option>
                     </select>
                 <?php endif; ?>
             </div>

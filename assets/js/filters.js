@@ -174,7 +174,7 @@ jQuery(document).ready(function($) {
         var suffix = filterConfig.suffix || '';
 
         function svgml_formatLabel(val) {
-            return prefix + svgml_formatNumber(val) + suffix;
+            return (prefix ? prefix + ' ' : '') + svgml_formatNumber(val) + (suffix ? ' ' + suffix : '');
         }
 
         // Collect all numeric values for this field
@@ -210,8 +210,8 @@ jQuery(document).ready(function($) {
             step: 1,                     // Step of 1 (adjustable)
             // Format the displayed values (rounded to whole numbers)
             tooltips: [
-                { to: function(v) { return prefix + Math.round(v) + suffix; } },
-                { to: function(v) { return prefix + Math.round(v) + suffix; } }
+                { to: function(v) { return (prefix ? prefix + ' ' : '') + Math.round(v) + (suffix ? ' ' + suffix : ''); } },
+                { to: function(v) { return (prefix ? prefix + ' ' : '') + Math.round(v) + (suffix ? ' ' + suffix : ''); } }
             ]
         });
 
