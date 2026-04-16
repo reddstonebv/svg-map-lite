@@ -186,9 +186,12 @@ jQuery(document).ready(function($) {
             var width       = parseInt(block.width || 100, 10);
             var staticValue = block.static_value || '';
 
+            var bPrefix = block.prefix || '';
+            var bSuffix = block.suffix || '';
+
             // Static blocks don't need a JSON field — pass static_value directly
             if (type === 'static_html' || type === 'static_button') {
-                html += svgml_renderBlock(type, field, staticValue, label, obj, width, false);
+                html += svgml_renderBlock(type, field, staticValue, label, obj, width, false, bPrefix, bSuffix);
                 return; // $.each continue
             }
 
@@ -205,7 +208,7 @@ jQuery(document).ready(function($) {
             // Generate the block HTML based on the type, with the correct width.
             // isHtml = true means the value contains raw HTML and should not be escaped.
             var isHtml = !!(block.html);
-            html += svgml_renderBlock(type, field, value, label, obj, width, isHtml);
+            html += svgml_renderBlock(type, field, value, label, obj, width, isHtml, bPrefix, bSuffix);
         });
 
         html += '</div>'; // .svgml-blocks-wrap
@@ -224,7 +227,9 @@ jQuery(document).ready(function($) {
      * @param {boolean} isHtml – If true, render the value as raw HTML (no escaping)
      * @returns {string}       – HTML string for this block
      */
-    function svgml_renderBlock(type, field, value, label, obj, width, isHtml) {
+    function svgml_renderBlock(type, field, value, label, obj, width, isHtml, prefix, suffix) {
+        prefix = prefix || '';
+        suffix = suffix || '';
         width = width || 100;
 
         // Calculate the CSS flex-basis.
@@ -294,7 +299,7 @@ jQuery(document).ready(function($) {
             // ── HEADING ────────────────────────────────────────────────────
             case 'heading':
                 // isHtml = true: render raw (e.g., text with <b> or <em>)
-                var headRaw = (block.prefix ? block.prefix + ' ' : '') + String(value) + (block.suffix ? ' ' + block.suffix : '');
+                var headRaw = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var headVal = isHtml ? headRaw : svgml.escapeHtml(headRaw);
                 blockHtml = '<div class="svgml-block svgml-block-heading"' + blockAttr + '>' +
                     '<h3 class="svgml-heading-value">' + headVal + '</h3>' +
@@ -316,7 +321,7 @@ jQuery(document).ready(function($) {
 
             // ── PRICE ──────────────────────────────────────────────────────
             case 'price':
-                var priceRaw = (block.prefix ? block.prefix + ' ' : '') + String(value) + (block.suffix ? ' ' + block.suffix : '');
+                var priceRaw = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var priceVal = isHtml ? priceRaw : svgml.escapeHtml(priceRaw);
                 blockHtml = '<div class="svgml-block svgml-block-price"' + blockAttr + '>' +
                     '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' +
@@ -355,7 +360,7 @@ jQuery(document).ready(function($) {
             default:
                 // isHtml = true: render the value as raw HTML (e.g., description with <p> tags)
                 // isHtml = false (default): use svgml_formatValue() with HTML escaping
-                var textRaw  = (block.prefix ? block.prefix + ' ' : '') + String(value) + (block.suffix ? ' ' + block.suffix : '');
+                var textRaw  = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var textVal  = isHtml ? textRaw : svgml_formatValue(textRaw);
                 blockHtml = '<div class="svgml-block svgml-block-text"' + blockAttr + '>' +
                     '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' +
