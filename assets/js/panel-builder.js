@@ -25,6 +25,35 @@ jQuery( document ).ready( function ( $ ) {
         return;
     }
 
+    // ── Show/hide static_value input based on block type ─────────────────────
+    var STATIC_TYPES = [ 'static_html', 'static_button' ];
+
+    function svgml_toggleStaticField( $row ) {
+        var type     = $row.find( '[name="svgml_block_type[]"]' ).val();
+        var $static  = $row.find( '.svgml-block-static-val' );
+        var $field   = $row.find( '[name="svgml_block_field[]"]' );
+        var isStatic = STATIC_TYPES.indexOf( type ) !== -1;
+
+        if ( isStatic ) {
+            $static.show().attr( 'placeholder', type === 'static_button' ? 'https://...' : 'HTML inhoud...' );
+            // Field dropdown is irrelevant for static types – hide it gracefully
+            if ( $field.is( 'select' ) ) $field.closest( 'td' ).css( 'opacity', '0.35' );
+        } else {
+            $static.hide();
+            if ( $field.is( 'select' ) ) $field.closest( 'td' ).css( 'opacity', '' );
+        }
+    }
+
+    // Init existing rows
+    $( '#svgml-blocks-tbody .svgml-block-row' ).each( function () {
+        svgml_toggleStaticField( $( this ) );
+    } );
+
+    // Delegate for newly added rows
+    $( '#svgml-blocks-tbody' ).on( 'change', '.svgml-block-type-select', function () {
+        svgml_toggleStaticField( $( this ).closest( 'tr' ) );
+    } );
+
     // ── intercept submit ──────────────────────────────────────────────────────
     $pbForm.on( 'submit', function () {
 
@@ -33,24 +62,28 @@ jQuery( document ).ready( function ( $ ) {
         $( '#svgml-blocks-tbody .svgml-block-row' ).each( function () {
             var $row = $( this );
 
-            // The hidden input in the html-flag cell is always kept in sync with
-            // the checkbox by the .svgml-block-html-cb change handler in
-            // admin-footer.php, so reading it here is always accurate.
             var htmlFlag = ( $row.find( '[name="svgml_block_html[]"][type="hidden"]' ).val() === '1' );
 
             blocks.push( {
-                // 'field' is '' for divider rows – that is intentional.
-                field : $row.find( '[name="svgml_block_field[]"]' ).val()  || '',
-                type  : $row.find( '[name="svgml_block_type[]"]' ).val()   || 'text',
-                label : $row.find( '[name="svgml_block_label[]"]' ).val()  || '',
-                width : parseInt( $row.find( '[name="svgml_block_width[]"]' ).val() || 100, 10 ),
-                html  : htmlFlag
+                field        : $row.find( '[name="svgml_block_field[]"]' ).val()        || '',
+                type         : $row.find( '[name="svgml_block_type[]"]' ).val()         || 'text',
+                label        : $row.find( '[name="svgml_block_label[]"]' ).val()        || '',
+                width        : parseInt( $row.find( '[name="svgml_block_width[]"]' ).val() || 100, 10 ),
+                html         : htmlFlag,
+                static_value : $row.find( '[name="svgml_block_static_value[]"]' ).val() || '',
+                prefix       : $row.find( '[name="svgml_block_prefix[]"]' ).val()       || '',
+                suffix       : $row.find( '[name="svgml_block_suffix[]"]' ).val()       || ''
             } );
         } );
 
-        // Write the JSON into the hidden field so it is included in $_POST.
-        // We do NOT call e.preventDefault() – the native POST continues.
         $pbForm.find( '#svgml_panel_blocks' ).val( JSON.stringify( blocks ) );
+    } );
+
+    // Also init rows added via the "+ Add" buttons (delegated via MutationObserver
+    // is overkill; a simple event on the tbody after the template clone works fine
+    // because admin-footer.php fires a custom svgmlBlockAdded event).
+    $( document ).on( 'svgmlBlockAdded', function ( e, $row ) {
+        if ( $row ) svgml_toggleStaticField( $row );
     } );
 
 } );

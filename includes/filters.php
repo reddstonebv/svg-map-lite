@@ -29,6 +29,8 @@ function svgml_render_filters_page( $map_id ) {
             $raw_button_show_counts   = $_POST['svgml_filter_button_show_count']   ?? [];
             $raw_button_custom_values = $_POST['svgml_filter_button_custom_values'] ?? [];
             $raw_input_modes          = $_POST['svgml_filter_input_mode']           ?? [];
+            $raw_prefixes             = $_POST['svgml_filter_prefix']               ?? [];
+            $raw_suffixes             = $_POST['svgml_filter_suffix']               ?? [];
 
             $filters = [];
             foreach ( $raw_fields as $i => $field ) {
@@ -61,6 +63,10 @@ function svgml_render_filters_page( $map_id ) {
                     $raw_mode = sanitize_text_field( $raw_input_modes[ $i ] ?? 'single' );
                     $filter_data['input_mode'] = in_array( $raw_mode, [ 'single', 'minmax' ], true ) ? $raw_mode : 'single';
                 }
+
+                // Prefix / suffix (voor range slider labels)
+                $filter_data['prefix'] = sanitize_text_field( $raw_prefixes[ $i ] ?? '' );
+                $filter_data['suffix'] = sanitize_text_field( $raw_suffixes[ $i ] ?? '' );
 
                 $filters[] = $filter_data;
             }
@@ -147,6 +153,8 @@ function svgml_render_filters_page( $map_id ) {
                             $fb_cnt     = $filter['button_show_count'] ?? '0';
                             $fb_val     = $filter['button_custom_values'] ?? '';
                             $fi_mode    = $filter['input_mode'] ?? 'single';
+                            $f_prefix   = $filter['prefix'] ?? '';
+                            $f_suffix   = $filter['suffix'] ?? '';
                         ?>
                         <tr class="svgml-filter-row">
                             <td class="svgml-drag-handle" style="cursor:grab; text-align:center; color:#999; width:30px;">
@@ -246,6 +254,14 @@ function svgml_render_filters_page( $map_id ) {
                                         <?php echo esc_textarea( $fb_val ); ?>
                                     </textarea>
                                 </div>
+                            </td>
+                            <td>
+                                <input type="text" name="svgml_filter_prefix[]"
+                                       value="<?php echo esc_attr( $f_prefix ); ?>"
+                                       placeholder="€" class="small-text" style="width:48px;" title="Prefix">
+                                <input type="text" name="svgml_filter_suffix[]"
+                                       value="<?php echo esc_attr( $f_suffix ); ?>"
+                                       placeholder="m²" class="small-text" style="width:48px;" title="Suffix">
                             </td>
                             <td>
                                 <button type="button" class="button svgml-remove-filter">✕</button>
@@ -453,6 +469,12 @@ function svgml_render_filters_page( $map_id ) {
                                   style="width:100%; min-height:40px; display:none;">
                         </textarea>
                     </div>
+                </td>
+                <td>
+                    <input type="text" name="svgml_filter_prefix[]"
+                           placeholder="€" class="small-text" style="width:48px;" title="Prefix">
+                    <input type="text" name="svgml_filter_suffix[]"
+                           placeholder="m²" class="small-text" style="width:48px;" title="Suffix">
                 </td>
                 <td>
                     <button type="button" class="button svgml-remove-filter">✕</button>

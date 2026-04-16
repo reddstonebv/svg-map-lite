@@ -165,6 +165,18 @@ jQuery(document).ready(function($) {
         var $minLabel   = $filterItem.find('.svgml-range-min');
         var $maxLabel   = $filterItem.find('.svgml-range-max');
 
+        // Read prefix/suffix from filterFields config
+        var filterConfig = {};
+        $.each(svgmlData.filterFields || [], function(i, fc) {
+            if (fc.field === field) { filterConfig = fc; return false; }
+        });
+        var prefix = filterConfig.prefix || '';
+        var suffix = filterConfig.suffix || '';
+
+        function svgml_formatLabel(val) {
+            return prefix + svgml_formatNumber(val) + suffix;
+        }
+
         // Collect all numeric values for this field
         var values = [];
         $.each(dataObjects, function(i, obj) {
@@ -198,14 +210,14 @@ jQuery(document).ready(function($) {
             step: 1,                     // Step of 1 (adjustable)
             // Format the displayed values (rounded to whole numbers)
             tooltips: [
-                { to: function(v) { return Math.round(v); } },
-                { to: function(v) { return Math.round(v); } }
+                { to: function(v) { return prefix + Math.round(v) + suffix; } },
+                { to: function(v) { return prefix + Math.round(v) + suffix; } }
             ]
         });
 
         // Update the min/max labels with the start values
-        $minLabel.text(svgml_formatNumber(minVal));
-        $maxLabel.text(svgml_formatNumber(maxVal));
+        $minLabel.text(svgml_formatLabel(minVal));
+        $maxLabel.text(svgml_formatLabel(maxVal));
 
         // Store the absolute min/max for the reset function
         $container.data('absMin', minVal);
@@ -219,8 +231,8 @@ jQuery(document).ready(function($) {
             var currentMax = parseFloat(values[1]);
 
             // Update the min/max labels
-            $minLabel.text(svgml_formatNumber(currentMin));
-            $maxLabel.text(svgml_formatNumber(currentMax));
+            $minLabel.text(svgml_formatLabel(currentMin));
+            $maxLabel.text(svgml_formatLabel(currentMax));
 
             // If the slider is at the full range, the filter is not active
             if (currentMin <= minVal && currentMax >= maxVal) {
@@ -234,8 +246,8 @@ jQuery(document).ready(function($) {
 
         // Update labels while the user drags too (for immediate feedback)
         sliderEl.noUiSlider.on('update', function(values) {
-            $minLabel.text(svgml_formatNumber(parseFloat(values[0])));
-            $maxLabel.text(svgml_formatNumber(parseFloat(values[1])));
+            $minLabel.text(svgml_formatLabel(parseFloat(values[0])));
+            $maxLabel.text(svgml_formatLabel(parseFloat(values[1])));
         });
     }
 

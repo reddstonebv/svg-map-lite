@@ -185,6 +185,7 @@ function svgml_admin_footer_scripts() {
             }
 
             $('#svgml-blocks-tbody').append( $newRow );
+            $(document).trigger('svgmlBlockAdded', [$newRow]);
         });
 
         // ── Remove block ────────────────────────────────────────────

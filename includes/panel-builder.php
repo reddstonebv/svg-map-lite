@@ -10,7 +10,7 @@ function svgml_render_panel_builder_page( $map_id ) {
             echo '<div class="notice notice-error"><p>Beveiligingsfout. Probeer opnieuw.</p></div>';
         } else {
             // ── Shared validation constants ──────────────────────────────────
-            $valid_types  = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider' ];
+            $valid_types  = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider', 'static_html', 'static_button' ];
             $valid_widths = [ 25, 33, 50, 75, 100 ];
 
             $map_mode  = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
@@ -25,55 +25,69 @@ function svgml_render_panel_builder_page( $map_id ) {
 
             $blocks = [];
 
+            $static_types = [ 'static_html', 'static_button', 'divider' ];
+
             if ( is_array( $json_blocks ) ) {
                 // JSON path — authoritative; JS has already done the ordering.
                 foreach ( $json_blocks as $block ) {
-                    $clean_type  = sanitize_text_field( $block['type']  ?? 'text' );
-                    $clean_field = sanitize_text_field( $block['field'] ?? '' );
-                    $clean_label = sanitize_text_field( $block['label'] ?? '' );
-                    $clean_width = intval( $block['width'] ?? 100 );
-                    $clean_html  = ! empty( $block['html'] );
+                    $clean_type   = sanitize_text_field( $block['type']         ?? 'text' );
+                    $clean_field  = sanitize_text_field( $block['field']        ?? '' );
+                    $clean_label  = sanitize_text_field( $block['label']        ?? '' );
+                    $clean_width  = intval( $block['width']                     ?? 100 );
+                    $clean_html   = ! empty( $block['html'] );
+                    $clean_static = wp_kses_post( $block['static_value']        ?? '' );
+                    $clean_prefix = sanitize_text_field( $block['prefix']       ?? '' );
+                    $clean_suffix = sanitize_text_field( $block['suffix']       ?? '' );
 
                     if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
                     if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
-                    if ( ! $is_manual && 'divider' !== $clean_type && empty( $clean_field ) ) continue;
+                    if ( ! $is_manual && ! in_array( $clean_type, $static_types ) && empty( $clean_field ) ) continue;
 
                     $blocks[] = [
-                        'field' => $clean_field,
-                        'type'  => $clean_type,
-                        'label' => $clean_label,
-                        'width' => $clean_width,
-                        'html'  => $clean_html,
+                        'field'        => $clean_field,
+                        'type'         => $clean_type,
+                        'label'        => $clean_label,
+                        'width'        => $clean_width,
+                        'html'         => $clean_html,
+                        'static_value' => $clean_static,
+                        'prefix'       => $clean_prefix,
+                        'suffix'       => $clean_suffix,
                     ];
                 }
             } else {
                 // ── Fallback path: parallel arrays (no-JS / legacy) ──────────
-                // Used when the JSON field is missing or unparseable.
-                // The hidden + checkbox combo keeps array indices consistent
-                // even for unchecked checkboxes.
-                $raw_fields     = $_POST['svgml_block_field'] ?? [];
-                $raw_types      = $_POST['svgml_block_type']  ?? [];
-                $raw_labels     = $_POST['svgml_block_label'] ?? [];
-                $raw_widths     = $_POST['svgml_block_width'] ?? [];
-                $raw_html_flags = $_POST['svgml_block_html']  ?? [];
+                $raw_fields        = $_POST['svgml_block_field']        ?? [];
+                $raw_types         = $_POST['svgml_block_type']         ?? [];
+                $raw_labels        = $_POST['svgml_block_label']        ?? [];
+                $raw_widths        = $_POST['svgml_block_width']        ?? [];
+                $raw_html_flags    = $_POST['svgml_block_html']         ?? [];
+                $raw_static_values = $_POST['svgml_block_static_value'] ?? [];
+                $raw_prefixes      = $_POST['svgml_block_prefix']       ?? [];
+                $raw_suffixes      = $_POST['svgml_block_suffix']       ?? [];
 
                 foreach ( $raw_fields as $i => $field ) {
-                    $clean_field = sanitize_text_field( $field );
-                    $clean_type  = sanitize_text_field( $raw_types[ $i ] ?? 'text' );
-                    $clean_label = sanitize_text_field( $raw_labels[ $i ] ?? '' );
-                    $clean_width = intval( $raw_widths[ $i ] ?? 100 );
-                    $clean_html  = ( ( $raw_html_flags[ $i ] ?? '0' ) === '1' );
+                    $clean_field  = sanitize_text_field( $field );
+                    $clean_type   = sanitize_text_field( $raw_types[ $i ]         ?? 'text' );
+                    $clean_label  = sanitize_text_field( $raw_labels[ $i ]        ?? '' );
+                    $clean_width  = intval( $raw_widths[ $i ]                     ?? 100 );
+                    $clean_html   = ( ( $raw_html_flags[ $i ]                     ?? '0' ) === '1' );
+                    $clean_static = wp_kses_post( $raw_static_values[ $i ]        ?? '' );
+                    $clean_prefix = sanitize_text_field( $raw_prefixes[ $i ]      ?? '' );
+                    $clean_suffix = sanitize_text_field( $raw_suffixes[ $i ]      ?? '' );
 
                     if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
                     if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
-                    if ( ! $is_manual && 'divider' !== $clean_type && empty( $clean_field ) ) continue;
+                    if ( ! $is_manual && ! in_array( $clean_type, $static_types ) && empty( $clean_field ) ) continue;
 
                     $blocks[] = [
-                        'field' => $clean_field,
-                        'type'  => $clean_type,
-                        'label' => $clean_label,
-                        'width' => $clean_width,
-                        'html'  => $clean_html,
+                        'field'        => $clean_field,
+                        'type'         => $clean_type,
+                        'label'        => $clean_label,
+                        'width'        => $clean_width,
+                        'html'         => $clean_html,
+                        'static_value' => $clean_static,
+                        'prefix'       => $clean_prefix,
+                        'suffix'       => $clean_suffix,
                     ];
                 }
             }
@@ -199,16 +213,18 @@ function svgml_render_panel_builder_page( $map_id ) {
             $field_names
         );
     }
-    $block_types       = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider' ];
+    $block_types       = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider', 'static_html', 'static_button' ];
     $block_type_labels = [
-        'thumbnail' => '🖼️ Thumbnail',
-        'heading'   => '🔤 Koptekst',
-        'badge'     => '🏷️ Badge',
-        'price'     => '💶 Prijs',
-        'text'      => '📝 Tekst',
-        'html'      => '🌐 HTML (raw)',
-        'link'      => '🔗 Link',
-        'divider'   => '─── Scheidingslijn',
+        'thumbnail'     => '🖼️ Thumbnail',
+        'heading'       => '🔤 Koptekst',
+        'badge'         => '🏷️ Badge',
+        'price'         => '💶 Prijs',
+        'text'          => '📝 Tekst',
+        'html'          => '🌐 HTML (raw)',
+        'link'          => '🔗 Link',
+        'divider'       => '─── Scheidingslijn',
+        'static_html'   => '✏️ Statische HTML',
+        'static_button' => '🔘 Statische Knop',
     ];
     // Breedte-opties voor elk blok
     $block_width_options = [
@@ -280,11 +296,15 @@ function svgml_render_panel_builder_page( $map_id ) {
                     <tbody id="svgml-blocks-tbody">
                         <?php if ( ! empty( $panel_blocks ) ) :
                             foreach ( $panel_blocks as $block ) :
-                                $b_field = $block['field'] ?? '';
-                                $b_type  = $block['type']  ?? 'text';
-                                $b_label = $block['label'] ?? '';
-                                $b_width = intval( $block['width'] ?? 100 );
-                                $b_html  = ! empty( $block['html'] );
+                                $b_field  = $block['field']        ?? '';
+                                $b_type   = $block['type']         ?? 'text';
+                                $b_label  = $block['label']        ?? '';
+                                $b_width  = intval( $block['width'] ?? 100 );
+                                $b_html   = ! empty( $block['html'] );
+                                $b_static = $block['static_value'] ?? '';
+                                $b_prefix = $block['prefix']       ?? '';
+                                $b_suffix = $block['suffix']       ?? '';
+                                $is_static = in_array( $b_type, [ 'static_html', 'static_button' ] );
                         ?>
                         <tr class="svgml-block-row">
                             <td class="svgml-drag-handle" title="Versleep om volgorde te wijzigen">⠿</td>
@@ -341,8 +361,21 @@ function svgml_render_panel_builder_page( $map_id ) {
                             <td>
                                 <input type="text" name="svgml_block_label[]"
                                        value="<?php echo esc_attr( $b_label ); ?>"
-                                       placeholder="Optioneel label"
-                                       class="regular-text">
+                                       placeholder="Label"
+                                       class="regular-text" style="width:100px">
+                                <input type="text" name="svgml_block_prefix[]"
+                                       value="<?php echo esc_attr( $b_prefix ); ?>"
+                                       placeholder="€" class="small-text" style="width:40px;" title="Prefix">
+                                <input type="text" name="svgml_block_suffix[]"
+                                       value="<?php echo esc_attr( $b_suffix ); ?>"
+                                       placeholder="m²" class="small-text" style="width:40px;" title="Suffix">
+                            </td>
+                            <td>
+                                <input type="text" name="svgml_block_static_value[]"
+                                       value="<?php echo esc_attr( $b_static ); ?>"
+                                       placeholder="<?php echo $is_static ? ( 'static_button' === $b_type ? 'https://...' : 'HTML inhoud...' ) : ''; ?>"
+                                       class="regular-text svgml-block-static-val"
+                                       <?php if ( ! $is_static ) echo 'style="display:none"'; ?>>
                             </td>
                             <td style="text-align:center">
                                 <!-- Hidden input zorgt dat de array-index altijd aanwezig is,
@@ -626,7 +659,17 @@ function svgml_render_panel_builder_page( $map_id ) {
                 </td>
                 <td>
                     <input type="text" name="svgml_block_label[]"
-                           placeholder="Optioneel label" class="regular-text">
+                           placeholder="Label" class="regular-text" style="width:100px">
+                    <input type="text" name="svgml_block_prefix[]"
+                           placeholder="€" class="small-text" style="width:40px;" title="Prefix">
+                    <input type="text" name="svgml_block_suffix[]"
+                           placeholder="m²" class="small-text" style="width:40px;" title="Suffix">
+                </td>
+                <td>
+                    <input type="text" name="svgml_block_static_value[]"
+                           placeholder="Inhoud / URL"
+                           class="regular-text svgml-block-static-val"
+                           style="display:none">
                 </td>
                 <td style="text-align:center">
                     <input type="hidden" name="svgml_block_html[]" value="0">

@@ -180,10 +180,17 @@ jQuery(document).ready(function($) {
 
         // Loop through each configured block
         $.each(blocks, function(i, block) {
-            var type  = block.type  || 'text';
-            var field = block.field || '';
-            var label = block.label || '';
-            var width = parseInt(block.width || 100, 10);
+            var type        = block.type         || 'text';
+            var field       = block.field        || '';
+            var label       = block.label        || '';
+            var width       = parseInt(block.width || 100, 10);
+            var staticValue = block.static_value || '';
+
+            // Static blocks don't need a JSON field — pass static_value directly
+            if (type === 'static_html' || type === 'static_button') {
+                html += svgml_renderBlock(type, field, staticValue, label, obj, width, false);
+                return; // $.each continue
+            }
 
             // In manual mode the block has no JSON field key; derive it from
             // the block's array index, which matches the backend storage key.
@@ -233,7 +240,27 @@ jQuery(document).ready(function($) {
             return '<div class="svgml-block svgml-block-divider" style="' + widthStyle + '"><hr></div>';
         }
 
-        // Skip empty values (except divider)
+        // Static HTML — render stored markup as-is (no JSON lookup)
+        if (type === 'static_html') {
+            return '<div class="svgml-block svgml-block-static-html" style="' + widthStyle + '">' +
+                String(value || '') +
+                '</div>';
+        }
+
+        // Static Button — render a link using stored URL + label as button text
+        if (type === 'static_button') {
+            var sbUrl = String(value || '').trim();
+            if (!sbUrl) return '';
+            return '<div class="svgml-block svgml-block-static-button" style="' + widthStyle + '">' +
+                '<a href="' + svgml.escapeHtml(sbUrl) + '" ' +
+                   'target="_blank" rel="noopener noreferrer" ' +
+                   'class="svgml-link-btn">' +
+                svgml.escapeHtml(label || sbUrl) +
+                ' ↗</a>' +
+                '</div>';
+        }
+
+        // Skip empty values (except divider and static types handled above)
         if (value === null || value === undefined || value === '') {
             return '';
         }
@@ -267,7 +294,8 @@ jQuery(document).ready(function($) {
             // ── HEADING ────────────────────────────────────────────────────
             case 'heading':
                 // isHtml = true: render raw (e.g., text with <b> or <em>)
-                var headVal = isHtml ? String(value) : svgml.escapeHtml(String(value));
+                var headRaw = (block.prefix || '') + String(value) + (block.suffix || '');
+                var headVal = isHtml ? headRaw : svgml.escapeHtml(headRaw);
                 blockHtml = '<div class="svgml-block svgml-block-heading"' + blockAttr + '>' +
                     '<h3 class="svgml-heading-value">' + headVal + '</h3>' +
                     '</div>';
@@ -288,7 +316,8 @@ jQuery(document).ready(function($) {
 
             // ── PRICE ──────────────────────────────────────────────────────
             case 'price':
-                var priceVal = isHtml ? String(value) : svgml.escapeHtml(String(value));
+                var priceRaw = (block.prefix || '') + String(value) + (block.suffix || '');
+                var priceVal = isHtml ? priceRaw : svgml.escapeHtml(priceRaw);
                 blockHtml = '<div class="svgml-block svgml-block-price"' + blockAttr + '>' +
                     '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' +
                     '<span class="svgml-price-value">' + priceVal + '</span>' +
@@ -326,7 +355,8 @@ jQuery(document).ready(function($) {
             default:
                 // isHtml = true: render the value as raw HTML (e.g., description with <p> tags)
                 // isHtml = false (default): use svgml_formatValue() with HTML escaping
-                var textVal = isHtml ? String(value) : svgml_formatValue(value);
+                var textRaw  = (block.prefix || '') + String(value) + (block.suffix || '');
+                var textVal  = isHtml ? textRaw : svgml_formatValue(textRaw);
                 blockHtml = '<div class="svgml-block svgml-block-text"' + blockAttr + '>' +
                     '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' +
                     '<span class="svgml-block-value">' + textVal + '</span>' +
