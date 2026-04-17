@@ -446,16 +446,6 @@ function svgml_render_settings_page( $map_id ) {
                                             <input type="checkbox" id="svgml-snap-toggle" checked>
                                             🧲 Vast
                                         </label>
-                                        <div class="svgml-stroke-controls">
-                                            <label title="Lijnkleur van polygonen">
-                                                Lijn
-                                                <input type="color" id="svgml-stroke-color" value="<?php echo esc_attr( $poly_stroke_color ); ?>">
-                                            </label>
-                                            <label title="Lijndikte in pixels">
-                                                Dikte
-                                                <input type="number" id="svgml-stroke-width" value="<?php echo esc_attr( $poly_stroke_width ); ?>" min="0.5" max="10" step="0.5">
-                                            </label>
-                                        </div>
                                     </div>
                                 </div>
 

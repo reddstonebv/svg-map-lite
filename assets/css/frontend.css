@@ -290,6 +290,12 @@
     pointer-events: none;
 }
 
+/* Hover vanuit sidebar */
+.svgml-svg [id].svgml-region-hover {
+    opacity: 1;
+    filter: brightness(1.07) drop-shadow(0 0 3px rgba(0, 0, 0, 0.25));
+}
+
 /* Actief / geselecteerd */
 .svgml-svg [id].svgml-region-active {
     opacity: 1;
@@ -424,6 +430,25 @@
     flex: 0 0 100%;
     max-width: 100%;
     box-sizing: border-box; /* Padding en border meerekenen in de breedte */
+}
+
+/* Label layout: stacked (default) vs inline */
+.svgml-layout-block {
+    display: block;
+}
+.svgml-layout-inline,
+.svgml-block-price.svgml-layout-inline,
+.svgml-block-text.svgml-layout-inline,
+.svgml-block-html.svgml-layout-inline {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+}
+.svgml-layout-inline .svgml-block-label {
+    flex-shrink: 0;
+    margin-bottom: 0;
 }
 
 /* ── BLOK: THUMBNAIL ────────────────────────────────────────────────────── */
@@ -693,7 +718,8 @@
     border-bottom: none;
 }
 
-.svgml-overview-item:hover {
+.svgml-overview-item:hover,
+.svgml-overview-item.svgml-item-hover {
     background: #fdf5f5;
 }
 
@@ -902,28 +928,27 @@
     pointer-events: none; /* Laat klikken door naar individuele polygonen */
 }
 
-/* Individuele polygon-regio's */
+/* Individuele polygon-regio's — stroke/stroke-width beheerd door PHP inline CSS */
 .svgml-poly-region {
-    fill: rgba(42, 157, 143, 0.15);        /* Subtiele teal tint */
-    stroke: rgba(42, 157, 143, 0.5);       /* Zachtere rand in rusttoestand */
-    stroke-width: 0.003;                    /* Dun: relatief aan viewBox 0 0 1 1 */
+    fill: rgba(42, 157, 143, 0.15);
     cursor: pointer;
-    pointer-events: all;                    /* Klikbaar, ondanks overlay pointer-events:none */
+    pointer-events: all;
     transition: fill 0.2s ease, stroke 0.2s ease, stroke-width 0.15s ease;
 }
 
 /* Hover: vlak licht op */
 .svgml-poly-region:hover {
     fill: rgba(42, 157, 143, 0.35);
-    stroke: rgba(42, 157, 143, 0.9);
-    stroke-width: 0.005;
+}
+
+/* Hover vanuit sidebar */
+.svgml-poly-region.svgml-region-hover {
+    fill: rgba(42, 157, 143, 0.30);
 }
 
 /* Actief/geselecteerd vlak: duidelijke highlight */
 .svgml-poly-region.svgml-region-active {
     fill: rgba(42, 157, 143, 0.45);
-    stroke: #2a9d8f;
-    stroke-width: 0.006;
 }
 
 /* Uitgesloten vlakken: gedimmed, niet klikbaar */

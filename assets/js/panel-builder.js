@@ -70,9 +70,10 @@ jQuery( document ).ready( function ( $ ) {
                 label        : $row.find( '[name="svgml_block_label[]"]' ).val()        || '',
                 width        : parseInt( $row.find( '[name="svgml_block_width[]"]' ).val() || 100, 10 ),
                 html         : htmlFlag,
-                static_value : $row.find( '[name="svgml_block_static_value[]"]' ).val() || '',
-                prefix       : $row.find( '[name="svgml_block_prefix[]"]' ).val()       || '',
-                suffix       : $row.find( '[name="svgml_block_suffix[]"]' ).val()       || ''
+                static_value : $row.find( '[name="svgml_block_static_value[]"]' ).val()    || '',
+                prefix       : $row.find( '[name="svgml_block_prefix[]"]' ).val()         || '',
+                suffix       : $row.find( '[name="svgml_block_suffix[]"]' ).val()         || '',
+                label_layout : $row.find( '[name="svgml_block_label_layout[]"]' ).val()   || 'block'
             } );
         } );
 

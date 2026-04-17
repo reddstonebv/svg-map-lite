@@ -93,6 +93,8 @@ function svgml_render_display_page( $map_id ) {
             $poly_stroke_width = max( 0, min( 10, intval( $_POST['svgml_poly_stroke_width'] ?? 1 ) ) );
             update_post_meta( $map_id, '_svgml_poly_stroke_color', $poly_stroke_color );
             update_post_meta( $map_id, '_svgml_poly_stroke_width', (string) $poly_stroke_width );
+            $poly_stroke_width_hover = max( 0, min( 20, floatval( $_POST['svgml_poly_stroke_width_hover'] ?? 3 ) ) );
+            update_post_meta( $map_id, '_svgml_poly_stroke_width_hover', (string) $poly_stroke_width_hover );
 
             delete_transient( 'svgml_json_cache_' . $map_id );
             delete_transient( 'svgml_html_'       . $map_id );
@@ -123,9 +125,11 @@ function svgml_render_display_page( $map_id ) {
     $input_text_color    = get_post_meta( $map_id, '_svgml_input_text_color',   true ) ?: '#333333';
     $input_border_color  = get_post_meta( $map_id, '_svgml_input_border_color', true ) ?: '#cccccc';
     $input_focus_color   = get_post_meta( $map_id, '_svgml_input_focus_color',  true ) ?: '#2a9d8f';
-    $poly_stroke_color   = get_post_meta( $map_id, '_svgml_poly_stroke_color',  true ) ?: '#2a9d8f';
-    $poly_stroke_width_v = get_post_meta( $map_id, '_svgml_poly_stroke_width',  true );
-    $poly_stroke_width_v = ( '' === $poly_stroke_width_v ) ? 1 : intval( $poly_stroke_width_v );
+    $poly_stroke_color         = get_post_meta( $map_id, '_svgml_poly_stroke_color',        true ) ?: '#2a9d8f';
+    $poly_stroke_width_v       = get_post_meta( $map_id, '_svgml_poly_stroke_width',        true );
+    $poly_stroke_width_v       = ( '' === $poly_stroke_width_v ) ? 1 : intval( $poly_stroke_width_v );
+    $poly_stroke_width_hover_v = get_post_meta( $map_id, '_svgml_poly_stroke_width_hover',  true );
+    $poly_stroke_width_hover_v = ( '' === $poly_stroke_width_hover_v ) ? 3 : floatval( $poly_stroke_width_hover_v );
 
     // Standaard vastgoed-statussen als er nog niets is ingesteld
     if ( empty( $status_colors ) ) {
@@ -459,7 +463,16 @@ function svgml_render_display_page( $map_id ) {
                             <input type="number" id="svgml_poly_stroke_width" name="svgml_poly_stroke_width"
                                    value="<?php echo esc_attr( $poly_stroke_width_v ); ?>"
                                    min="0" max="10" step="1" class="small-text">
-                            <p class="description">Standaard: 1 (relatief aan de SVG viewBox)</p>
+                            <p class="description">Standaard: 1px (schermgrootte)</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="svgml_poly_stroke_width_hover">Hover/Active Lijndikte</label></th>
+                        <td>
+                            <input type="number" id="svgml_poly_stroke_width_hover" name="svgml_poly_stroke_width_hover"
+                                   value="<?php echo esc_attr( $poly_stroke_width_hover_v ); ?>"
+                                   min="0" max="20" step="0.5" class="small-text">
+                            <p class="description">Lijndikte bij hover en actieve selectie. Standaard: 3px</p>
                         </td>
                     </tr>
                 </table>

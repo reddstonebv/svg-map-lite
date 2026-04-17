@@ -50,6 +50,13 @@ jQuery(document).ready(function($) {
         });
     }
 
+    // ── STRIP HARDCODED STROKE ATTRIBUTES ────────────────────────────────
+    // Raw uploaded SVGs may carry presentation attributes like stroke="green"
+    // that take precedence over CSS. Remove them so the inline <style> rules win.
+    $svg.find('polygon[id], path[id], .svgml-poly-region').each(function() {
+        $(this).removeAttr('stroke stroke-width');
+    });
+
 
     // ── CLICK ON SVG REGIONS ───────────────────────────────────────────────
 
@@ -302,6 +309,21 @@ jQuery(document).ready(function($) {
         }
     }
 
+
+    // ── SVG → SIDEBAR HOVER SYNC ────────────────────────────────────────────
+    $svg.on('mouseenter', '[id]', function() {
+        var svgId  = $(this).attr('id');
+        if (excludedIds.indexOf(svgId) !== -1) return;
+        var jsonId = svgmlData.mapMode === 'manual'
+            ? svgId
+            : (svgmlData.mapping[svgId] || null);
+        if (!jsonId) return;
+        $('.svgml-overview-item[data-json-id="' + jsonId + '"]').addClass('svgml-item-hover');
+    });
+
+    $svg.on('mouseleave', '[id]', function() {
+        $('.svgml-overview-item').removeClass('svgml-item-hover');
+    });
 
     // ── MULTI-LAYER SUPPORT (Floor/viewpoint switching) ──────────────────────
     // Allow users to switch between different images and their polygons.

@@ -151,6 +151,22 @@ function svgml_render_shortcode( $atts ) {
             $svg_content,
             1
         );
+
+        // Obliterate embedded <style> blocks (Illustrator/Inkscape export artefacts)
+        // before any attribute stripping, so selector rules can't survive.
+        $svg_content = preg_replace( '/<style\b[^>]*>.*?<\/style>/is', '', $svg_content );
+
+        // Strip hardcoded presentation attributes so PHP-generated CSS wins.
+        $svg_content = preg_replace( '/\bstroke="[^"]*"/i',       '', $svg_content );
+        $svg_content = preg_replace( '/\bstroke-width="[^"]*"/i', '', $svg_content );
+        $svg_content = preg_replace( '/\bstroke-color="[^"]*"/i', '', $svg_content );
+        $svg_content = preg_replace( '/\bfill="[^"]*"/i',         '', $svg_content );
+        // Strip inline style blocks on shape elements only (not on <svg> or <g>)
+        $svg_content = preg_replace(
+            '/(<(?:polygon|path|circle|ellipse|rect|line|polyline)\b[^>]*?)\s+style="[^"]*"/i',
+            '$1',
+            $svg_content
+        );
     }
 
     // ── JSON DATA OPHALEN ────────────────────────────────────────────────────
@@ -202,7 +218,7 @@ function svgml_render_shortcode( $atts ) {
     // ── BUILD HTML WITH OUTPUT BUFFER ──────────────────────────────────────────
     ob_start();
     ?>
-    <div class="svgml-wrap">
+    <div id="svgml-wrap-<?php echo esc_attr( $map_id ); ?>" class="svgml-wrap">
 
         <!-- ── MAP + PANEL CONTAINER ──────────────────────────────────────── -->
         <div class="svgml-container">
@@ -396,7 +412,7 @@ function svgml_render_filters_shortcode( $atts ) {
 
     ob_start();
     ?>
-    <div class="svgml-wrap">
+    <div id="svgml-wrap-<?php echo esc_attr( $map_id ); ?>" class="svgml-wrap">
     <div class="svgml-filters-bar" id="svgml-filters-bar">
         <div class="svgml-filters-inner">
             <?php foreach ( $filter_fields as $filter ) :
@@ -516,8 +532,9 @@ function svgml_output_custom_css() {
             return $result;
         };
 
-        // Specificity prefix — beats frontend.css single-class selectors without !important
-        $p = '.svgml-wrap';
+        // Specificity prefix — scoped to this map's unique wrapper ID so CSS
+        // from map A can never bleed into map B when multiple maps are published.
+        $p = "#svgml-wrap-{$map_id}";
 
         // Get map-specific colors and settings
         $status_colors     = $get_meta( 'status_colors', [] );
@@ -624,26 +641,60 @@ function svgml_output_custom_css() {
             $css_output .= "{$input_focus_selectors} { border-color: {$input_focus_color}; outline-color: {$input_focus_color}; }\n";
         }
 
-        // Polygon stroke styling
-        $poly_stroke_color = $get_meta( 'poly_stroke_color', '#2a9d8f' );
-        $poly_stroke_width = $get_meta( 'poly_stroke_width', '1' );
+        // Polygon stroke styling — meta keys: _svgml_poly_stroke_color / _svgml_poly_stroke_width
+        $poly_stroke_color = sanitize_text_field(
+            get_post_meta( $map_id, '_svgml_poly_stroke_color', true )
+        );
+        if ( empty( $poly_stroke_color ) ) {
+            $poly_stroke_color = '#ffffff';
+        }
 
-        $vb_stroke        = round( floatval( $poly_stroke_width ) / 1000, 6 );
-        $vb_stroke_hover  = round( $vb_stroke * 1.8, 6 );
-        $vb_stroke_active = round( $vb_stroke * 2.2, 6 );
+        $raw_stroke_width  = get_post_meta( $map_id, '_svgml_poly_stroke_width', true );
+        $poly_stroke_width = ( is_numeric( $raw_stroke_width ) && floatval( $raw_stroke_width ) > 0 )
+                             ? floatval( $raw_stroke_width )
+                             : 1;
+
+        $raw_hover_width  = get_post_meta( $map_id, '_svgml_poly_stroke_width_hover', true );
+        $hover_width      = ( is_numeric( $raw_hover_width ) && floatval( $raw_hover_width ) > 0 )
+                            ? floatval( $raw_hover_width )
+                            : 3;
+
+        // vector-effect: non-scaling-stroke → stroke-width is screen pixels.
+        $sw       = round( $poly_stroke_width, 2 );
+        $sw_hover = round( $hover_width, 2 );
 
         $stroke_rgba_half = svgml_hex_to_rgba( $poly_stroke_color, 0.5 );
         $stroke_rgba_full = svgml_hex_to_rgba( $poly_stroke_color, 0.9 );
 
-        $css_output .= "{$p} .svgml-poly-region { "
-                     . "stroke: {$stroke_rgba_half}; "
-                     . "stroke-width: {$vb_stroke}; }\n";
-        $css_output .= "{$p} .svgml-poly-region:hover { "
-                     . "stroke: {$stroke_rgba_full}; "
-                     . "stroke-width: {$vb_stroke_hover}; }\n";
-        $css_output .= "{$p} .svgml-poly-region.svgml-region-active { "
-                     . "stroke: {$poly_stroke_color}; "
-                     . "stroke-width: {$vb_stroke_active}; }\n";
+        $sel_base = implode( ', ', [
+            "{$p} .svgml-poly-region",
+            "{$p} .svgml-svg polygon[id]",
+            "{$p} .svgml-svg path[id]",
+        ] );
+        $sel_hover = implode( ', ', [
+            "{$p} .svgml-poly-region:hover",
+            "{$p} .svgml-poly-region.svgml-region-hover",
+            "{$p} .svgml-svg polygon[id]:hover",
+            "{$p} .svgml-svg path[id]:hover",
+        ] );
+        $sel_active = implode( ', ', [
+            "{$p} .svgml-poly-region.svgml-region-active",
+            "{$p} .svgml-svg polygon[id].svgml-region-active",
+            "{$p} .svgml-svg path[id].svgml-region-active",
+        ] );
+
+        $css_output .= "{$sel_base} { "
+                     . "stroke: {$stroke_rgba_half} !important; "
+                     . "stroke-width: {$sw}px !important; "
+                     . "vector-effect: non-scaling-stroke !important; }\n";
+        $css_output .= "{$sel_hover} { "
+                     . "stroke: {$stroke_rgba_full} !important; "
+                     . "stroke-width: {$sw_hover}px !important; "
+                     . "vector-effect: non-scaling-stroke !important; }\n";
+        $css_output .= "{$sel_active} { "
+                     . "stroke: {$poly_stroke_color} !important; "
+                     . "stroke-width: {$sw_hover}px !important; "
+                     . "vector-effect: non-scaling-stroke !important; }\n";
 
         // Custom CSS (per-map)
         $custom_css = $get_meta( 'custom_css', '' );

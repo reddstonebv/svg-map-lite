@@ -186,12 +186,13 @@ jQuery(document).ready(function($) {
             var width       = parseInt(block.width || 100, 10);
             var staticValue = block.static_value || '';
 
-            var bPrefix = block.prefix || '';
-            var bSuffix = block.suffix || '';
+            var bPrefix      = block.prefix       || '';
+            var bSuffix      = block.suffix       || '';
+            var labelLayout  = block.label_layout || 'block';
 
             // Static blocks don't need a JSON field — pass static_value directly
             if (type === 'static_html' || type === 'static_button') {
-                html += svgml_renderBlock(type, field, staticValue, label, obj, width, false, bPrefix, bSuffix);
+                html += svgml_renderBlock(type, field, staticValue, label, obj, width, false, bPrefix, bSuffix, labelLayout);
                 return; // $.each continue
             }
 
@@ -208,7 +209,7 @@ jQuery(document).ready(function($) {
             // Generate the block HTML based on the type, with the correct width.
             // isHtml = true means the value contains raw HTML and should not be escaped.
             var isHtml = !!(block.html);
-            html += svgml_renderBlock(type, field, value, label, obj, width, isHtml, bPrefix, bSuffix);
+            html += svgml_renderBlock(type, field, value, label, obj, width, isHtml, bPrefix, bSuffix, labelLayout);
         });
 
         html += '</div>'; // .svgml-blocks-wrap
@@ -227,10 +228,11 @@ jQuery(document).ready(function($) {
      * @param {boolean} isHtml – If true, render the value as raw HTML (no escaping)
      * @returns {string}       – HTML string for this block
      */
-    function svgml_renderBlock(type, _field, value, label, _obj, width, isHtml, prefix, suffix) {
-        prefix = prefix || '';
-        suffix = suffix || '';
-        width = width || 100;
+    function svgml_renderBlock(type, _field, value, label, _obj, width, isHtml, prefix, suffix, labelLayout) {
+        prefix      = prefix      || '';
+        suffix      = suffix      || '';
+        width       = width       || 100;
+        labelLayout = labelLayout || 'block';
 
         // Calculate the CSS flex-basis.
         // For 33% we use 33.333% for correct rendering.
@@ -270,8 +272,12 @@ jQuery(document).ready(function($) {
             return '';
         }
 
-        // Build the style string for the width
-        var blockAttr = ' style="' + widthStyle + '"';
+        // Build reusable class+style attribute for each block div
+        var layoutClass = labelLayout === 'inline' ? ' svgml-layout-inline' : ' svgml-layout-block';
+        var blockStyle  = ' style="' + widthStyle + '"';
+        function bDiv(typeClass) {
+            return '<div class="svgml-block ' + typeClass + layoutClass + '"' + blockStyle + '>';
+        }
 
         var blockHtml = '';
 
@@ -296,7 +302,7 @@ jQuery(document).ready(function($) {
                 // isHtml = true: render raw (e.g., text with <b> or <em>)
                 var headRaw = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var headVal = isHtml ? headRaw : svgml.escapeHtml(headRaw);
-                blockHtml = '<div class="svgml-block svgml-block-heading"' + blockAttr + '>' +
+                blockHtml = bDiv('svgml-block-heading') +
                     '<h3 class="svgml-heading-value">' + headVal + '</h3>' +
                     '</div>';
                 break;
@@ -309,7 +315,7 @@ jQuery(document).ready(function($) {
                 var configClass  = statusColors[String(value)] || '';
                 if (configClass) { badgeClass = configClass; }
 
-                blockHtml = '<div class="svgml-block svgml-block-badge"' + blockAttr + '>' +
+                blockHtml = bDiv('svgml-block-badge') +
                     '<span class="svgml-badge svgml-badge-' + badgeClass + '">' + badgeVal + '</span>' +
                     '</div>';
                 break;
@@ -318,7 +324,7 @@ jQuery(document).ready(function($) {
             case 'price':
                 var priceRaw = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var priceVal = isHtml ? priceRaw : svgml.escapeHtml(priceRaw);
-                blockHtml = '<div class="svgml-block svgml-block-price"' + blockAttr + '>' +
+                blockHtml = bDiv('svgml-block-price') +
                     (label ? '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' : '') +
                     '<span class="svgml-price-value">' + priceVal + '</span>' +
                     '</div>';
@@ -328,7 +334,7 @@ jQuery(document).ready(function($) {
             case 'link':
                 var linkUrl = String(value);
                 if (/^https?:\/\//i.test(linkUrl)) {
-                    blockHtml = '<div class="svgml-block svgml-block-link"' + blockAttr + '>' +
+                    blockHtml = bDiv('svgml-block-link') +
                         '<a href="' + svgml.escapeHtml(linkUrl) + '" ' +
                            'target="_blank" rel="noopener noreferrer" ' +
                            'class="svgml-link-btn">' +
@@ -345,7 +351,7 @@ jQuery(document).ready(function($) {
             // from a trusted source (your own JSON feed).
             case 'html':
                 var rawHtml = String(value);
-                blockHtml = '<div class="svgml-block svgml-block-html"' + blockAttr + '>' +
+                blockHtml = bDiv('svgml-block-html') +
                     (label ? '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' : '') +
                     '<div class="svgml-block-html-content">' + rawHtml + '</div>' +
                     '</div>';
@@ -357,7 +363,7 @@ jQuery(document).ready(function($) {
                 // isHtml = false (default): use svgml_formatValue() with HTML escaping
                 var textRaw  = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var textVal  = isHtml ? textRaw : svgml_formatValue(textRaw);
-                blockHtml = '<div class="svgml-block svgml-block-text"' + blockAttr + '>' +
+                blockHtml = bDiv('svgml-block-text') +
                     (label ? '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' : '') +
                     '<span class="svgml-block-value">' + textVal + '</span>' +
                     '</div>';
@@ -578,6 +584,28 @@ jQuery(document).ready(function($) {
                 return '<span class="svgml-ov-text">' + safe + '</span>';
         }
     }
+
+    // ── SIDEBAR → SVG HOVER SYNC ────────────────────────────────────────────
+    $(document).on('mouseenter', '.svgml-overview-item', function() {
+        var svgId = $(this).data('svg-id');
+        if (!svgId) return;
+        // Support multi-view: find all SVG elements sharing this json-id via the mapping
+        var jsonId  = String($(this).data('json-id') || svgId);
+        var mapping = (typeof svgmlData !== 'undefined') ? (svgmlData.mapping || {}) : {};
+        if (svgmlData.mapMode === 'manual') {
+            $('[id="' + svgId + '"]').addClass('svgml-region-hover');
+        } else {
+            $.each(mapping, function(sid, jid) {
+                if (String(jid) === jsonId) {
+                    $('[id="' + sid + '"]').addClass('svgml-region-hover');
+                }
+            });
+        }
+    });
+
+    $(document).on('mouseleave', '.svgml-overview-item', function() {
+        $('.svgml-region-hover').removeClass('svgml-region-hover');
+    });
 
     // ── CLICK ON OVERVIEW ROW ────────────────────────────────────────────────
     // When a visitor clicks on a row in the overview, we simulate a

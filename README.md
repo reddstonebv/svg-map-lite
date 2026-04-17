@@ -5,12 +5,17 @@ SVG Map Lite is een krachtige, lichtgewicht WordPress-plugin waarmee je interact
 ## ✨ Features
 
 - **Twee Datamodi:**
-- **JSON Modus:** Koppel regio's aan een externe, dynamische JSON-feed (ideaal voor real-time vastgoed beschikbaarheid).
-- **Handmatige Modus:** Voer je data direct in de WordPress backend in, zonder dat je een externe feed nodig hebt.
-- **Interactieve Polygonen:** Teken eenvoudig klikbare regio's (polygonen) direct over je geüploade afbeelding.
-- **Drag & Drop Paneel Bouwer:** Bepaal visueel welke velden uit je data (JSON of handmatig) in het informatiepaneel worden     getoond, inclusief scheidingslijnen.
-- **Dynamische Filters:** Genereer automatisch filterbalken (keuzelijsten of schuifregelaars) op basis van je data. Regio's die niet aan de filters voldoen, worden netjes gedimd.
-- **Live Preview Styling:** Pas de kleuren, randen, hoekradiussen en de statuskleuren (bijv. 'Beschikbaar' = groen, 'Verkocht' = rood) direct aan in de admin met een real-time preview.
+  - **JSON Modus:** Koppel regio's aan een externe, dynamische JSON-feed (ideaal voor real-time vastgoed beschikbaarheid).
+  - **Handmatige Modus:** Voer je data direct in de WordPress backend in, zonder dat je een externe feed nodig hebt.
+- **Interactieve Polygonen:** Teken eenvoudig klikbare regio's (polygonen) direct over je geüploade afbeelding via een ingebouwde Fabric.js-editor.
+- **Multi-Laag Ondersteuning:** Organiseer polygonen over meerdere lagen (bijv. per verdieping of aanzicht), elk met een eigen achtergrondafbeelding en lijnstijl.
+- **Multi-View (Many-to-One Mapping):** Koppel meerdere polygonen aan hetzelfde JSON-object — ideaal voor complexe gebouwen waarbij voor-, zij- en bovenaanzicht van één eenheid tegelijk oplichten bij een klik.
+- **Drag & Drop Paneel Bouwer:** Bepaal visueel welke velden uit je data in het informatiepaneel worden getoond. Ondersteunt types: Koptekst, Prijs, Tekst, Badge, Link, Afbeelding, HTML (raw), Scheidingslijn, Statische HTML en Statische Knop. Inclusief prefix/suffix-opties per blok (bijv. `€` of `m²`).
+- **Resultatenlijst (Overzicht):** Naast het klik-paneel kun je ook een compacte kaartjesweergave onder de kaart activeren die alle regio's als lijstitems toont, eveneens klikbaar en filterbaar.
+- **Dynamische Filters:** Genereer automatisch filterbalken op basis van je data. Kies per filter het type: keuzelijst (dropdown), schuifregelaar (range), zoekveld (autocomplete), invoerveld of knoppen. Regio's die niet aan de filters voldoen worden netjes gedimd.
+- **Aparte Filters Shortcode:** Plaats de filterbalk los van de kaart via `[svg_map_filters id="123"]`, zodat je de kaart en de filters vrij kunt positioneren op je pagina.
+- **Live Preview Styling:** Pas kleuren, randen, hoekradiussen en statuskleuren (bijv. Beschikbaar/Verhuurd/Gereserveerd) direct aan in de admin met een real-time preview.
+- **Import / Export:** Exporteer een volledige kaartconfiguratie als JSON en importeer deze op een andere omgeving (bijv. van lokaal naar productie). Media-koppelingen worden leeggelaten zodat je ze handmatig opnieuw kunt koppelen.
 - **Shortcode Integratie:** Plaats je kaart overal op je website met een simpele shortcode: `[svg_map id="123"]`.
 
 ## 🚀 Installatie
@@ -30,6 +35,19 @@ SVG Map Lite is een krachtige, lichtgewicht WordPress-plugin waarmee je interact
 6. **Weergave:** Stel je merkkleuren, statuskleuren en paneel-styling in.
 7. Sla de kaart op, kopieer de `[svg_map id="..."]` shortcode rechtsboven en plak deze op een pagina of in een bericht.
 
+## 🆕 Recente Updates
+
+- **Multi-View Ondersteuning (Many-to-One Mapping):** Meerdere SVG-vlakken kunnen aan hetzelfde JSON-object worden gekoppeld. Klik je op een item in de kaart of resultatenlijst, dan lichten alle bijbehorende vlakken tegelijk op. De editor waarschuwt bij dubbele ID's maar biedt een 'Multi-View toestaan' toggle om dit bewust te overschrijven voor multi-layer kaarten.
+
+- **Verbeterde Map Editor Stabiliteit:** De synchronisatie tussen de sidebar, de Fabric.js tekenengine en de WordPress-database is volledig herschreven. Geen race conditions meer bij opslaan via knop of `Cmd+S`. Aangepaste polygon-ID's worden direct en betrouwbaar opgeslagen.
+
+- **Panel Builder Verbeteringen:** Volledig responsive kolombreedtes (geen weggedrukte knoppen meer op kleinere schermen). Een leeg label-veld in de backend resulteert nu in een label-loos blok aan de voorkant — geen automatische terugval op de veldnaam.
+
+- **Quality of Life in Filters:** 'Click-to-Copy' knoppen voor veelgebruikte symbolen (`€`, `m²`) in de Filter Bouwer, met een robuuste fallback voor lokale (niet-HTTPS) omgevingen.
+
+- **Import / Export:** Kaartconfiguraties zijn exporteerbaar als JSON-bestand en importeerbaar op een andere WordPress-installatie. Handig voor migraties tussen lokaal, staging en productie.
+
 ## 🛠️ Technische Stack
-- Backend: PHP (WordPress Plugin API, Custom Post Types)
+- Backend: PHP (WordPress Plugin API, Custom Post Types, post meta)
+- Teken-editor: Fabric.js
 - Frontend: Vanilla JS, jQuery (admin), noUiSlider (range filters)

@@ -28,8 +28,8 @@ jQuery(document).ready(function($) {
     // ── COLORS ───────────────────────────────────────────────────────────
     var POLY_FILL         = 'rgba(42, 157, 143, 0.20)';
     var POLY_FILL_ACTIVE  = 'rgba(42, 157, 143, 0.40)';
-    var POLY_STROKE       = '#2a9d8f';
-    var POLY_STROKE_WIDTH = 1;
+    var POLY_STROKE       = '#007cba'; // Editor-only: hardcoded for visibility
+    var POLY_STROKE_WIDTH = 2;        // Editor-only: hardcoded for visibility
     var POINT_RADIUS      = 5;
     var POINT_FILL        = '#e76f51';       // Coral: draw points
     var EDIT_POINT_FILL   = '#264653';       // Charcoal: editable points
@@ -82,12 +82,6 @@ jQuery(document).ready(function($) {
     var $zoomReset    = $('#svgml-zoom-reset');
     var $zoomLevel    = $('#svgml-zoom-level');
     var $snapToggle   = $('#svgml-snap-toggle');
-    var $strokeColor  = $('#svgml-stroke-color');
-    var $strokeWidth  = $('#svgml-stroke-width');
-
-    // Initialise line style constants from saved values in the toolbar
-    if ($strokeColor.length && $strokeColor.val()) POLY_STROKE = $strokeColor.val();
-    if ($strokeWidth.length && $strokeWidth.val()) POLY_STROKE_WIDTH = parseFloat($strokeWidth.val()) || 1;
 
     $deleteBtn.hide();
     $('.svgml-edit-options').hide();
@@ -423,30 +417,6 @@ jQuery(document).ready(function($) {
     //  LINE STYLE SETTINGS (colour + thickness)
     // ════════════════════════════════════════════════════════════════════
 
-    // When changing colour or thickness: update all existing polygons directly
-    // and sync to hidden form fields so values are saved.
-    $strokeColor.add($strokeWidth).on('input change', function() {
-        var newColor = $strokeColor.val();
-        var newWidth = parseFloat($strokeWidth.val()) || 1;
-
-        // Update the constant so new polygons get the same style
-        POLY_STROKE       = newColor;
-        POLY_STROKE_WIDTH = newWidth;
-
-        // Sync to hidden form fields (sent with save)
-        $('#svgml_poly_stroke_color').val(newColor);
-        $('#svgml_poly_stroke_width').val(newWidth);
-
-        // Apply to all existing polygon objects on the canvas
-        if (!canvas) return;
-        $.each(polygons, function(i, p) {
-            if (p.fabricObj) {
-                p.fabricObj.set('stroke', newColor);
-                p.fabricObj.set('strokeWidth', newWidth);
-            }
-        });
-        canvas.renderAll();
-    });
 
     // ════════════════════════════════════════════════════════════════════
     //  SNAP-TO-POINT
@@ -528,14 +498,10 @@ jQuery(document).ready(function($) {
      * @param {boolean} addToCanvas – true = add to canvas
      */
     function createFabricPolygon(points, id, addToCanvas) {
-        // Read current line style settings from the toolbar
-        var currentStroke = $strokeColor.val() || POLY_STROKE;
-        var currentWidth  = parseFloat($strokeWidth.val()) || POLY_STROKE_WIDTH;
-
         var poly = new fabric.Polygon(points, {
             fill:                POLY_FILL,
-            stroke:              currentStroke,
-            strokeWidth:         currentWidth,
+            stroke:              POLY_STROKE,
+            strokeWidth:         POLY_STROKE_WIDTH,
             selectable:          true,
             hasControls:         false,
             hasBorders:          false,           // No blue Fabric.js selection border
@@ -1541,8 +1507,6 @@ jQuery(document).ready(function($) {
             layers[activeLayerIndex].polygons = $.map(polygons, function(p) {
                 return { id: p.id, points: p.points };
             });
-            layers[activeLayerIndex].strokeColor = $strokeColor.val() || '#2a9d8f';
-            layers[activeLayerIndex].strokeWidth  = $strokeWidth.val() || '1';
         }
 
         // Stop any edit or draw mode
@@ -1580,8 +1544,6 @@ jQuery(document).ready(function($) {
             layers[activeLayerIndex].polygons = $.map(polygons, function(p) {
                 return { id: p.id, points: p.points };
             });
-            layers[activeLayerIndex].strokeColor = $strokeColor.val() || '#2a9d8f';
-            layers[activeLayerIndex].strokeWidth = $strokeWidth.val() || '1';
         }
 
         // Create JSON with all layers
@@ -1641,13 +1603,6 @@ jQuery(document).ready(function($) {
     function loadLayer(idx) {
         var layer = layers[idx];
         if (!layer || !layer.imageAttachmentId) return;
-
-        // Set line style BEFORE loading polygons, so createFabricPolygon()
-        // reads the correct values from the toolbar inputs.
-        $strokeColor.val(layer.strokeColor || '#2a9d8f');
-        $strokeWidth.val(layer.strokeWidth  || '1');
-        POLY_STROKE       = $strokeColor.val();
-        POLY_STROKE_WIDTH = parseFloat($strokeWidth.val()) || 1;
 
         $.post(svgmlAdmin.ajaxUrl, {
             action:        'svgml_get_image_url',

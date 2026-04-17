@@ -36,8 +36,10 @@ function svgml_render_panel_builder_page( $map_id ) {
                     $clean_width  = intval( $block['width']                     ?? 100 );
                     $clean_html   = ! empty( $block['html'] );
                     $clean_static = wp_kses_post( $block['static_value']        ?? '' );
-                    $clean_prefix = sanitize_text_field( $block['prefix']       ?? '' );
-                    $clean_suffix = sanitize_text_field( $block['suffix']       ?? '' );
+                    $clean_prefix  = sanitize_text_field( $block['prefix']        ?? '' );
+                    $clean_suffix  = sanitize_text_field( $block['suffix']        ?? '' );
+                    $clean_layout  = sanitize_text_field( $block['label_layout']  ?? 'block' );
+                    if ( ! in_array( $clean_layout, [ 'block', 'inline' ], true ) ) $clean_layout = 'block';
 
                     if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
                     if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
@@ -52,6 +54,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                         'static_value' => $clean_static,
                         'prefix'       => $clean_prefix,
                         'suffix'       => $clean_suffix,
+                        'label_layout' => $clean_layout,
                     ];
                 }
             } else {
@@ -62,8 +65,9 @@ function svgml_render_panel_builder_page( $map_id ) {
                 $raw_widths        = $_POST['svgml_block_width']        ?? [];
                 $raw_html_flags    = $_POST['svgml_block_html']         ?? [];
                 $raw_static_values = $_POST['svgml_block_static_value'] ?? [];
-                $raw_prefixes      = $_POST['svgml_block_prefix']       ?? [];
-                $raw_suffixes      = $_POST['svgml_block_suffix']       ?? [];
+                $raw_prefixes      = $_POST['svgml_block_prefix']        ?? [];
+                $raw_suffixes      = $_POST['svgml_block_suffix']        ?? [];
+                $raw_layouts       = $_POST['svgml_block_label_layout']  ?? [];
 
                 foreach ( $raw_fields as $i => $field ) {
                     $clean_field  = sanitize_text_field( $field );
@@ -74,6 +78,8 @@ function svgml_render_panel_builder_page( $map_id ) {
                     $clean_static = wp_kses_post( $raw_static_values[ $i ]        ?? '' );
                     $clean_prefix = sanitize_text_field( $raw_prefixes[ $i ]      ?? '' );
                     $clean_suffix = sanitize_text_field( $raw_suffixes[ $i ]      ?? '' );
+                    $clean_layout = sanitize_text_field( $raw_layouts[ $i ]       ?? 'block' );
+                    if ( ! in_array( $clean_layout, [ 'block', 'inline' ], true ) ) $clean_layout = 'block';
 
                     if ( ! in_array( $clean_type, $valid_types ) )   $clean_type  = 'text';
                     if ( ! in_array( $clean_width, $valid_widths ) ) $clean_width = 100;
@@ -88,6 +94,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                         'static_value' => $clean_static,
                         'prefix'       => $clean_prefix,
                         'suffix'       => $clean_suffix,
+                        'label_layout' => $clean_layout,
                     ];
                 }
             }
@@ -288,9 +295,10 @@ function svgml_render_panel_builder_page( $map_id ) {
                             <?php endif; ?>
                             <th style="width:15%">Type</th>
                             <th style="width:12%">Breedte</th>
-                            <th style="width:22%">Label (optioneel)</th>
-                            <th style="width:18%">Inhoud / URL</th>
-                            <th style="width:10%;text-align:center" title="Waarde bevat HTML-opmaak">HTML</th>
+                            <th style="width:18%">Label (optioneel)</th>
+                            <th style="width:8%">Positie</th>
+                            <th style="width:14%">Inhoud / URL</th>
+                            <th style="width:8%;text-align:center" title="Waarde bevat HTML-opmaak">HTML</th>
                             <th style="width:5%">✕</th>
                         </tr>
                     </thead>
@@ -303,8 +311,9 @@ function svgml_render_panel_builder_page( $map_id ) {
                                 $b_width  = intval( $block['width'] ?? 100 );
                                 $b_html   = ! empty( $block['html'] );
                                 $b_static = $block['static_value'] ?? '';
-                                $b_prefix = $block['prefix']       ?? '';
-                                $b_suffix = $block['suffix']       ?? '';
+                                $b_prefix  = $block['prefix']        ?? '';
+                                $b_suffix  = $block['suffix']        ?? '';
+                                $b_layout  = $block['label_layout']  ?? 'block';
                                 $is_static = in_array( $b_type, [ 'static_html', 'static_button' ] );
                         ?>
                         <tr class="svgml-block-row">
@@ -370,6 +379,12 @@ function svgml_render_panel_builder_page( $map_id ) {
                                 <input type="text" name="svgml_block_suffix[]"
                                        value="<?php echo esc_attr( $b_suffix ); ?>"
                                        placeholder="m²" class="small-text" style="width:40px;" title="Suffix">
+                            </td>
+                            <td>
+                                <select name="svgml_block_label_layout[]" class="svgml-block-label-layout-select">
+                                    <option value="block"  <?php selected( $b_layout, 'block' ); ?>>Boven</option>
+                                    <option value="inline" <?php selected( $b_layout, 'inline' ); ?>>Naast</option>
+                                </select>
                             </td>
                             <td>
                                 <input type="text" name="svgml_block_static_value[]"
@@ -665,6 +680,12 @@ function svgml_render_panel_builder_page( $map_id ) {
                            placeholder="€" class="small-text" style="width:40px;" title="Prefix">
                     <input type="text" name="svgml_block_suffix[]"
                            placeholder="m²" class="small-text" style="width:40px;" title="Suffix">
+                </td>
+                <td>
+                    <select name="svgml_block_label_layout[]" class="svgml-block-label-layout-select">
+                        <option value="block">Boven</option>
+                        <option value="inline">Naast</option>
+                    </select>
                 </td>
                 <td>
                     <input type="text" name="svgml_block_static_value[]"

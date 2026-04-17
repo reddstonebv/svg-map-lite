@@ -356,22 +356,27 @@ function svgml_admin_footer_scripts() {
                 var $row  = $(this);
                 var field = $row.find('[name="svgml_block_field[]"]').val()  || '';
                 var type  = $row.find('[name="svgml_block_type[]"]').val()   || 'text';
-                var label = $row.find('[name="svgml_block_label[]"]').val()  || '';
-                var width = parseInt($row.find('[name="svgml_block_width[]"]').val() || 100, 10);
-                var html  = ($row.find('[name="svgml_block_html[]"][type="hidden"]').val() === '1');
-                blocks.push({ field:field, type:type, label:label, width:width, html:html });
+                var label  = $row.find('[name="svgml_block_label[]"]').val()        || '';
+                var width  = parseInt($row.find('[name="svgml_block_width[]"]').val() || 100, 10);
+                var html   = ($row.find('[name="svgml_block_html[]"][type="hidden"]').val() === '1');
+                var layout = $row.find('[name="svgml_block_label_layout[]"]').val() || 'block';
+                blocks.push({ field:field, type:type, label:label, width:width, html:html, label_layout:layout });
             });
             return blocks;
         }
 
         function svgml_renderPreviewBlock(block, obj) {
-            var type   = block.type  || 'text';
-            var field  = block.field || '';
-            var label  = block.label || '';
-            var width  = block.width || 100;
-            var isHtml = !!block.html;
-            var flex   = (width === 33) ? '33.333%' : (width + '%');
-            var style  = 'flex:0 0 ' + flex + ';max-width:' + flex + ';box-sizing:border-box;';
+            var type        = block.type         || 'text';
+            var field       = block.field        || '';
+            var label       = block.label        || '';
+            var width       = block.width        || 100;
+            var isHtml      = !!block.html;
+            var labelLayout = block.label_layout || 'block';
+            var flex        = (width === 33) ? '33.333%' : (width + '%');
+            var style       = 'flex:0 0 ' + flex + ';max-width:' + flex + ';box-sizing:border-box;';
+            var inlineStyle = labelLayout === 'inline'
+                ? 'display:flex;gap:8px;align-items:center;justify-content:space-between;'
+                : '';
 
             if (type === 'divider') {
                 return '<div style="' + style + 'padding:4px 0;width:100%;">' +
@@ -423,7 +428,7 @@ function svgml_admin_footer_scripts() {
                            '</div>';
 
                 case 'price':
-                    return '<div class="svgml-preview-block" style="' + style + '">' +
+                    return '<div class="svgml-preview-block" style="' + style + inlineStyle + '">' +
                                (label ? '<span class="svgml-preview-label-text">' +
                                             svgml_previewEscape(label) + '</span>' : '') +
                                '<div class="svgml-preview-value" style="font-weight:600;">' +
@@ -441,14 +446,14 @@ function svgml_admin_footer_scripts() {
                     return '';
 
                 case 'html':
-                    return '<div class="svgml-preview-block" style="' + style + '">' +
+                    return '<div class="svgml-preview-block" style="' + style + inlineStyle + '">' +
                                (label ? '<span class="svgml-preview-label-text">' +
                                             svgml_previewEscape(label) + '</span>' : '') +
                                '<div class="svgml-preview-value">' + strVal + '</div>' +
                            '</div>';
 
                 default:
-                    return '<div class="svgml-preview-block" style="' + style + '">' +
+                    return '<div class="svgml-preview-block" style="' + style + inlineStyle + '">' +
                                (label ? '<span class="svgml-preview-label-text">' +
                                             svgml_previewEscape(label) + '</span>' : '') +
                                '<div class="svgml-preview-value">' +
