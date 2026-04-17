@@ -96,6 +96,12 @@ function svgml_render_display_page( $map_id ) {
             $poly_stroke_width_hover = max( 0, min( 20, floatval( $_POST['svgml_poly_stroke_width_hover'] ?? 3 ) ) );
             update_post_meta( $map_id, '_svgml_poly_stroke_width_hover', (string) $poly_stroke_width_hover );
 
+            // ── Highlight (hover/active fill) ────────────────────────────────────
+            $highlight_color   = sanitize_hex_color( $_POST['svgml_highlight_color'] ?? '' ) ?: '#2a9d8f';
+            $highlight_opacity = round( max( 0.0, min( 1.0, floatval( $_POST['svgml_highlight_opacity'] ?? 0.7 ) ) ), 2 );
+            update_post_meta( $map_id, '_svgml_highlight_color',   $highlight_color );
+            update_post_meta( $map_id, '_svgml_highlight_opacity', (string) $highlight_opacity );
+
             delete_transient( 'svgml_json_cache_' . $map_id );
             delete_transient( 'svgml_html_'       . $map_id );
 
@@ -130,6 +136,9 @@ function svgml_render_display_page( $map_id ) {
     $poly_stroke_width_v       = ( '' === $poly_stroke_width_v ) ? 1 : intval( $poly_stroke_width_v );
     $poly_stroke_width_hover_v = get_post_meta( $map_id, '_svgml_poly_stroke_width_hover',  true );
     $poly_stroke_width_hover_v = ( '' === $poly_stroke_width_hover_v ) ? 3 : floatval( $poly_stroke_width_hover_v );
+    $highlight_color_v   = get_post_meta( $map_id, '_svgml_highlight_color',   true ) ?: '#2a9d8f';
+    $highlight_opacity_v = get_post_meta( $map_id, '_svgml_highlight_opacity', true );
+    $highlight_opacity_v = ( '' === $highlight_opacity_v ) ? 0.7 : floatval( $highlight_opacity_v );
 
     // Standaard vastgoed-statussen als er nog niets is ingesteld
     if ( empty( $status_colors ) ) {
@@ -473,6 +482,31 @@ function svgml_render_display_page( $map_id ) {
                                    value="<?php echo esc_attr( $poly_stroke_width_hover_v ); ?>"
                                    min="0" max="20" step="0.5" class="small-text">
                             <p class="description">Lijndikte bij hover en actieve selectie. Standaard: 3px</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="svgml_highlight_color">Highlight Kleur</label></th>
+                        <td>
+                            <input type="color" id="svgml_highlight_color" name="svgml_highlight_color"
+                                   value="<?php echo esc_attr( $highlight_color_v ); ?>" class="svgml-color-input">
+                            <p class="description">Opvulkleur bij hover en actieve selectie.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="svgml_highlight_opacity">Highlight Helderheid</label></th>
+                        <td>
+                            <input type="range" id="svgml_highlight_opacity" name="svgml_highlight_opacity"
+                                   value="<?php echo esc_attr( $highlight_opacity_v ); ?>"
+                                   min="0" max="1" step="0.05" style="width:200px; vertical-align:middle;">
+                            <span id="svgml_highlight_opacity_val"><?php echo esc_html( $highlight_opacity_v ); ?></span>
+                            <p class="description">Doorzichtigheid van de opvulkleur (0 = onzichtbaar, 1 = volledig dekkend). Standaard: 0.7</p>
+                            <script>
+                            (function() {
+                                var r = document.getElementById('svgml_highlight_opacity');
+                                var s = document.getElementById('svgml_highlight_opacity_val');
+                                if (r && s) r.addEventListener('input', function() { s.textContent = this.value; });
+                            })();
+                            </script>
                         </td>
                     </tr>
                 </table>

@@ -659,12 +659,23 @@ function svgml_output_custom_css() {
                             ? floatval( $raw_hover_width )
                             : 3;
 
+        $raw_highlight_color   = get_post_meta( $map_id, '_svgml_highlight_color', true );
+        $highlight_color       = ( ! empty( $raw_highlight_color ) && sanitize_hex_color( $raw_highlight_color ) )
+                                 ? $raw_highlight_color
+                                 : $poly_stroke_color;
+
+        $raw_highlight_opacity = get_post_meta( $map_id, '_svgml_highlight_opacity', true );
+        $highlight_opacity     = ( is_numeric( $raw_highlight_opacity ) )
+                                 ? round( max( 0.0, min( 1.0, floatval( $raw_highlight_opacity ) ) ), 2 )
+                                 : 0.7;
+
         // vector-effect: non-scaling-stroke → stroke-width is screen pixels.
         $sw       = round( $poly_stroke_width, 2 );
         $sw_hover = round( $hover_width, 2 );
 
-        $stroke_rgba_half = svgml_hex_to_rgba( $poly_stroke_color, 0.5 );
-        $stroke_rgba_full = svgml_hex_to_rgba( $poly_stroke_color, 0.9 );
+        $stroke_rgba_half  = svgml_hex_to_rgba( $poly_stroke_color, 0.5 );
+        $stroke_rgba_full  = svgml_hex_to_rgba( $poly_stroke_color, 0.9 );
+        $highlight_rgba    = svgml_hex_to_rgba( $highlight_color, $highlight_opacity );
 
         $sel_base = implode( ', ', [
             "{$p} .svgml-poly-region",
@@ -688,10 +699,12 @@ function svgml_output_custom_css() {
                      . "stroke-width: {$sw}px !important; "
                      . "vector-effect: non-scaling-stroke !important; }\n";
         $css_output .= "{$sel_hover} { "
+                     . "fill: {$highlight_rgba} !important; "
                      . "stroke: {$stroke_rgba_full} !important; "
                      . "stroke-width: {$sw_hover}px !important; "
                      . "vector-effect: non-scaling-stroke !important; }\n";
         $css_output .= "{$sel_active} { "
+                     . "fill: {$highlight_rgba} !important; "
                      . "stroke: {$poly_stroke_color} !important; "
                      . "stroke-width: {$sw_hover}px !important; "
                      . "vector-effect: non-scaling-stroke !important; }\n";
