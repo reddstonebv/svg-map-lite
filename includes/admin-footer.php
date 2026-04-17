@@ -43,6 +43,13 @@ function svgml_save_shortcut_script() {
 
         // ── SAVE FUNCTIONS ────────────────────────────────────────────────────
         function svgmlSavePage() {
+            // Force any focused input to blur first — this synchronously fires the
+            // 'change' event so pending ID edits are committed to the JS state
+            // before we call syncLayersToHiddenField or submit the form.
+            if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+                document.activeElement.blur();
+            }
+
             // Save scroll position so it can be restored after the reload
             var _mid = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
             if (_mid) {
@@ -61,10 +68,15 @@ function svgml_save_shortcut_script() {
 
             if (!$form.length) return;
 
-            // Click the form's own submit button — identical to what the user does
-            // when pressing the native button. This triggers the full browser submit
-            // pipeline: submit event fires (which runs syncLayersToHiddenField via
-            // the polygon-editor.js listener), then the POST is sent with all fields.
+            // Flush polygon ID edits into the hidden JSON field BEFORE the form
+            // submits. native form.submit() does not fire jQuery 'submit' handlers,
+            // so we call the exported sync function explicitly here.
+            if (typeof window.svgmlSyncLayersToHidden === 'function') {
+                window.svgmlSyncLayersToHidden();
+            }
+
+            // Click the form's own submit button — triggers the full browser submit
+            // pipeline including jQuery 'submit' handlers as a second safety net.
             var $submitBtn = $form.find('input[type="submit"], button[type="submit"]').first();
             if ($submitBtn.length) {
                 $submitBtn[0].click();
@@ -355,7 +367,7 @@ function svgml_admin_footer_scripts() {
         function svgml_renderPreviewBlock(block, obj) {
             var type   = block.type  || 'text';
             var field  = block.field || '';
-            var label  = block.label || (field ? svgml_previewHumanize(field) : '');
+            var label  = block.label || '';
             var width  = block.width || 100;
             var isHtml = !!block.html;
             var flex   = (width === 33) ? '33.333%' : (width + '%');
@@ -514,7 +526,7 @@ function svgml_admin_footer_scripts() {
         function svgml_renderOverviewPreviewBlock(block, obj) {
             var type   = block.type  || 'text';
             var field  = block.field || '';
-            var label  = block.label || (field ? svgml_previewHumanize(field) : '');
+            var label  = block.label || '';
             var isHtml = !!block.html;
 
             var value = (field && obj.hasOwnProperty(field)) ? obj[field] : null;
@@ -645,6 +657,7 @@ function svgml_admin_footer_scripts() {
         // ── DRAG-AND-DROP SORTING ───────────────────────────────────────────────
         $('#svgml-filters-tbody').sortable({
             handle:      '.svgml-drag-handle',
+            cancel:      'input, textarea, button, select, option, .svgml-allow-select',
             axis:        'y',
             placeholder: 'svgml-sort-placeholder',
             helper: function(e, ui) {
@@ -656,6 +669,39 @@ function svgml_admin_footer_scripts() {
             opacity:   0.85,
             tolerance: 'pointer'
         }).disableSelection();
+
+        // Click-to-copy buttons in filter rows
+        $(document).on('click', '.svgml-copy-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $btn         = $(this);
+            var textToCopy   = $btn.attr('data-copy');
+            var originalText = $btn.text();
+
+            function showSuccess() {
+                $btn.text('✓');
+                setTimeout(function() { $btn.text(originalText); }, 800);
+            }
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(showSuccess);
+            } else {
+                var textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                textArea.style.position = 'absolute';
+                textArea.style.left = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showSuccess();
+                } catch (err) {
+                    console.error('Fallback copy failed', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        });
 
         $('#svgml-add-filter').on('click', function() {
             var $template = $('#svgml-filter-row-template');

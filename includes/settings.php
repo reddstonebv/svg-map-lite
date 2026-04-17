@@ -136,6 +136,7 @@ function svgml_render_settings_page( $map_id ) {
             }
 
             update_post_meta( $map_id, '_svgml_layers', $clean_layers );
+            update_post_meta( $map_id, '_svgml_allow_multiview', isset( $_POST['svgml_allow_multiview'] ) ? '1' : '0' );
 
             // ── NATIVE AUTO-SYNC POLYGONS TO JSON FEED ───────────────────────
             $map_mode_sync = get_post_meta( $map_id, '_svgml_map_mode', true );
@@ -253,6 +254,7 @@ function svgml_render_settings_page( $map_id ) {
     $layers              = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
     $layer_switcher      = get_post_meta( $map_id, '_svgml_layer_switcher', true ) ?: 'buttons';
     $map_mode            = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+    $allow_multiview     = get_post_meta( $map_id, '_svgml_allow_multiview', true ) === '1';
 
     ?>
     <div class="wrap svgml-admin-wrap">
@@ -459,6 +461,10 @@ function svgml_render_settings_page( $map_id ) {
 
                                 <!-- Vlakkenlijst: overzicht van alle getekende polygonen -->
                                 <div class="svgml-polygon-list-wrap">
+                                    <label style="display:inline-flex;align-items:center;gap:6px;margin:10px 0 4px;font-size:13px;">
+                                        <input type="checkbox" id="svgml-allow-multiview" name="svgml_allow_multiview" value="1"<?php checked( $allow_multiview ); ?>>
+                                        Multi-View toestaan (dubbele ID's)
+                                    </label>
                                     <h4 style="margin:14px 0 6px">Getekende vlakken</h4>
                                     <table class="wp-list-table widefat fixed striped" id="svgml-polygon-list">
                                         <thead>
@@ -483,9 +489,14 @@ function svgml_render_settings_page( $map_id ) {
                                     </p>
                                 </div>
 
-                                <?php if ( ! empty( $polygons ) ) :
-                                    $poly_count = count( array_filter( array_map( function( $p ) { return $p['id'] ?? ''; }, $polygons ) ) );
-                                ?>
+                                <?php
+                                $poly_count = 0;
+                                foreach ( $layers as $layer ) {
+                                    foreach ( $layer['polygons'] ?? [] as $p ) {
+                                        if ( ! empty( $p['id'] ) ) $poly_count++;
+                                    }
+                                }
+                                if ( $poly_count > 0 ) : ?>
                                 <div id="svgml-polygon-ids-status" class="svgml-ids-status" style="margin-top:12px">
                                     <div class="svgml-status-box svgml-status-success">
                                         <strong>✓ <?php echo $poly_count; ?> vlakken getekend</strong>

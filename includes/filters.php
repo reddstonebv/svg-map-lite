@@ -138,12 +138,13 @@ function svgml_render_filters_page( $map_id ) {
                 <table class="wp-list-table widefat fixed striped" id="svgml-filters-table">
                     <thead>
                         <tr>
-                            <th style="width:30px"></th>
-                            <th style="width:25%"><?php echo ( 'manual' === $map_mode ) ? 'Paneel Veld' : 'JSON Veld'; ?></th>
-                            <th style="width:20%">Type</th>
-                            <th style="width:25%">Label</th>
-                            <th style="width:20%">Opties</th>
-                            <th style="width:60px">Verwijder</th>
+                            <th style="width:5%"></th>
+                            <th style="width:15%"><?php echo ( 'manual' === $map_mode ) ? 'Paneel Veld' : 'JSON Veld'; ?></th>
+                            <th style="width:15%">Type</th>
+                            <th style="width:15%">Label</th>
+                            <th style="width:15%">Opties</th>
+                            <th style="width:20%">Prefix/Suffix & Placeholder</th>
+                            <th style="width:5%">Verwijder</th>
                         </tr>
                     </thead>
                     <tbody id="svgml-filters-tbody">
@@ -259,15 +260,16 @@ function svgml_render_filters_page( $map_id ) {
                                 </div>
                             </td>
                             <td>
+                                <div class="svgml-copy-helper" style="display:flex; gap:6px; align-items:center; font-size:11px; color:#646970; margin-bottom:6px;">Snel kopiëren: <button type="button" class="button button-small svgml-copy-btn" data-copy="€" onmousedown="event.stopPropagation();">€</button> <button type="button" class="button button-small svgml-copy-btn" data-copy="m²" onmousedown="event.stopPropagation();">m²</button></div>
                                 <input type="text" name="svgml_filter_prefix[]"
                                        value="<?php echo esc_attr( $f_prefix ); ?>"
-                                       placeholder="€" class="small-text" style="width:48px;" title="Prefix">
+                                       placeholder="bijv. €" class="small-text" style="width:15%;" title="Prefix">
                                 <input type="text" name="svgml_filter_suffix[]"
                                        value="<?php echo esc_attr( $f_suffix ); ?>"
-                                       placeholder="m²" class="small-text" style="width:48px;" title="Suffix">
+                                       placeholder="bijv. m²" class="small-text" style="width:15%;" title="Suffix">
                                 <input type="text" name="svgml_filter_placeholder[]"
                                        value="<?php echo esc_attr( $f_placeholder ); ?>"
-                                       placeholder="Alles" class="small-text" style="width:72px;" title="Dropdown standaardtekst">
+                                       placeholder="Alles" class="small-text" style="width:50%;" title="Dropdown standaardtekst">
                             </td>
                             <td>
                                 <button type="button" class="button svgml-remove-filter">✕</button>

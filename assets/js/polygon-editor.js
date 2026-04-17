@@ -673,14 +673,14 @@ jQuery(document).ready(function($) {
 
     function promptForId() {
         while (true) {
-            var polyId = prompt('Geef een unieke ID voor dit vlak (bijv. "unit-1"):');
+            var polyId = prompt('Geef een ID voor dit vlak (bijv. "unit-1"):');
             if (!polyId || !polyId.trim()) {
                 return null;
             }
             polyId = polyId.trim();
 
-            if (findPolyByIdAcrossLayers(polyId)) {
-                alert('Deze ID bestaat al in een andere laag. Kies een andere ID.');
+            if (findPolyByIdAcrossLayers(polyId) && !$('#svgml-allow-multiview').is(':checked')) {
+                alert('Deze ID bestaat al. Kies een andere ID, of vink "Multi-View toestaan" aan om dubbele ID\'s te gebruiken.');
                 continue;
             }
 
@@ -1328,27 +1328,38 @@ jQuery(document).ready(function($) {
         deletePolygon(id);
     });
 
-    // Change ID
     $(document).on('change', '.svgml-poly-id-input', function() {
-        var $input     = $(this);
-        var originalId = $input.data('original-id');
-        var newId      = $.trim($input.val());
+        var index          = $(this).closest('tr').index();
+        var newVal         = $.trim($(this).val());
+        var originalId     = $(this).attr('data-original-id');
+        var allowMultiView = $('#svgml-allow-multiview').is(':checked');
 
-        if (!newId) { alert('ID cannot be empty.'); $input.val(originalId); return; }
+        if (!newVal || !polygons[index]) return;
 
-        var dup = findPolyByIdAcrossLayers(newId, originalId);
-if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.val(originalId); return; }
-
-        var poly = findPolyById(originalId);
-        if (poly) {
-            poly.id = newId;
-            if (poly.fabricObj) poly.fabricObj.svgmlId = newId;
+        // Duplicate check (skip if Multi-View allowed)
+        if (!allowMultiView) {
+            var isDuplicate = false;
+            for (var i = 0; i < polygons.length; i++) {
+                if (i !== index && polygons[i].id === newVal) {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+            if (isDuplicate) {
+                alert('Dit ID wordt al gebruikt. Vink "Multi-View toestaan" aan om dubbele ID\'s te gebruiken.');
+                $(this).val(originalId);
+                return;
+            }
         }
-        $input.data('original-id', newId);
-        $input.closest('tr').attr('data-poly-id', newId);
-        syncToHiddenField();
-        updateStatus('ID: "' + originalId + '" → "' + newId + '"');
-        updateDuplicateWarning();
+
+        polygons[index].id      = newVal;
+        polygons[index].svgmlId = newVal;
+        if (polygons[index].fabricObj) {
+            polygons[index].fabricObj.set({ id: newVal, svgmlId: newVal });
+        }
+        $(this).attr('data-original-id', newVal);
+        $(this).closest('tr').attr('data-poly-id', newVal);
+        syncLayersToHiddenField();
     });
 
     // ════════════════════════════════════════════════════════════════════
@@ -1400,6 +1411,15 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
             });
         }
 
+        var $warning       = $('#svgml-duplicate-warning');
+        var allowMultiView = $('#svgml-allow-multiview').is(':checked');
+
+        if (allowMultiView) {
+            $warning.html('Multi-View actief: gedeelde ID\'s toegestaan.');
+            $warning.show().css('color', '#0073aa');
+            return;
+        }
+
         var counts = {};
         $.each(layers, function(li, layer) {
             $.each(layer.polygons || [], function(i, p) {
@@ -1413,14 +1433,18 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
             if (count > 1) duplicates.push(id);
         });
 
-        var $warning = $('#svgml-duplicate-warning');
         if (duplicates.length > 0) {
-            $warning.html('Duplicate polygon IDs found across layers: <strong>' + escHtml(duplicates.join(', ')) + '</strong>. Polygon IDs must be unique across all layers.');
+            $warning.html('Dubbele ID\'s gevonden: <strong>' + escHtml(duplicates.join(', ')) + '</strong>. Vink "Multi-View toestaan" aan als dit opzettelijk is.').css('color', '');
             $warning.show();
         } else {
             $warning.hide();
         }
     }
+
+    // React immediately when the Multi-View checkbox changes
+    $(document).on('change', '#svgml-allow-multiview', function() {
+        updateDuplicateWarning();
+    });
 
     function clearAllPolygons() {
         $.each(polygons, function(i, p) { if (p.fabricObj) canvas.remove(p.fabricObj); });
@@ -1591,6 +1615,17 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
         
         // Update the hidden field (for form submission)
         $('#svgml_layers_json').val(jsonStr);
+
+        // Update the "X vlakken getekend" count across all layers
+        var $status = $('#svgml-polygon-ids-status');
+        if ($status.length) {
+            if (polyCount > 0) {
+                $status.find('.svgml-status-box strong').text('✓ ' + polyCount + ' vlakken getekend');
+                $status.show();
+            } else {
+                $status.hide();
+            }
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -1656,6 +1691,9 @@ if (dup) { alert('Deze ID bestaat al in een andere laag of polygon.'); $input.va
 
         // Initialise layers from PHP data
         initLayersFromAdmin();
+
+        // Sync warning state immediately based on saved checkbox value
+        updateDuplicateWarning();
 
         // ── Event handlers for the layer system ──────────────────────────
         // These are ALWAYS bound (even with 1 or 0 layers) so they

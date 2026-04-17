@@ -227,7 +227,7 @@ jQuery(document).ready(function($) {
      * @param {boolean} isHtml – If true, render the value as raw HTML (no escaping)
      * @returns {string}       – HTML string for this block
      */
-    function svgml_renderBlock(type, field, value, label, obj, width, isHtml, prefix, suffix) {
+    function svgml_renderBlock(type, _field, value, label, _obj, width, isHtml, prefix, suffix) {
         prefix = prefix || '';
         suffix = suffix || '';
         width = width || 100;
@@ -268,11 +268,6 @@ jQuery(document).ready(function($) {
         // Skip empty values (except divider and static types handled above)
         if (value === null || value === undefined || value === '') {
             return '';
-        }
-
-        // Default label = field name, but made readable
-        if (!label) {
-            label = svgml_humanizeFieldName(field);
         }
 
         // Build the style string for the width
@@ -324,7 +319,7 @@ jQuery(document).ready(function($) {
                 var priceRaw = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var priceVal = isHtml ? priceRaw : svgml.escapeHtml(priceRaw);
                 blockHtml = '<div class="svgml-block svgml-block-price"' + blockAttr + '>' +
-                    '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' +
+                    (label ? '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' : '') +
                     '<span class="svgml-price-value">' + priceVal + '</span>' +
                     '</div>';
                 break;
@@ -363,7 +358,7 @@ jQuery(document).ready(function($) {
                 var textRaw  = (prefix ? prefix + ' ' : '') + String(value) + (suffix ? ' ' + suffix : '');
                 var textVal  = isHtml ? textRaw : svgml_formatValue(textRaw);
                 blockHtml = '<div class="svgml-block svgml-block-text"' + blockAttr + '>' +
-                    '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' +
+                    (label ? '<span class="svgml-block-label">' + svgml.escapeHtml(label) + '</span>' : '') +
                     '<span class="svgml-block-value">' + textVal + '</span>' +
                     '</div>';
                 break;

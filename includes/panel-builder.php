@@ -282,15 +282,16 @@ function svgml_render_panel_builder_page( $map_id ) {
                 <table class="wp-list-table widefat fixed striped" id="svgml-blocks-table">
                     <thead>
                         <tr>
-                            <th style="width:28px">☰</th>                 
+                            <th style="width:3%">☰</th>
                             <?php if ( ! $is_manual ) : ?>
-                            <th style="width:22%">JSON Veld</th>
+                            <th style="width:15%">JSON Veld</th>
                             <?php endif; ?>
-                            <th style="width:18%">Type</th>
-                            <th style="width:14%">Breedte</th>
-                            <th style="width:20%">Label (optioneel)</th>
-                            <th style="width:60px" title="Waarde bevat HTML-opmaak">HTML</th>
-                            <th style="width:50px">✕</th>
+                            <th style="width:15%">Type</th>
+                            <th style="width:12%">Breedte</th>
+                            <th style="width:22%">Label (optioneel)</th>
+                            <th style="width:18%">Inhoud / URL</th>
+                            <th style="width:10%;text-align:center" title="Waarde bevat HTML-opmaak">HTML</th>
+                            <th style="width:5%">✕</th>
                         </tr>
                     </thead>
                     <tbody id="svgml-blocks-tbody">
