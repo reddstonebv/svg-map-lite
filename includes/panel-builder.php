@@ -148,6 +148,12 @@ function svgml_render_panel_builder_page( $map_id ) {
             }
             update_post_meta( $map_id, '_svgml_overview_blocks', $overview_blocks );
 
+            // Overview sorting
+            $overview_sort_field = sanitize_text_field( $_POST['svgml_overview_sort_field'] ?? '' );
+            $overview_sort_order = ( ( $_POST['svgml_overview_sort_order'] ?? 'asc' ) === 'desc' ) ? 'desc' : 'asc';
+            update_post_meta( $map_id, '_svgml_overview_sort_field', $overview_sort_field );
+            update_post_meta( $map_id, '_svgml_overview_sort_order', $overview_sort_order );
+
             delete_transient( 'svgml_json_cache_' . $map_id );
             delete_transient( 'svgml_html_'       . $map_id );
 
@@ -176,6 +182,9 @@ function svgml_render_panel_builder_page( $map_id ) {
 
     $overview_blocks   = get_post_meta( $map_id, '_svgml_overview_blocks', true );
     if ( ! is_array( $overview_blocks ) ) $overview_blocks = [];
+
+    $overview_sort_field = get_post_meta( $map_id, '_svgml_overview_sort_field', true );
+    $overview_sort_order = get_post_meta( $map_id, '_svgml_overview_sort_order', true ) ?: 'asc';
 
     $map_mode    = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
     $is_manual   = ( 'manual' === $map_mode );
@@ -491,6 +500,28 @@ function svgml_render_panel_builder_page( $map_id ) {
                             <p class="description">
                                 Bij inschakelen verschijnt bij het laden automatisch een lijst van alle objecten
                                 die in de Regio Koppeling zijn opgenomen. Klikken op een rij toont het detailpanel.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="svgml_overview_sort_field">Sorteren op</label></th>
+                        <td>
+                            <select id="svgml_overview_sort_field" name="svgml_overview_sort_field">
+                                <option value="" <?php selected( $overview_sort_field, '' ); ?>>— SVG Tekenvolgorde —</option>
+                                <?php foreach ( $overview_field_options as $sort_opt ) : ?>
+                                    <option value="<?php echo esc_attr( $sort_opt['value'] ); ?>" <?php selected( $overview_sort_field, $sort_opt['value'] ); ?>>
+                                        <?php echo esc_html( $sort_opt['label'] ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select name="svgml_overview_sort_order" style="margin-left:8px">
+                                <option value="asc"  <?php selected( $overview_sort_order, 'asc'  ); ?>>Oplopend (A→Z, 0→9)</option>
+                                <option value="desc" <?php selected( $overview_sort_order, 'desc' ); ?>>Aflopend (Z→A, 9→0)</option>
+                            </select>
+                            <p class="description">
+                                Kies op welk veld de objectenlijst gesorteerd wordt. Bij <em>SVG Tekenvolgorde</em> wordt
+                                de oorspronkelijke volgorde van de tekening (of van de JSON-feed) aangehouden.
+                                Zonder keuze wordt automatisch op een veld met de naam <code>name</code> gesorteerd als dat bestaat.
                             </p>
                         </td>
                     </tr>

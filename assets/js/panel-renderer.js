@@ -444,6 +444,35 @@ jQuery(document).ready(function($) {
         var hasOverviewBlocks = (overviewBlocks.length > 0);
         var html              = '<div class="svgml-overview-list">';
 
+        // Sort helper: returns a new key array ordered by the configured field.
+        // If no field is configured, auto-selects a "name" field (case-insensitive)
+        // when present on the items; otherwise preserves the original order.
+        function sortKeys(keys, getObj) {
+            var field = svgmlData.overviewSortField || '';
+            var order = (svgmlData.overviewSortOrder === 'desc') ? -1 : 1;
+
+            if (!field && keys.length > 0) {
+                var sample = getObj(keys[0]);
+                if (sample && typeof sample === 'object') {
+                    var nameKey = Object.keys(sample).find(function(k) {
+                        return k.toLowerCase() === 'name';
+                    });
+                    if (nameKey) field = nameKey;
+                }
+            }
+            if (!field) return keys;
+
+            return keys.slice().sort(function(a, b) {
+                var oa = getObj(a), ob = getObj(b);
+                var va = (oa && oa[field] != null) ? oa[field] : '';
+                var vb = (ob && ob[field] != null) ? ob[field] : '';
+                var na = parseFloat(String(va).replace(',', '.'));
+                var nb = parseFloat(String(vb).replace(',', '.'));
+                if (!isNaN(na) && !isNaN(nb)) return (na - nb) * order;
+                return String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' }) * order;
+            });
+        }
+
         if (svgmlData.mapMode === 'manual') {
             // ── Manual mode: iterate manualData keyed by svgId ───────────────
             var manualData = svgmlData.manualData || {};
@@ -451,7 +480,9 @@ jQuery(document).ready(function($) {
                 return '<p class="svgml-panel-empty">Geen objecten beschikbaar.</p>';
             }
 
-            $.each(manualData, function(svgId, obj) {
+            var manualKeys = sortKeys(Object.keys(manualData), function(id) { return manualData[id]; });
+            $.each(manualKeys, function(_, svgId) {
+                var obj = manualData[svgId];
                 if (!obj) return;
                 var rowHtml = '';
                 if (hasOverviewBlocks) {
@@ -499,7 +530,11 @@ jQuery(document).ready(function($) {
                 if (objId) jsonLookup[objId] = obj;
             });
 
-            $.each(mapping, function(svgId, jsonId) {
+            var svgIdsSorted = sortKeys(Object.keys(mapping), function(sid) {
+                return jsonLookup[String(mapping[sid])];
+            });
+            $.each(svgIdsSorted, function(_, svgId) {
+                var jsonId = mapping[svgId];
                 var obj = jsonLookup[String(jsonId)];
                 if (!obj) return;
 

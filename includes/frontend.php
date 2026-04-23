@@ -202,6 +202,8 @@ function svgml_render_shortcode( $atts ) {
         'filterFields'    => $filter_fields,
         'overviewEnabled' => $overview_enabled,
         'overviewBlocks'  => $overview_blocks,
+        'overviewSortField' => get_post_meta( $map_id, '_svgml_overview_sort_field', true ) ?: '',
+        'overviewSortOrder' => get_post_meta( $map_id, '_svgml_overview_sort_order', true ) ?: 'asc',
         'jsonArrayKey'    => $json_array_key,
         'manualData'      => $manual_data,
     ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT );
