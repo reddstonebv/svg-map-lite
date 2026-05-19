@@ -4,6 +4,36 @@
  * Aanpasbaar via custom CSS in het Stijlen-menu, of via de CSS-variabelen hieronder.
  */
 
+/* ── Scoped Reset: prevent theme CSS from breaking the plugin layout ── */
+.svgml-wrap *,
+.svgml-wrap *::before,
+.svgml-wrap *::after {
+    box-sizing: border-box;
+}
+
+.svgml-sidebar ul,
+.svgml-sidebar li,
+.svgml-sidebar p,
+.svgml-sidebar h1,
+.svgml-sidebar h2,
+.svgml-sidebar h3,
+.svgml-sidebar h4,
+.svgml-sidebar h5,
+.svgml-sidebar h6,
+.svgml-panel-block ul,
+.svgml-panel-block li,
+.svgml-panel-block p,
+.svgml-panel-block h1,
+.svgml-panel-block h2,
+.svgml-panel-block h3,
+.svgml-panel-block h4,
+.svgml-panel-block h5,
+.svgml-panel-block h6 {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
 
 /* ── BUITENSTE WRAPPER (wrap + filters) ─────────────────────────────────── */
 .svgml-wrap {

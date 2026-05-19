@@ -16,25 +16,35 @@
  *   svgmlData.jsonArrayKey   – Manual sub-array key (e.g. 'spaces'), empty = auto-detect
  */
 
-jQuery(document).ready(function($) {
+(function($) {
+    "use strict";
 
-    'use strict';
+    console.log('[SVGML] 📦 Script loaded and IIFE executing.');
+
+    jQuery(document).ready(function() {
+
+    console.log('[SVGML] ✅ DOM ready fired.');
 
     // ── CHECK: Is the data available? ────────────────────────────────────
     // If svgmlData does not exist, the shortcode probably is not on this page.
     if (typeof svgmlData === 'undefined') {
-        return; // Stop the script
+        console.warn('[SVGML] ⛔ svgmlData is undefined — shortcode not on this page. Script stopped.');
+        return;
     }
+
+    console.log('[SVGML] ✅ svgmlData found. mapMode:', svgmlData.mapMode, '| mapping keys:', Object.keys(svgmlData.mapping || {}).length);
 
     // Ensure excludedIds is always an array, even if the option is missing
     var excludedIds = svgmlData.excludedIds || [];
 
     // ── DOM REFERENCES ──────────────────────────────────────────────────────
-    var $container    = $('.svgml-container');    // The outer wrapper
-    var $svg          = $('.svgml-svg');           // The SVG element itself
-    var $panel        = $('.svgml-panel');         // The info panel (single instance)
-    var $panelContent = $('.svgml-panel-content');// The content of the panel
-    var $closeBtn     = $('.svgml-panel-close');  // The close button
+    var $container    = $('.svgml-container');
+    var $svg          = $('.svgml-svg');
+    var $panel        = $('.svgml-panel');
+    var $panelContent = $('.svgml-panel-content');
+    var $closeBtn     = $('.svgml-panel-close');
+
+    console.log('[SVGML] 🗺️ Map DOM — .svgml-svg found:', $svg.length, '| .svgml-panel found:', $panel.length, '| .svgml-wrap found:', $('.svgml-wrap').length);
 
     // Store the actively selected region so we can deselect it
     var $activeRegion = null;
@@ -65,42 +75,68 @@ jQuery(document).ready(function($) {
     // and is more efficient than setting a listener on each element separately.
     //
     // '[id]' is a CSS selector that selects all elements with an id attribute.
-    $svg.on('click', '[id]', function(e) {
+    // ── CLICK HANDLER (capture phase) ─────────────────────────────────────
+    // Gutenberg/theme scripts call stopPropagation() during bubbling, so jQuery
+    // document delegation never fires. Capture phase runs before any of that.
+    document.addEventListener('click', function(e) {
 
-        e.stopPropagation(); // Prevent the click event from bubbling to the SVG itself
+        // Log every click so we can confirm the capture listener is alive
+        console.log('[SVGML] 🖱️ Capture click fired. Target:', e.target.tagName, e.target.id || '(no id)', '| in .svgml-wrap:', !!e.target.closest('.svgml-wrap'));
 
-        var $clicked  = $(this);
-        var svgId     = $clicked.attr('id'); // The id attribute of the clicked element
+        if (e.target.closest('.svgml-panel-close')) {
+            console.log('[SVGML T] Close button hit.');
+            closePanel();
+            return;
+        }
 
-        // Check if this SVG id is excluded from interaction.
-        // indexOf() returns -1 if the value is not in the array.
+        var wrap = e.target.closest('.svgml-wrap');
+        if (!wrap) return;
+
+        console.log('[SVGML T] 1. Click inside .svgml-wrap. Target:', e.target);
+
+        var idNode = e.target.closest('[id]');
+        console.log('[SVGML T] 2. Closest [id] node:', idNode ? idNode.id : 'NONE');
+
+        if (!idNode || !idNode.closest('.svgml-svg')) {
+            console.log('[SVGML T] 3. No mapped id node or outside .svgml-svg — background click.');
+            if (e.target.closest('.svgml-svg')) closePanel();
+            return;
+        }
+
+        var svgId = idNode.getAttribute('id');
+        console.log('[SVGML T] 3. svgId:', svgId, '| mapMode:', svgmlData.mapMode);
+        console.log('[SVGML T] 4. excludedIds:', excludedIds, '| mapping keys:', Object.keys(svgmlData.mapping || {}));
+
         if (excludedIds.indexOf(svgId) !== -1) {
-            return; // Excluded – do not show panel, do nothing
+            console.log('[SVGML T] 4a. ABORT — svgId is in excludedIds.');
+            return;
         }
 
         var jsonObject = null;
 
         if (svgmlData.mapMode === 'manual') {
-            // ── Manual mode: look up data directly by SVG id ──────────────────
-            // No JSON feed or mapping table. The SVG id is the data key.
             var manualData = svgmlData.manualData || {};
+            console.log('[SVGML T] 5. Manual mode. manualData keys:', Object.keys(manualData));
             if (!manualData.hasOwnProperty(svgId)) {
-                // Region has no manual data entered yet – do nothing
+                console.log('[SVGML T] 5a. ABORT — svgId not in manualData.');
                 return;
             }
             jsonObject = manualData[svgId];
         } else {
-            // ── JSON mode: mapping table → JSON dataset lookup ────────────────
+            console.log('[SVGML T] 5. JSON mode. mapping has svgId?', svgmlData.mapping.hasOwnProperty(svgId));
             if (!svgmlData.mapping.hasOwnProperty(svgId)) {
-                // No mapping for this element – do nothing
+                console.log('[SVGML T] 5a. ABORT — svgId not in mapping. Closing panel.');
+                closePanel();
                 return;
             }
             var jsonObjectId = svgmlData.mapping[svgId];
+            console.log('[SVGML T] 6. jsonObjectId from mapping:', jsonObjectId);
             jsonObject = findJsonObject(jsonObjectId);
+            console.log('[SVGML T] 7. findJsonObject result:', jsonObject);
         }
 
         if (!jsonObject) {
-            // No data found for this region
+            console.log('[SVGML T] 8. ABORT — jsonObject is null. Showing not-found message.');
             $panelContent.html(
                 '<p class="svgml-panel-not-found">' +
                 'No data found for ID: <em>' + svgId + '</em>' +
@@ -110,36 +146,20 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        // Mark the active region visually
-        setActiveRegion($clicked);
-
-        // Build the panel content and show the panel (legacy renderer)
+        console.log('[SVGML T] 9. All checks passed. Calling setActiveRegion / renderPanel / openPanel.');
+        var $region = $(idNode);
+        setActiveRegion($region);
         renderPanel(jsonObject, svgId);
         openPanel();
 
-        // Emit a custom event so panel-renderer.js (and other scripts)
-        // can respond to the click without direct coupling.
         $(document).trigger('svgmlRegionClick', [{
-            jsonObject: jsonObject,  // The complete JSON object of the region
-            svgId:      svgId,       // The SVG id of the clicked region
-            $region:    $clicked     // The jQuery element of the region
+            jsonObject: jsonObject,
+            svgId:      svgId,
+            $region:    $region
         }]);
-    });
 
+    }, true); // capture: true — fires before any stopPropagation() call
 
-    // ── CLOSE PANEL ────────────────────────────────────────────────────────
-
-    // Click on the close button
-    $closeBtn.on('click', function() {
-        closePanel();
-    });
-
-    // Click outside the panel (on the SVG or the container) closes the panel
-    $svg.on('click', function() {
-        // This event reaches the SVG itself only if there was NO click on an [id] element
-        // (because stopPropagation() is called above)
-        closePanel();
-    });
 
     // Escape key closes the panel
     $(document).on('keydown', function(e) {
@@ -286,11 +306,12 @@ jQuery(document).ready(function($) {
      * Open the info panel with an animation.
      */
     function openPanel() {
+        console.log('[SVGML] 📋 openPanel called. $panel length:', $panel.length, '| currently visible:', $panel.is(':visible'));
         $panel
-            .removeAttr('aria-hidden') // Accessibility: panel is now visible
+            .removeAttr('aria-hidden')
             .addClass('svgml-panel-open')
-            .stop(true, true)          // Cancel running jQuery animations
-            .fadeIn(200);              // Fade in over 200ms
+            .stop(true, true)
+            .fadeIn(200);
     }
 
     /**
@@ -313,6 +334,7 @@ jQuery(document).ready(function($) {
     // ── SVG → SIDEBAR HOVER SYNC ────────────────────────────────────────────
     $svg.on('mouseenter', '[id]', function() {
         var svgId  = $(this).attr('id');
+        console.log('[SVGML] 🟡 Hover enter. svgId:', svgId, '| in mapping:', svgmlData.mapping.hasOwnProperty(svgId));
         if (excludedIds.indexOf(svgId) !== -1) return;
         var jsonId = svgmlData.mapMode === 'manual'
             ? svgId
@@ -329,7 +351,7 @@ jQuery(document).ready(function($) {
     // Allow users to switch between different images and their polygons.
 
     // Button switcher
-    $('.svgml-layer-btn').on('click', function() {
+    $(document).on('click', '.svgml-layer-btn', function() {
         var layerIndex = $(this).data('layer');
         switchLayer(layerIndex);
         $('.svgml-layer-btn').removeClass('svgml-layer-btn-active');
@@ -337,13 +359,13 @@ jQuery(document).ready(function($) {
     });
 
     // Dropdown switcher
-    $('.svgml-layer-select').on('change', function() {
+    $(document).on('change', '.svgml-layer-select', function() {
         var layerIndex = $(this).val();
         switchLayer(parseInt(layerIndex, 10));
     });
 
     // Custom switcher option
-    $('.svgml-layer-option').on('click', function() {
+    $(document).on('click', '.svgml-layer-option', function() {
         var layerIndex = $(this).data('layer');
         switchLayer(layerIndex);
         $('.svgml-layer-option').removeClass('svgml-layer-option-active');
@@ -370,4 +392,6 @@ jQuery(document).ready(function($) {
         }
     }
 
-}); // End jQuery(document).ready
+    }); // End jQuery(document).ready
+
+})(jQuery);

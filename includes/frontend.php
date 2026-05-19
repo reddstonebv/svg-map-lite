@@ -206,7 +206,12 @@ function svgml_render_shortcode( $atts ) {
         'manualData'      => $manual_data,
     ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT );
 
-    wp_add_inline_script( 'svgml-frontend-js', 'var svgmlData = ' . $js_data . ';' );
+    wp_add_inline_script( 'svgml-frontend-js', 'var svgmlData = ' . $js_data . ';', 'before' );
+
+    // Guaranteed fallback: output data inline so it works regardless of whether
+    // wp_add_inline_script fires (some themes/contexts never flush the script queue).
+    // This runs outside the transient cache so the data is always fresh.
+    echo '<script id="svgml-data-' . esc_attr( $map_id ) . '">var svgmlData = ' . $js_data . ';</script>';
 
     // ── HTML TRANSIENT CACHE ───────────────────────────────────────────────────
     $transient_key = 'svgml_html_' . $map_id;
@@ -485,7 +490,7 @@ function svgml_render_filters_shortcode( $atts ) {
 
             <div class="svgml-filter-item svgml-filter-reset-wrap">
                 <button type="button" class="svgml-filter-reset" id="svgml-filter-reset">
-                    ↺ Filters resetten
+                    Reset
                 </button>
             </div>
         </div>

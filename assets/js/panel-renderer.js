@@ -24,9 +24,10 @@
  *   svgmlData.mapping         – { 'svg-id': 'json-object-id', ... }
  */
 
-jQuery(document).ready(function($) {
+(function($) {
+    "use strict";
 
-    'use strict';
+    jQuery(document).ready(function() {
 
     // ── CHECK: Is the data available? ────────────────────────────────────────
     if (typeof svgmlData === 'undefined') {
@@ -686,4 +687,6 @@ jQuery(document).ready(function($) {
     }
 
 
-}); // End jQuery(document).ready
+    }); // End jQuery(document).ready
+
+})(jQuery);
