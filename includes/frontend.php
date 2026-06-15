@@ -93,6 +93,7 @@ function svgml_render_shortcode( $atts ) {
     $status_colors       = $get_meta( 'status_colors', [] );
     $overview_enabled    = (bool) $get_meta( 'overview_enabled', false );
     $overview_blocks     = $get_meta( 'overview_blocks', [] );
+    $overview_clickable  = get_post_meta( $map_id, '_svgml_overview_clickable', true ) !== '1';
     $json_array_key      = $get_meta( 'json_array_key', '' );
     $layers              = $get_meta( 'layers', [] );
     $layer_switcher      = $get_meta( 'layer_switcher', 'buttons' );
@@ -202,8 +203,9 @@ function svgml_render_shortcode( $atts ) {
         'filterFields'    => $filter_fields,
         'overviewEnabled' => $overview_enabled,
         'overviewBlocks'  => $overview_blocks,
-        'overviewSortField' => get_post_meta( $map_id, '_svgml_overview_sort_field', true ) ?: '',
-        'overviewSortOrder' => get_post_meta( $map_id, '_svgml_overview_sort_order', true ) ?: 'asc',
+        'overviewSortField'  => get_post_meta( $map_id, '_svgml_overview_sort_field', true ) ?: '',
+        'overviewSortOrder'  => get_post_meta( $map_id, '_svgml_overview_sort_order', true ) ?: 'asc',
+        'overviewClickable'  => $overview_clickable,
         'jsonArrayKey'    => $json_array_key,
         'manualData'      => $manual_data,
     ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT );

@@ -443,6 +443,8 @@
     function svgml_buildOverviewHtml() {
         var overviewBlocks    = svgmlData.overviewBlocks || [];
         var hasOverviewBlocks = (overviewBlocks.length > 0);
+        var isClickable       = (svgmlData.overviewClickable !== false);
+        var itemClass         = 'svgml-overview-item' + (isClickable ? '' : ' svgml-overview-item--no-click');
         var html              = '<div class="svgml-overview-list">';
 
         // Sort helper: returns a new key array ordered by the configured field.
@@ -508,7 +510,7 @@
                 }
 
                 // data-json-id = svgId in manual mode (no separate JSON ID)
-                html += '<div class="svgml-overview-item" ' +
+                html += '<div class="' + itemClass + '" ' +
                         'data-svg-id="' + svgml.escapeHtml(svgId) + '" ' +
                         'data-json-id="' + svgml.escapeHtml(svgId) + '">' +
                         rowHtml +
@@ -560,7 +562,7 @@
                     rowHtml = '<span class="svgml-overview-title">' + svgml.escapeHtml(firstVal || String(jsonId)) + '</span>';
                 }
 
-                html += '<div class="svgml-overview-item" ' +
+                html += '<div class="' + itemClass + '" ' +
                         'data-svg-id="' + svgml.escapeHtml(svgId) + '" ' +
                         'data-json-id="' + svgml.escapeHtml(String(jsonId)) + '">' +
                         rowHtml +
@@ -591,14 +593,17 @@
      * @param {boolean} isHtml - If true, the value is shown as raw HTML (no escaping)
      */
     function svgml_renderOverviewBlock(type, field, value, label, obj, isHtml) {
-        if (!label) label = svgml_humanizeFieldName(field);
-
         // Helper: escape unless HTML mode is active
         var safe = isHtml ? String(value) : svgml.escapeHtml(String(value));
 
+        // Only show a label prefix when the user explicitly filled it in
+        var labelHtml = (label && type !== 'badge' && type !== 'link')
+            ? '<span class="svgml-ov-label">' + svgml.escapeHtml(label) + '</span>'
+            : '';
+
         switch (type) {
             case 'heading':
-                return '<span class="svgml-ov-heading">' + safe + '</span>';
+                return '<span class="svgml-ov-heading">' + labelHtml + safe + '</span>';
 
             case 'badge':
                 var badgeVal   = svgml.escapeHtml(String(value)); // always escape badges (short text)
@@ -607,17 +612,17 @@
                 return '<span class="svgml-badge svgml-badge-' + bClass + ' svgml-ov-badge">' + badgeVal + '</span>';
 
             case 'price':
-                return '<span class="svgml-ov-price">' + safe + '</span>';
+                return '<span class="svgml-ov-price">' + labelHtml + safe + '</span>';
 
             case 'link':
                 if (/^https?:\/\//i.test(String(value))) {
                     return '<a href="' + svgml.escapeHtml(String(value)) + '" class="svgml-ov-link" target="_blank" rel="noopener" onclick="event.stopPropagation()">' +
-                           svgml.escapeHtml(label || 'Link') + ' ↗</a>';
+                           svgml.escapeHtml(label || svgml_humanizeFieldName(field) || 'Link') + ' ↗</a>';
                 }
                 return '';
 
             default: // text
-                return '<span class="svgml-ov-text">' + safe + '</span>';
+                return '<span class="svgml-ov-text">' + labelHtml + safe + '</span>';
         }
     }
 
@@ -647,6 +652,7 @@
     // When a visitor clicks on a row in the overview, we simulate a
     // click on the corresponding SVG region so the detail panel is shown.
     $(document).on('click', '.svgml-overview-item', function() {
+        if (svgmlData.overviewClickable === false) return;
         var svgId  = $(this).data('svg-id');
         var jsonId = $(this).data('json-id');
         var obj    = null;

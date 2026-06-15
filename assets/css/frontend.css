@@ -624,8 +624,9 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #999;
+    color: #666;
     display: block;
+    margin-bottom: 2px;
 }
 
 .svgml-block-value {
@@ -748,6 +749,15 @@
     border-bottom: none;
 }
 
+.svgml-overview-item--no-click {
+    cursor: default;
+}
+
+.svgml-overview-item--no-click:hover,
+.svgml-overview-item--no-click.svgml-item-hover {
+    background: transparent;
+}
+
 .svgml-overview-item:hover,
 .svgml-overview-item.svgml-item-hover {
     background: #fdf5f5;
@@ -759,6 +769,14 @@
     font-size: 13px;
     color: #1a1a1a;
     flex: 1 1 100%;
+}
+
+/* Label prefix shown before the value in an overview row */
+.svgml-ov-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin-right: 4px;
 }
 
 /* Badge in de rij (kleiner dan het detail-panel) — chained selector beats .svgml-badge alone */

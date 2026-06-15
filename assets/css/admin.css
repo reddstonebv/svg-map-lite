@@ -1684,7 +1684,7 @@ tr.svgml-row-excluded .svgml-exclude-label {
 /* Card actions */
 .svgml-map-card-actions {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 12px 18px;
     border-top: 1px solid var(--svgml-border);
@@ -1694,8 +1694,17 @@ tr.svgml-row-excluded .svgml-exclude-label {
 .svgml-map-card-actions .button {
     display: inline-flex !important;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     font-size: 12px !important;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.svgml-map-card-actions .button-link-delete {
+    flex-basis: calc(50% - 4px);
 }
 
 .svgml-map-card-actions .button .dashicons {
@@ -1703,6 +1712,7 @@ tr.svgml-row-excluded .svgml-exclude-label {
     width: 14px;
     height: 14px;
     line-height: 14px;
+    flex-shrink: 0;
 }
 
 .wp-core-ui .button-group.button-small .button, 
@@ -2009,3 +2019,47 @@ tr.svgml-row-excluded .svgml-exclude-label {
 .svgml-admin-wrap .cm-builtin       { color: #e6c07b !important; }
 .svgml-admin-wrap .cm-error         { color: #ffffff !important; background-color: #e06c75 !important; }
 .svgml-allow-select { user-select: text !important; -webkit-user-select: text !important; cursor: text !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MANUAL DATA INTERFACE — Region sidebar exclude button
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.svgml-item-excluded {
+    opacity: 0.45;
+}
+
+.svgml-item-excluded .svgml-polygon-item-name {
+    text-decoration: line-through;
+}
+
+.svgml-exclude-toggle-btn {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    line-height: 1.6;
+    border-radius: 20px;
+    border: 1px solid #ddd;
+    background: #f9f9f9;
+    color: #888;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.svgml-exclude-toggle-btn:hover {
+    background: #fff0f0;
+    border-color: #e07070;
+    color: #c00;
+}
+
+.svgml-exclude-toggle-btn.is-excluded {
+    background: #fff3e0;
+    border-color: #f0a500;
+    color: #c07800;
+}
+
+.svgml-exclude-toggle-btn.is-excluded:hover {
+    background: #e8f5e9;
+    border-color: #4caf50;
+    color: #2e7d32;
+}

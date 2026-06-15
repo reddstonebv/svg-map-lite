@@ -404,3 +404,68 @@ function svgml_ajax_delete_map() {
         'message' => 'Kaart verwijderd',
     ] );
 }
+
+/**
+ * AJAX: DUPLICATE MAP
+ * Copies all settings/panel config from one map to a new map,
+ * but clears image/region-specific data so the user can attach a new image.
+ */
+add_action( 'wp_ajax_svgml_duplicate_map', 'svgml_ajax_duplicate_map' );
+
+function svgml_ajax_duplicate_map() {
+
+    check_ajax_referer( 'svgml_admin_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( 'Geen rechten.' );
+        return;
+    }
+
+    $source_id = intval( $_POST['map_id'] ?? 0 );
+    if ( ! $source_id ) {
+        wp_send_json_error( 'Geen kaart ID opgegeven.' );
+        return;
+    }
+
+    $source = get_post( $source_id );
+    if ( ! $source || $source->post_type !== 'svgml_map' ) {
+        wp_send_json_error( 'Kaart niet gevonden.' );
+        return;
+    }
+
+    $new_id = wp_insert_post( [
+        'post_type'   => 'svgml_map',
+        'post_status' => 'publish',
+        'post_title'  => 'Kopie van ' . $source->post_title,
+    ] );
+
+    if ( ! $new_id || is_wp_error( $new_id ) ) {
+        wp_send_json_error( 'Kon de kaart niet aanmaken.' );
+        return;
+    }
+
+    // Fields that are image- or region-specific and must NOT be copied.
+    $clear_keys = [
+        '_svgml_svg_attachment_id',
+        '_svgml_image_attachment_id',
+        '_svgml_layers',
+        '_svgml_polygons',
+        '_svgml_svg_ids',
+        '_svgml_id_mapping',
+        '_svgml_excluded_ids',
+        '_svgml_manual_data',
+    ];
+
+    $all_meta = get_post_meta( $source_id );
+    foreach ( $all_meta as $key => $values ) {
+        if ( strpos( $key, '_svgml_' ) !== 0 ) {
+            continue;
+        }
+        $value = in_array( $key, $clear_keys, true ) ? '' : maybe_unserialize( $values[0] );
+        update_post_meta( $new_id, $key, $value );
+    }
+
+    wp_send_json_success( [
+        'redirect' => admin_url( 'admin.php?page=svgml-settings&map_id=' . $new_id ),
+    ] );
+}

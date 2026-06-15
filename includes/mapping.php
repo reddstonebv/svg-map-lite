@@ -84,7 +84,12 @@ function svgml_render_json_mapping_interface( $map_id ) {
         foreach ( $layers as $li => $layer ) {
             foreach ( ($layer['polygons'] ?? []) as $poly ) {
                 $pid = $poly['id'] ?? '';
-                if ( $pid ) $id_to_layer[ $pid ] = $layer['name'] ?? ('Laag ' . ($li + 1));
+                if ( $pid ) {
+                    $id_to_layer[ $pid ] = $layer['name'] ?? ('Laag ' . ($li + 1));
+                    if ( ! in_array( $pid, $svg_ids, true ) ) {
+                        $svg_ids[] = $pid;
+                    }
+                }
             }
         }
     }
@@ -319,10 +324,28 @@ function svgml_render_manual_data_interface( $map_id ) {
         }
     }
 
+    // Handle exclude toggle (submitted via AJAX button in the sidebar)
+    if ( isset( $_POST['svgml_exclude_toggle_nonce'] ) ) {
+        if ( wp_verify_nonce( $_POST['svgml_exclude_toggle_nonce'], 'svgml_exclude_toggle' ) ) {
+            $toggle_id   = sanitize_text_field( $_POST['svgml_toggle_id'] ?? '' );
+            $excl        = get_post_meta( $map_id, '_svgml_excluded_ids', true ) ?: [];
+            if ( ! is_array( $excl ) ) $excl = [];
+            if ( in_array( $toggle_id, $excl, true ) ) {
+                $excl = array_values( array_diff( $excl, [ $toggle_id ] ) );
+            } else {
+                $excl[] = $toggle_id;
+            }
+            update_post_meta( $map_id, '_svgml_excluded_ids', $excl );
+            delete_transient( 'svgml_html_' . $map_id );
+        }
+    }
+
     // Get map data
-    $layers = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
+    $layers      = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
     $source_type = get_post_meta( $map_id, '_svgml_source_type', true ) ?: 'svg';
     $manual_data = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
+    $excluded_ids = get_post_meta( $map_id, '_svgml_excluded_ids', true ) ?: [];
+    if ( ! is_array( $excluded_ids ) ) $excluded_ids = [];
 
     // Build list of all polygons
     $all_polygons = [];
@@ -332,11 +355,22 @@ function svgml_render_manual_data_interface( $map_id ) {
                 $pid = $poly['id'] ?? '';
                 if ( $pid ) {
                     $all_polygons[] = [
-                        'id' => $pid,
-                        'name' => $poly['name'] ?? $pid,
+                        'id'    => $pid,
+                        'name'  => $poly['name'] ?? $pid,
                         'layer' => $layer['name'] ?? ( 'Laag ' . ( $layer_idx + 1 ) ),
                     ];
                 }
+            }
+        }
+    } else {
+        $svg_ids = get_post_meta( $map_id, '_svgml_svg_ids', true ) ?: [];
+        foreach ( $svg_ids as $pid ) {
+            if ( $pid ) {
+                $all_polygons[] = [
+                    'id'    => $pid,
+                    'name'  => $pid,
+                    'layer' => '',
+                ];
             }
         }
     }
@@ -365,22 +399,33 @@ function svgml_render_manual_data_interface( $map_id ) {
             <div class="svgml-manual-sidebar">
                 <h3 style="margin-top:0; color:var(--svgml-red, #2a9d8f);">Regio&#39;s</h3>
                 <div class="svgml-polygon-list">
-                    <?php foreach ( $all_polygons as $idx => $poly ) : 
-                        $is_selected = ( $idx === 0 ); // First one selected by default
-                        $has_data = isset( $manual_data[ $poly['id'] ] );
+                    <?php foreach ( $all_polygons as $idx => $poly ) :
+                        $is_excluded = in_array( $poly['id'], $excluded_ids, true );
+                        $is_selected = ( $idx === 0 && ! $is_excluded );
+                        $has_data    = isset( $manual_data[ $poly['id'] ] );
                     ?>
-                        <div class="svgml-polygon-item <?php echo $is_selected ? 'active' : ''; ?> <?php echo $has_data ? 'has-data' : ''; ?>"
+                        <div class="svgml-polygon-item <?php echo $is_selected ? 'active' : ''; ?> <?php echo $has_data ? 'has-data' : ''; ?> <?php echo $is_excluded ? 'svgml-item-excluded' : ''; ?>"
                              data-polygon-id="<?php echo esc_attr( $poly['id'] ); ?>"
                              data-polygon-index="<?php echo $idx; ?>">
                             <div class="svgml-polygon-item-name">
                                 <?php echo esc_html( $poly['name'] ); ?>
-                                <?php if ( $has_data ) : ?>
+                                <?php if ( $has_data && ! $is_excluded ) : ?>
                                     <span class="svgml-data-indicator" title="Gegevens ingevuld">&#10003;</span>
                                 <?php endif; ?>
                             </div>
+                            <?php if ( $poly['layer'] ) : ?>
                             <div class="svgml-polygon-item-layer">
                                 <?php echo esc_html( $poly['layer'] ); ?>
                             </div>
+                            <?php endif; ?>
+                            <form method="post" style="margin:0">
+                                <?php wp_nonce_field( 'svgml_exclude_toggle', 'svgml_exclude_toggle_nonce' ); ?>
+                                <input type="hidden" name="svgml_toggle_id" value="<?php echo esc_attr( $poly['id'] ); ?>">
+                                <button type="submit" class="svgml-exclude-toggle-btn <?php echo $is_excluded ? 'is-excluded' : ''; ?>"
+                                        title="<?php echo $is_excluded ? 'Herstellen' : 'Uitsluiten'; ?>">
+                                    <?php echo $is_excluded ? '⊘ Uitgesloten' : '✕ Uitsluiten'; ?>
+                                </button>
+                            </form>
                         </div>
                     <?php endforeach; ?>
                 </div>

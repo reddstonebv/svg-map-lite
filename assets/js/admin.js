@@ -207,9 +207,11 @@ jQuery(document).ready(function($) {
      * @returns {string} URL to the mapping page
      */
     function svgmlMappingUrl() {
-        // Get the base path of admin-ajax.php and replace 'admin-ajax.php'
-        // with 'admin.php?page=svgml-mapping'
-        return svgmlAdmin.ajaxUrl.replace('admin-ajax.php', 'admin.php?page=svgml-mapping');
+        var base = svgmlAdmin.ajaxUrl.replace('admin-ajax.php', 'admin.php?page=svgml-mapping');
+        if (svgmlAdmin.mapId) {
+            base += '&map_id=' + svgmlAdmin.mapId;
+        }
+        return base;
     }
 
 
@@ -353,5 +355,36 @@ jQuery(document).ready(function($) {
                 .removeClass('svgml-confirm-ok');
         }
     }
+
+    // ── DUPLICATE MAP ────────────────────────────────────────────────────────
+    $(document).on('click', '.svgml-duplicate-map', function() {
+        var $btn   = $(this);
+        var mapId  = $btn.data('map-id');
+        var nonce  = $btn.data('nonce');
+
+        $btn.prop('disabled', true).text('Bezig…');
+
+        $.ajax({
+            url:  svgmlAdmin.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'svgml_duplicate_map',
+                nonce:  nonce,
+                map_id: mapId,
+            },
+            success: function(response) {
+                if (response.success && response.data.redirect) {
+                    window.location.href = response.data.redirect;
+                } else {
+                    alert('Fout: ' + (response.data || 'Onbekende fout'));
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-admin-page"></span> Dupliceer');
+                }
+            },
+            error: function() {
+                alert('AJAX-fout bij dupliceren.');
+                $btn.prop('disabled', false).html('<span class="dashicons dashicons-admin-page"></span> Dupliceer');
+            }
+        });
+    });
 
 }); // End jQuery(document).ready

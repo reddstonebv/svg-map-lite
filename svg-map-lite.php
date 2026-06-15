@@ -352,6 +352,12 @@ function svgml_render_overview_page() {
                             <a href="<?php echo esc_url( $edit_url ); ?>" class="button button-primary button-small">
                                 <span class="dashicons dashicons-edit"></span> Bewerken
                             </a>
+                            <button type="button"
+                                    class="button button-secondary button-small svgml-duplicate-map"
+                                    data-map-id="<?php echo $map_id; ?>"
+                                    data-nonce="<?php echo wp_create_nonce( 'svgml_admin_nonce' ); ?>">
+                                <span class="dashicons dashicons-admin-page"></span> Dupliceer
+                            </button>
                             <a href="<?php echo esc_url( $export_url ); ?>" class="button button-secondary button-small">
                                 <span class="dashicons dashicons-download"></span> Exporteer
                             </a>
@@ -577,7 +583,7 @@ function svgml_admin_enqueue( $hook ) {
     // Teal background for our admin pages
     wp_add_inline_style( 'svgml-admin-css', 'body.wp-admin { background: #edf5f4 !important; }' );
 
-    // Overview page: wire up import file input auto-submit, then bail
+    // Overview page: wire up import file input auto-submit, load admin.js for duplicate button, then bail
     if ( 'svgml-overview' === $current_page ) {
         wp_add_inline_script( 'jquery', '
             document.addEventListener("DOMContentLoaded", function() {
@@ -589,6 +595,19 @@ function svgml_admin_enqueue( $hook ) {
                 }
             });
         ' );
+        wp_enqueue_script(
+            'svgml-admin-js',
+            SVGML_URL . 'assets/js/admin.js',
+            [ 'jquery' ],
+            SVGML_VERSION,
+            true
+        );
+        wp_localize_script( 'svgml-admin-js', 'svgmlAdmin', [
+            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'svgml_admin_nonce' ),
+            'mapId'   => 0,
+            'strings' => [],
+        ] );
         return;
     }
 

@@ -154,6 +154,9 @@ function svgml_render_panel_builder_page( $map_id ) {
             update_post_meta( $map_id, '_svgml_overview_sort_field', $overview_sort_field );
             update_post_meta( $map_id, '_svgml_overview_sort_order', $overview_sort_order );
 
+            // Non-clickable overview list (store '1' = non-clickable, '0' = clickable)
+            update_post_meta( $map_id, '_svgml_overview_clickable', isset( $_POST['svgml_overview_clickable'] ) ? '1' : '0' );
+
             delete_transient( 'svgml_json_cache_' . $map_id );
             delete_transient( 'svgml_html_'       . $map_id );
 
@@ -185,6 +188,9 @@ function svgml_render_panel_builder_page( $map_id ) {
 
     $overview_sort_field = get_post_meta( $map_id, '_svgml_overview_sort_field', true );
     $overview_sort_order = get_post_meta( $map_id, '_svgml_overview_sort_order', true ) ?: 'asc';
+
+    // '1' = non-clickable, '0' or '' (not yet set) = clickable (default)
+    $overview_clickable = get_post_meta( $map_id, '_svgml_overview_clickable', true ) !== '1';
 
     $map_mode    = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
     $is_manual   = ( 'manual' === $map_mode );
@@ -449,35 +455,6 @@ function svgml_render_panel_builder_page( $map_id ) {
                 </div><!-- .svgml-blocks-with-preview -->
             </div>
 
-            <!-- ─── STATUS KLEUREN NOTITIE ──────────────────────────────── -->
-            <!-- Status-instellingen staan in het Weergave-tabblad               -->
-            <div class="svgml-section" style="border-left: 4px solid #f0a500;">
-                <h2>Statuskleuren</h2>
-                <div style="padding: 16px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                    <span style="font-size:13px; color:#555;">
-                        De statuskleuren (Beschikbaar / Onder Optie / Verkocht) worden ingesteld in het
-                        <strong>Weergave</strong>-tabblad. De badge in het info-panel pikt de kleuren
-                        automatisch op vanuit die instellingen.
-                    </span>
-                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=svgml-display&map_id=' . $map_id ) ); ?>"
-                       class="button button-secondary" style="flex-shrink:0;">
-                        → Naar Weergave &amp; Statuskleuren
-                    </a>
-                </div>
-                <?php if ( ! empty( $status_colors ) ) : ?>
-                <div style="padding: 0 24px 16px; display:flex; gap:10px; flex-wrap:wrap;">
-                    <?php foreach ( $status_colors as $sv => $sc ) :
-                        $sh = $status_hex_colors[ $sv ] ?? '#888888';
-                    ?>
-                    <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; background:#f9f9f9; padding:5px 10px; border-radius:50px; border:1px solid #eee;">
-                        <span style="width:10px;height:10px;border-radius:50%;background:<?php echo esc_attr( $sh ); ?>;display:inline-block;flex-shrink:0;"></span>
-                        <?php echo esc_html( $sv ); ?>
-                    </span>
-                    <?php endforeach; ?>
-                </div>
-                <?php endif; ?>
-            </div>
-
             <!-- ─── OVERZICHT PANEL ──────────────────────────────────────── -->
             <div class="svgml-section">
                 <h2>Overzicht – Lijst bij laden</h2>
@@ -522,6 +499,20 @@ function svgml_render_panel_builder_page( $map_id ) {
                                 Kies op welk veld de objectenlijst gesorteerd wordt. Bij <em>SVG Tekenvolgorde</em> wordt
                                 de oorspronkelijke volgorde van de tekening (of van de JSON-feed) aangehouden.
                                 Zonder keuze wordt automatisch op een veld met de naam <code>name</code> gesorteerd als dat bestaat.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="svgml_overview_clickable">Klikgedrag</label></th>
+                        <td>
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="svgml_overview_clickable"
+                                       name="svgml_overview_clickable" value="1"
+                                       <?php checked( ! $overview_clickable ); ?>>
+                                <span>Toon overzicht zonder klikfunctie (lijst is puur informatief)</span>
+                            </label>
+                            <p class="description">
+                                Aangevinkt: klikken op een rij opent <em>geen</em> detailpanel. De muishover-highlight op de kaart blijft wel actief.
                             </p>
                         </td>
                     </tr>
@@ -630,6 +621,35 @@ function svgml_render_panel_builder_page( $map_id ) {
                 </div>
 
                 </div><!-- .svgml-blocks-with-preview -->
+            </div>
+
+            <!-- ─── STATUS KLEUREN NOTITIE ──────────────────────────────── -->
+            <!-- Status-instellingen staan in het Weergave-tabblad               -->
+            <div class="svgml-section" style="border-left: 4px solid #f0a500;">
+                <h2>Statuskleuren</h2>
+                <div style="padding: 16px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <span style="font-size:13px; color:#555;">
+                        De statuskleuren (Beschikbaar / Onder Optie / Verkocht) worden ingesteld in het
+                        <strong>Weergave</strong>-tabblad. De badge in het info-panel pikt de kleuren
+                        automatisch op vanuit die instellingen.
+                    </span>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=svgml-display&map_id=' . $map_id ) ); ?>"
+                       class="button button-secondary" style="flex-shrink:0;">
+                        → Naar Weergave &amp; Statuskleuren
+                    </a>
+                </div>
+                <?php if ( ! empty( $status_colors ) ) : ?>
+                <div style="padding: 0 24px 16px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <?php foreach ( $status_colors as $sv => $sc ) :
+                        $sh = $status_hex_colors[ $sv ] ?? '#888888';
+                    ?>
+                    <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; background:#f9f9f9; padding:5px 10px; border-radius:50px; border:1px solid #eee;">
+                        <span style="width:10px;height:10px;border-radius:50%;background:<?php echo esc_attr( $sh ); ?>;display:inline-block;flex-shrink:0;"></span>
+                        <?php echo esc_html( $sv ); ?>
+                    </span>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- ─── GEAVANCEERD: LEGACY VELDEN ───────────────────────────── -->

@@ -83,6 +83,11 @@
         // Log every click so we can confirm the capture listener is alive
         console.log('[SVGML] 🖱️ Capture click fired. Target:', e.target.tagName, e.target.id || '(no id)', '| in .svgml-wrap:', !!e.target.closest('.svgml-wrap'));
 
+        // When overview is in non-clickable display mode, block all region interaction
+        if (svgmlData.overviewClickable === false && !e.target.closest('.svgml-panel-close')) {
+            return;
+        }
+
         if (e.target.closest('.svgml-panel-close')) {
             console.log('[SVGML T] Close button hit.');
             closePanel();
