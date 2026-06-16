@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-define( 'SVGML_VERSION', '2.0.0' );
+define( 'SVGML_VERSION', '2.0.1' );
 define( 'SVGML_PATH',    plugin_dir_path( __FILE__ ) );
 define( 'SVGML_URL',     plugin_dir_url( __FILE__ ) );
 
