@@ -691,6 +691,7 @@ function svgml_admin_enqueue( $hook ) {
             'noIds'       => 'Geen ID\'s gevonden in deze SVG.',
             'notInJson'   => '✗ Niet gevonden in JSON',
             'noNameField' => '(geen name-veld)',
+            'importError' => 'Ongeldig JSON-bestand.',
         ],
     ];
 

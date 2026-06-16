@@ -694,6 +694,17 @@ function svgml_render_panel_builder_page( $map_id ) {
             <?php submit_button( 'Panel Builder opslaan' ); ?>
         </form>
 
+        <div class="svgml-panel-io-buttons" style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+            <button type="button" id="svgml-export-panel" class="button">
+                ⬇ Exporteer panelinstellingen
+            </button>
+            <button type="button" id="svgml-import-panel" class="button">
+                ⬆ Importeer panelinstellingen
+            </button>
+            <input type="file" id="svgml-import-file" accept=".json" style="display:none;">
+            <span id="svgml-panel-io-msg" style="font-size:13px;color:#2e7d32;display:none;"></span>
+        </div>
+
         <!-- ── Verborgen rij-template voor JavaScript ─────────────────────── -->
         <template id="svgml-block-row-template">
             <tr class="svgml-block-row">

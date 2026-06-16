@@ -87,4 +87,66 @@ jQuery( document ).ready( function ( $ ) {
         if ( $row ) svgml_toggleStaticField( $row );
     } );
 
+    // ── Export panel settings ─────────────────────────────────────────────────
+    $( '#svgml-export-panel' ).on( 'click', function () {
+        var $btn = $( this );
+        $btn.prop( 'disabled', true );
+        $.post( svgmlAdmin.ajaxUrl, {
+            action : 'svgml_export_panel_settings',
+            nonce  : svgmlAdmin.nonce,
+            map_id : svgmlAdmin.mapId
+        }, function ( res ) {
+            $btn.prop( 'disabled', false );
+            if ( ! res.success ) {
+                alert( res.data || 'Export mislukt.' );
+                return;
+            }
+            var blob = new Blob( [ JSON.stringify( res.data.settings, null, 2 ) ], { type: 'application/json' } );
+            var a    = document.createElement( 'a' );
+            a.href   = URL.createObjectURL( blob );
+            a.download = 'panel-settings-map-' + svgmlAdmin.mapId + '.json';
+            document.body.appendChild( a );
+            a.click();
+            document.body.removeChild( a );
+            URL.revokeObjectURL( a.href );
+        } );
+    } );
+
+    // ── Import panel settings ─────────────────────────────────────────────────
+    $( '#svgml-import-panel' ).on( 'click', function () {
+        $( '#svgml-import-file' ).val( '' ).trigger( 'click' );
+    } );
+
+    $( '#svgml-import-file' ).on( 'change', function () {
+        var file = this.files[0];
+        if ( ! file ) return;
+
+        var reader = new FileReader();
+        reader.onload = function ( e ) {
+            var settings;
+            try {
+                settings = JSON.parse( e.target.result );
+            } catch ( err ) {
+                alert( ( svgmlAdmin.strings && svgmlAdmin.strings.importError ) || 'Ongeldig JSON-bestand.' );
+                return;
+            }
+
+            var $importBtn = $( '#svgml-import-panel' ).prop( 'disabled', true );
+            $.post( svgmlAdmin.ajaxUrl, {
+                action   : 'svgml_import_panel_settings',
+                nonce    : svgmlAdmin.nonce,
+                map_id   : svgmlAdmin.mapId,
+                settings : JSON.stringify( settings )
+            }, function ( res ) {
+                $importBtn.prop( 'disabled', false );
+                if ( res.success ) {
+                    window.location.reload();
+                } else {
+                    alert( res.data || 'Import mislukt.' );
+                }
+            } );
+        };
+        reader.readAsText( file );
+    } );
+
 } );

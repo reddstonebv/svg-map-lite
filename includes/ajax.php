@@ -406,6 +406,112 @@ function svgml_ajax_delete_map() {
 }
 
 /**
+ * AJAX: EXPORT PANEL SETTINGS
+ * Returns the panel builder meta fields for a given map as JSON.
+ */
+add_action( 'wp_ajax_svgml_export_panel_settings', 'svgml_ajax_export_panel_settings' );
+
+function svgml_ajax_export_panel_settings() {
+    check_ajax_referer( 'svgml_admin_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( 'Geen rechten.' );
+        return;
+    }
+
+    $map_id = intval( $_POST['map_id'] ?? 0 );
+    if ( ! $map_id ) {
+        wp_send_json_error( 'Geen kaart ID opgegeven.' );
+        return;
+    }
+
+    $settings = [
+        'panel_blocks'          => get_post_meta( $map_id, '_svgml_panel_blocks', true ) ?: [],
+        'panel_title'           => get_post_meta( $map_id, '_svgml_panel_title', true ) ?: '',
+        'overview_enabled'      => get_post_meta( $map_id, '_svgml_overview_enabled', true ) ?: '',
+        'overview_blocks'       => get_post_meta( $map_id, '_svgml_overview_blocks', true ) ?: [],
+        'overview_sort_field'   => get_post_meta( $map_id, '_svgml_overview_sort_field', true ) ?: '',
+        'overview_sort_order'   => get_post_meta( $map_id, '_svgml_overview_sort_order', true ) ?: 'asc',
+        'overview_clickable'    => get_post_meta( $map_id, '_svgml_overview_clickable', true ) ?: '',
+    ];
+
+    wp_send_json_success( [ 'settings' => $settings ] );
+}
+
+/**
+ * AJAX: IMPORT PANEL SETTINGS
+ * Applies exported panel settings JSON to a given map.
+ */
+add_action( 'wp_ajax_svgml_import_panel_settings', 'svgml_ajax_import_panel_settings' );
+
+function svgml_ajax_import_panel_settings() {
+    check_ajax_referer( 'svgml_admin_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( 'Geen rechten.' );
+        return;
+    }
+
+    $map_id = intval( $_POST['map_id'] ?? 0 );
+    if ( ! $map_id ) {
+        wp_send_json_error( 'Geen kaart ID opgegeven.' );
+        return;
+    }
+
+    $raw = stripslashes( $_POST['settings'] ?? '' );
+    $settings = json_decode( $raw, true );
+
+    if ( ! is_array( $settings ) || ! isset( $settings['panel_blocks'] ) ) {
+        wp_send_json_error( 'Ongeldig instellingenbestand.' );
+        return;
+    }
+
+    $valid_types  = [ 'thumbnail', 'heading', 'badge', 'price', 'text', 'html', 'link', 'divider', 'static_html', 'static_button' ];
+    $valid_widths = [ 25, 33, 50, 75, 100 ];
+
+    $blocks = [];
+    foreach ( (array) $settings['panel_blocks'] as $b ) {
+        if ( ! is_array( $b ) ) continue;
+        $type  = sanitize_text_field( $b['type'] ?? 'text' );
+        $width = intval( $b['width'] ?? 100 );
+        if ( ! in_array( $type, $valid_types, true ) ) continue;
+        if ( ! in_array( $width, $valid_widths, true ) ) $width = 100;
+        $blocks[] = [
+            'field'        => sanitize_text_field( $b['field'] ?? '' ),
+            'type'         => $type,
+            'label'        => sanitize_text_field( $b['label'] ?? '' ),
+            'width'        => $width,
+            'html'         => ! empty( $b['html'] ),
+            'static_value' => wp_kses_post( $b['static_value'] ?? '' ),
+            'prefix'       => sanitize_text_field( $b['prefix'] ?? '' ),
+            'suffix'       => sanitize_text_field( $b['suffix'] ?? '' ),
+            'label_layout' => in_array( $b['label_layout'] ?? '', [ 'block', 'inline' ] ) ? $b['label_layout'] : 'block',
+        ];
+    }
+
+    $overview_blocks = [];
+    foreach ( (array) ( $settings['overview_blocks'] ?? [] ) as $ob ) {
+        if ( ! is_array( $ob ) ) continue;
+        $type = sanitize_text_field( $ob['type'] ?? 'text' );
+        if ( ! in_array( $type, [ 'heading', 'badge', 'price', 'text', 'link' ], true ) ) continue;
+        $overview_blocks[] = [
+            'field' => sanitize_text_field( $ob['field'] ?? '' ),
+            'type'  => $type,
+            'label' => sanitize_text_field( $ob['label'] ?? '' ),
+            'html'  => ! empty( $ob['html'] ),
+        ];
+    }
+
+    update_post_meta( $map_id, '_svgml_panel_blocks',        $blocks );
+    update_post_meta( $map_id, '_svgml_panel_title',         sanitize_text_field( $settings['panel_title'] ?? '' ) );
+    update_post_meta( $map_id, '_svgml_overview_enabled',    ! empty( $settings['overview_enabled'] ) ? '1' : '' );
+    update_post_meta( $map_id, '_svgml_overview_blocks',     $overview_blocks );
+    update_post_meta( $map_id, '_svgml_overview_sort_field', sanitize_text_field( $settings['overview_sort_field'] ?? '' ) );
+    update_post_meta( $map_id, '_svgml_overview_sort_order', in_array( $settings['overview_sort_order'] ?? '', [ 'asc', 'desc' ] ) ? $settings['overview_sort_order'] : 'asc' );
+    update_post_meta( $map_id, '_svgml_overview_clickable',  ! empty( $settings['overview_clickable'] ) ? '1' : '' );
+
+    wp_send_json_success();
+}
+
+/**
  * AJAX: DUPLICATE MAP
  * Copies all settings/panel config from one map to a new map,
  * but clears image/region-specific data so the user can attach a new image.
