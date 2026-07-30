@@ -219,11 +219,12 @@ function svgml_render_overview_page() {
 
     // Query all maps
     $maps = get_posts( [
-        'post_type'      => 'svgml_map',
-        'posts_per_page' => -1,
-        'orderby'        => 'date',
-        'order'          => 'DESC',
-        'post_status'    => 'any',
+        'post_type'        => 'svgml_map',
+        'posts_per_page'   => -1,
+        'orderby'          => 'date',
+        'order'            => 'DESC',
+        'post_status'      => 'any',
+        'suppress_filters' => false,
     ] );
 
     // Build the "New map" URL with nonce
