@@ -303,7 +303,9 @@ function svgml_render_manual_data_interface( $map_id ) {
                 if ( ! is_array( $decoded ) ) {
                     echo '<div class="notice notice-error"><p>Ongeldige JSON ontvangen. Probeer opnieuw.</p></div>';
                 } else {
-                    $existing = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
+                    $existing  = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
+                    $reordered = [];
+                    // Insert in submitted order so drag-to-reorder is preserved.
                     foreach ( $decoded as $poly_id => $fields ) {
                         $clean_id = sanitize_text_field( (string) $poly_id );
                         if ( ! $clean_id || ! is_array( $fields ) ) continue;
@@ -314,9 +316,15 @@ function svgml_render_manual_data_interface( $map_id ) {
                                 ? sanitize_text_field( $fields[ $field_key ] )
                                 : '';
                         }
-                        $existing[ $clean_id ] = $clean_fields;
+                        $reordered[ $clean_id ] = $clean_fields;
                     }
-                    update_post_meta( $map_id, '_svgml_manual_data', $existing );
+                    // Append regions not in the submitted payload (e.g. excluded ones).
+                    foreach ( $existing as $pid => $data ) {
+                        if ( ! isset( $reordered[ $pid ] ) ) {
+                            $reordered[ $pid ] = $data;
+                        }
+                    }
+                    update_post_meta( $map_id, '_svgml_manual_data', $reordered );
                     delete_transient( 'svgml_html_' . $map_id );
                     echo '<div class="notice notice-success is-dismissible"><p>Regio gegevens opgeslagen!</p></div>';
                 }
@@ -375,6 +383,20 @@ function svgml_render_manual_data_interface( $map_id ) {
         }
     }
 
+    // Sort the sidebar list by the saved manualData key order so drag-to-reorder
+    // is reflected after page reload. Regions without saved data go at the end.
+    if ( ! empty( $manual_data ) ) {
+        $saved_order = array_keys( $manual_data );
+        usort( $all_polygons, function( $a, $b ) use ( $saved_order ) {
+            $pos_a = array_search( $a['id'], $saved_order, true );
+            $pos_b = array_search( $b['id'], $saved_order, true );
+            if ( $pos_a === false && $pos_b === false ) return 0;
+            if ( $pos_a === false ) return 1;
+            if ( $pos_b === false ) return -1;
+            return $pos_a - $pos_b;
+        } );
+    }
+
     if ( empty( $all_polygons ) ) {
         ?>
         <div class="wrap svgml-admin-wrap">
@@ -407,25 +429,28 @@ function svgml_render_manual_data_interface( $map_id ) {
                         <div class="svgml-polygon-item <?php echo $is_selected ? 'active' : ''; ?> <?php echo $has_data ? 'has-data' : ''; ?> <?php echo $is_excluded ? 'svgml-item-excluded' : ''; ?>"
                              data-polygon-id="<?php echo esc_attr( $poly['id'] ); ?>"
                              data-polygon-index="<?php echo $idx; ?>">
-                            <div class="svgml-polygon-item-name">
-                                <?php echo esc_html( $poly['name'] ); ?>
-                                <?php if ( $has_data && ! $is_excluded ) : ?>
-                                    <span class="svgml-data-indicator" title="Gegevens ingevuld">&#10003;</span>
+                            <span class="svgml-drag-handle" title="Versleep om volgorde te wijzigen">⠿</span>
+                            <div class="svgml-polygon-item-content">
+                                <div class="svgml-polygon-item-name">
+                                    <?php echo esc_html( $poly['name'] ); ?>
+                                    <?php if ( $has_data && ! $is_excluded ) : ?>
+                                        <span class="svgml-data-indicator" title="Gegevens ingevuld">&#10003;</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ( $poly['layer'] ) : ?>
+                                <div class="svgml-polygon-item-layer">
+                                    <?php echo esc_html( $poly['layer'] ); ?>
+                                </div>
                                 <?php endif; ?>
+                                <form method="post" style="margin:0">
+                                    <?php wp_nonce_field( 'svgml_exclude_toggle', 'svgml_exclude_toggle_nonce' ); ?>
+                                    <input type="hidden" name="svgml_toggle_id" value="<?php echo esc_attr( $poly['id'] ); ?>">
+                                    <button type="submit" class="svgml-exclude-toggle-btn <?php echo $is_excluded ? 'is-excluded' : ''; ?>"
+                                            title="<?php echo $is_excluded ? 'Herstellen' : 'Uitsluiten'; ?>">
+                                        <?php echo $is_excluded ? '⊘ Uitgesloten' : '✕ Uitsluiten'; ?>
+                                    </button>
+                                </form>
                             </div>
-                            <?php if ( $poly['layer'] ) : ?>
-                            <div class="svgml-polygon-item-layer">
-                                <?php echo esc_html( $poly['layer'] ); ?>
-                            </div>
-                            <?php endif; ?>
-                            <form method="post" style="margin:0">
-                                <?php wp_nonce_field( 'svgml_exclude_toggle', 'svgml_exclude_toggle_nonce' ); ?>
-                                <input type="hidden" name="svgml_toggle_id" value="<?php echo esc_attr( $poly['id'] ); ?>">
-                                <button type="submit" class="svgml-exclude-toggle-btn <?php echo $is_excluded ? 'is-excluded' : ''; ?>"
-                                        title="<?php echo $is_excluded ? 'Herstellen' : 'Uitsluiten'; ?>">
-                                    <?php echo $is_excluded ? '⊘ Uitgesloten' : '✕ Uitsluiten'; ?>
-                                </button>
-                            </form>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -502,12 +527,26 @@ function svgml_render_manual_data_interface( $map_id ) {
         }
 
         .svgml-polygon-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
             padding: 10px 12px;
             background: white;
             border: 2px solid #e0e0e0;
             border-radius: 3px;
-            cursor: pointer;
+            cursor: default;
             transition: all 0.2s ease;
+        }
+
+        .svgml-polygon-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .svgml-polygon-item .svgml-drag-handle {
+            padding-top: 2px;
+            flex-shrink: 0;
+            cursor: grab;
         }
 
         .svgml-polygon-item:hover {
@@ -533,7 +572,6 @@ function svgml_render_manual_data_interface( $map_id ) {
 
         .svgml-polygon-item-name {
             font-weight: 600;
-            margin-bottom: 4px;
             font-size: 13px;
         }
 
@@ -600,6 +638,16 @@ function svgml_render_manual_data_interface( $map_id ) {
         var manualData = <?php echo wp_json_encode( empty( $manual_data ) ? new stdClass() : $manual_data ); ?>;
         if (Array.isArray(manualData)) { manualData = {}; }
 
+        // Make region items draggable to reorder the overview on the frontend.
+        $('.svgml-polygon-list').sortable({
+            handle:      '.svgml-drag-handle',
+            axis:        'y',
+            placeholder: 'svgml-sort-placeholder',
+            opacity:     0.85,
+            tolerance:   'pointer',
+            cancel:      'form, button, input, textarea, a',
+        }).disableSelection();
+
         /**
          * Save the currently visible form fields into manualData before switching region.
          * Must be called BEFORE changing #polygon_id or clearing the fields.
@@ -642,10 +690,18 @@ function svgml_render_manual_data_interface( $map_id ) {
             }
         });
 
-        // Serialize entire manualData object into hidden field before POST.
+        // Serialize entire manualData object into hidden field before POST,
+        // rebuilding in current DOM order so the new region sequence is saved to the backend.
         $('#svgml-manual-form').on('submit', function() {
             saveCurrentToManualData();
-            $('#svgml_manual_data_all').val(JSON.stringify(manualData));
+            var ordered = {};
+            $('.svgml-polygon-item').each(function() {
+                var id = $(this).data('polygon-id');
+                if (manualData.hasOwnProperty(id)) {
+                    ordered[id] = manualData[id];
+                }
+            });
+            $('#svgml_manual_data_all').val(JSON.stringify(ordered));
         });
 
         // Initialise: restore previously active region tab or default to first.

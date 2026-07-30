@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    WPML configuration for SVG Map Lite.
+    Read by WPML on activation to decide how to handle the svgml_map CPT
+    and its _svgml_* meta fields when a translated post is created.
+-->
+<wpml-config>
+
+    <!-- Register the svgml_map CPT for translation -->
+    <custom-types>
+        <custom-type translate="1">svgml_map</custom-type>
+    </custom-types>
+
+    <custom-fields>
+
+        <!-- Source / Regions — structural, must match across languages -->
+        <custom-field action="copy">_svgml_source_type</custom-field>
+        <custom-field action="copy">_svgml_svg_attachment_id</custom-field>
+        <custom-field action="copy">_svgml_svg_attachment_url</custom-field>
+        <custom-field action="copy">_svgml_svg_ids</custom-field>
+        <custom-field action="copy">_svgml_image_attachment_id</custom-field>
+        <custom-field action="copy">_svgml_image_attachment_url</custom-field>
+        <custom-field action="copy">_svgml_layers</custom-field>
+        <custom-field action="copy">_svgml_polygons</custom-field>
+        <custom-field action="copy">_svgml_layer_switcher</custom-field>
+        <custom-field action="copy">_svgml_map_mode</custom-field>
+
+        <!-- JSON Feed — same feed and field mapping for every language -->
+        <custom-field action="copy-once">_svgml_json_url</custom-field>
+        <custom-field action="copy">_svgml_json_id_field</custom-field>
+        <custom-field action="copy">_svgml_json_array_key</custom-field>
+
+        <!-- Region Mapping -->
+        <custom-field action="copy">_svgml_id_mapping</custom-field>
+        <custom-field action="copy">_svgml_excluded_ids</custom-field>
+        <custom-field action="copy-once">_svgml_manual_data</custom-field>
+
+        <!-- Panel & Display -->
+        <custom-field action="copy">_svgml_panel_position</custom-field>
+        <custom-field action="translate">_svgml_panel_title</custom-field>
+        <custom-field action="copy-once">_svgml_panel_blocks</custom-field>
+        <custom-field action="copy">_svgml_display_fields</custom-field>
+        <custom-field action="copy">_svgml_allow_multiview</custom-field>
+        <custom-field action="copy">_svgml_overview_enabled</custom-field>
+        <custom-field action="copy">_svgml_overview_clickable</custom-field>
+        <custom-field action="copy-once">_svgml_overview_blocks</custom-field>
+        <custom-field action="copy">_svgml_overview_sort_field</custom-field>
+        <custom-field action="copy">_svgml_overview_sort_order</custom-field>
+
+        <!-- Filters & Status -->
+        <custom-field action="copy-once">_svgml_filter_fields</custom-field>
+        <custom-field action="copy">_svgml_status_field</custom-field>
+        <custom-field action="copy-once">_svgml_status_colors</custom-field>
+        <custom-field action="copy-once">_svgml_status_hex_colors</custom-field>
+        <custom-field action="copy">_svgml_status_opacity</custom-field>
+
+        <!-- Style / Colours -->
+        <custom-field action="copy">_svgml_custom_css</custom-field>
+        <custom-field action="copy">_svgml_poly_stroke_color</custom-field>
+        <custom-field action="copy">_svgml_poly_stroke_width</custom-field>
+        <custom-field action="copy">_svgml_poly_stroke_width_hover</custom-field>
+        <custom-field action="copy">_svgml_highlight_color</custom-field>
+        <custom-field action="copy">_svgml_highlight_opacity</custom-field>
+        <custom-field action="copy">_svgml_filter_bg_color</custom-field>
+        <custom-field action="copy">_svgml_filter_dim_color</custom-field>
+        <custom-field action="copy">_svgml_filter_match_color</custom-field>
+        <custom-field action="copy">_svgml_filter_text_color</custom-field>
+        <custom-field action="copy">_svgml_panel_bg_color</custom-field>
+        <custom-field action="copy">_svgml_panel_border_color</custom-field>
+        <custom-field action="copy">_svgml_panel_border_radius</custom-field>
+        <custom-field action="copy">_svgml_panel_border_width</custom-field>
+        <custom-field action="copy">_svgml_panel_text_color</custom-field>
+        <custom-field action="copy">_svgml_input_bg_color</custom-field>
+        <custom-field action="copy">_svgml_input_border_color</custom-field>
+        <custom-field action="copy">_svgml_input_focus_color</custom-field>
+        <custom-field action="copy">_svgml_input_text_color</custom-field>
+        <custom-field action="copy">_svgml_slider_accent_color</custom-field>
+
+    </custom-fields>
+
+</wpml-config>

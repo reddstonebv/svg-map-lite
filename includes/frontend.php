@@ -48,6 +48,9 @@ function svgml_render_shortcode( $atts ) {
 
     $map_id = absint( $atts['id'] );
 
+    // If WPML is active, swap the map ID for the current-language translation.
+    $map_id = (int) apply_filters( 'wpml_object_id', $map_id, 'svgml_map', true );
+
     // Fallback: find first published svgml_map post if no ID provided
     if ( ! $map_id ) {
         $first_map = get_posts( [
@@ -343,6 +346,9 @@ function svgml_render_panel_shortcode( $atts ) {
 
     $map_id = absint( $atts['id'] );
 
+    // If WPML is active, swap the map ID for the current-language translation.
+    $map_id = (int) apply_filters( 'wpml_object_id', $map_id, 'svgml_map', true );
+
     // Fallback
     if ( ! $map_id ) {
         $first_map = get_posts( [
@@ -398,6 +404,9 @@ function svgml_render_filters_shortcode( $atts ) {
     );
 
     $map_id = absint( $atts['id'] );
+
+    // If WPML is active, swap the map ID for the current-language translation.
+    $map_id = (int) apply_filters( 'wpml_object_id', $map_id, 'svgml_map', true );
 
     if ( ! $map_id ) {
         $first_map = get_posts( [

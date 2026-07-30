@@ -456,7 +456,7 @@ function svgml_render_editor_wrapper() {
     // Tab definitions: slug => [ label, include_file, render_function ]
     $tabs = [
         'svgml-settings'      => [ 'Afbeelding & Koppeling', 'settings.php',      'svgml_render_settings_page' ],
-        'svgml-mapping'       => [ 'Data per Vlak',          'mapping.php',       'svgml_render_mapping_page' ],
+        'svgml-mapping'       => [ 'Data per vlak',          'mapping.php',       'svgml_render_mapping_page' ],
         'svgml-panel-builder' => [ 'Paneel Bouwer',          'panel-builder.php', 'svgml_render_panel_builder_page' ],
         'svgml-display'       => [ 'Weergave',               'display.php',       'svgml_render_display_page' ],
         'svgml-filters'       => [ 'Filters',                'filters.php',       'svgml_render_filters_page' ],
