@@ -303,8 +303,7 @@ function svgml_render_manual_data_interface( $map_id ) {
                 if ( ! is_array( $decoded ) ) {
                     echo '<div class="notice notice-error"><p>Ongeldige JSON ontvangen. Probeer opnieuw.</p></div>';
                 } else {
-                    $existing  = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
-                    $reordered = [];
+                    $new_data = [];
                     // Insert in submitted order so drag-to-reorder is preserved.
                     foreach ( $decoded as $poly_id => $fields ) {
                         $clean_id = sanitize_text_field( (string) $poly_id );
@@ -316,15 +315,9 @@ function svgml_render_manual_data_interface( $map_id ) {
                                 ? sanitize_text_field( $fields[ $field_key ] )
                                 : '';
                         }
-                        $reordered[ $clean_id ] = $clean_fields;
+                        $new_data[ $clean_id ] = $clean_fields;
                     }
-                    // Append regions not in the submitted payload (e.g. excluded ones).
-                    foreach ( $existing as $pid => $data ) {
-                        if ( ! isset( $reordered[ $pid ] ) ) {
-                            $reordered[ $pid ] = $data;
-                        }
-                    }
-                    update_post_meta( $map_id, '_svgml_manual_data', $reordered );
+                    update_post_meta( $map_id, '_svgml_manual_data', $new_data );
                     delete_transient( 'svgml_html_' . $map_id );
                     echo '<div class="notice notice-success is-dismissible"><p>Regio gegevens opgeslagen!</p></div>';
                 }
