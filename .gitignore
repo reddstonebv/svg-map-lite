@@ -16,6 +16,11 @@ package-lock.json
 # Composer (if added later)
 vendor/
 
+# Exception: PUC's own vendor map (Parsedown + PucReadmeParser) moet wel mee
+# de repo in, anders krijgt de klantsite een fatal error zodra een GitHub
+# Release een omschrijving heeft (Parsedown::instance() wordt dan aangeroepen).
+!/plugin-update-checker/vendor/
+
 # WordPress
 *.log
 

@@ -5,7 +5,7 @@
  * Description: Interactieve kaart plugin. Upload een afbeelding of SVG, teken polygonen,
  *              koppel ze aan een JSON feed, en toon data in een info-panel.
  *              Ondersteunt meerdere kaarten per site.
- * Version:     2.0.3
+ * Version:     2.0.4
  * Author:      REDDSTONE
  * Author URI:  https://reddstone.nl
  * License:     GPL v2 or later
@@ -22,9 +22,73 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-define( 'SVGML_VERSION', '2.0.3' );
+define( 'SVGML_VERSION', '2.0.4' );
 define( 'SVGML_PATH',    plugin_dir_path( __FILE__ ) );
 define( 'SVGML_URL',     plugin_dir_url( __FILE__ ) );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-UPDATES VIA GITHUB (Plugin Update Checker v5.7)
+//
+// This plugin runs on client sites we do not manage, so it cannot rely on the
+// WordPress.org plugin directory. Instead it uses the third-party "Plugin
+// Update Checker" (PUC) library by Yahnis Elsts to poll our own public GitHub
+// repository and offer updates the normal WordPress way (Dashboard → Updates,
+// "update available" notice under Plugins).
+//
+// How PUC decides a new version exists:
+//   - It asks the GitHub API for the newest tagged **Release** on the repo
+//     (not just any commit on `main`).
+//   - It reads the `Version:` header at the top of THIS file, as that file
+//     exists inside that release, and compares it to the version installed.
+//   - Fallback order PUC actually uses: newest Release -> highest tag ->
+//     latest commit on the pinned branch. That last one always exists, so
+//     until this repo has at least one Release or tag, the updater runs off
+//     the latest commit on `main` — meaning a push with a bumped Version
+//     header WOULD roll out immediately. Once the first Release/tag exists,
+//     that fallback stops applying and only Releases/tags count from then on.
+// So pushing commits to `main` does NOT roll out an update by itself once a
+// Release/tag exists — a new version then only ships once a GitHub Release is
+// created with a matching Version bump. See the release checklist in CLAUDE.md.
+//
+// No token, ever:
+//   - github.com/reddstonebv/svg-map-lite is PUBLIC, so the GitHub API can be
+//     read anonymously. We deliberately do NOT call ->setAuthentication() or
+//     pass any credential. Never add one — client sites would ship it too.
+//
+// Admin/cron only:
+//   - Wrapped in is_admin() || wp_doing_cron() because front-end visitors
+//     never need the updater; this costs nothing on the public site.
+// ─────────────────────────────────────────────────────────────────────────────
+if ( is_admin() || wp_doing_cron() ) {
+
+    // file_exists() guard: if the library folder is ever missing (e.g. someone
+    // forgot to commit it), the plugin must keep working instead of causing a
+    // fatal "class not found" error that would take down the whole site.
+    if ( file_exists( SVGML_PATH . 'plugin-update-checker/plugin-update-checker.php' ) ) {
+        require_once SVGML_PATH . 'plugin-update-checker/plugin-update-checker.php';
+
+        // Fully-qualified class name on purpose — no `use` statement, because
+        // `use` imports must sit at the very top of the file, before any other
+        // code, and we don't want one there.
+        $svgml_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+            'https://github.com/reddstonebv/svg-map-lite/', // Public repo, no token.
+            __FILE__,                                        // This plugin's main file.
+            'svg-map-lite'                                   // Must match the plugin slug/folder.
+        );
+
+        // Pin on `main`. This is NOT cosmetic: PUC only looks at GitHub
+        // Releases and tags when the branch is named 'main' or 'master'. Set
+        // a different branch here and PUC ignores your releases entirely,
+        // falling back to just the latest commit on that branch.
+        //
+        // Order PUC uses: newest Release -> highest tag -> latest commit on
+        // the branch. That last one is ALWAYS there as a fallback. As long as
+        // the repo has zero releases or tags, the updater runs off the latest
+        // commit on `main`, so a push with a bumped Version header would roll
+        // out immediately. From the first release onward, that stops.
+        $svgml_update_checker->setBranch( 'main' );
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INCLUDE FILES

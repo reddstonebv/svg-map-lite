@@ -3,7 +3,7 @@
 ## Identity
 - **Plugin slug:** `svg-map-lite`
 - **Plugin folder / main file:** `svg-map-lite/svg-map-lite.php`
-- **GitHub repo:** `peerventures/svg-map-lite` (branch `main`)
+- **GitHub repo:** `reddstonebv/svg-map-lite` (branch `main`)
 - **CPT:** `svgml_map` (one post per map)
 - **Post meta prefix:** `_svgml_`
 - **Version constant:** `SVGML_VERSION` (must always equal the `Version:` header — see Releases)
@@ -129,6 +129,7 @@ Frontend CSS is scoped: `#svgml-wrap-{map_id}` for isolation between multiple ma
 - `assets/js/vendor/` and `assets/css/vendor/` are **git-ignored** (the `vendor/` rule in `.gitignore` matches any folder named `vendor`, at any depth).
 - `svg-map-lite.php` checks `file_exists()` for each vendor file and **falls back to a CDN URL** when it is missing. So a git-based install/update works without them; it just loads Fabric.js and noUiSlider from CDN.
 - To bundle them locally, run `assets/js/vendor/download-vendor.sh` from that folder. Do this only in a hand-built release ZIP — never commit them.
+- **Exception:** `plugin-update-checker/vendor/` (Parsedown + PucReadmeParser, bundled inside PUC itself) is explicitly un-ignored via `!/plugin-update-checker/vendor/` in `.gitignore`, placed directly below the blanket `vendor/` rule. Unlike Fabric.js/noUiSlider there is **no CDN fallback** for it: PUC calls `Parsedown::instance()` while rendering a GitHub Release's body as changelog HTML (`Puc/v5p7/Vcs/GitHubApi.php`), and a missing class there is a fatal error, not a graceful skip. If this exception is ever removed, every client site fatal-errors on its next update check as soon as a release has a non-empty description.
 
 ## Releases & Auto-Update (Plugin Update Checker v5 + GitHub)
 
@@ -142,7 +143,7 @@ via **Plugin Update Checker (PUC) v5** by Yahnis Elsts.
 - Bootstrapped in `svg-map-lite.php` with the fully-qualified class name
   `\YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker()`
   (no `use` statement — avoids the "must be at top of file" trap).
-- Repo URL `https://github.com/peerventures/svg-map-lite/`, `__FILE__`, slug `svg-map-lite`.
+- Repo URL `https://github.com/reddstonebv/svg-map-lite/`, `__FILE__`, slug `svg-map-lite`.
 - Branch is pinned with `->setBranch('main')`.
 - The repo is **public**, so **no access token is used or stored** anywhere. Never add one.
 - The bootstrap is wrapped in an `is_admin() || wp_doing_cron()` guard so it costs nothing
