@@ -2,9 +2,11 @@
 
 ## Identity
 - **Plugin slug:** `svg-map-lite`
+- **Plugin folder / main file:** `svg-map-lite/svg-map-lite.php`
+- **GitHub repo:** `peerventures/svg-map-lite` (branch `main`)
 - **CPT:** `svgml_map` (one post per map)
 - **Post meta prefix:** `_svgml_`
-- **Version constant:** `SVGML_VERSION`
+- **Version constant:** `SVGML_VERSION` (must always equal the `Version:` header — see Releases)
 - **Path constant:** `SVGML_PATH` / `SVGML_URL`
 - **AJAX nonce action:** `svgml_admin_nonce`
 - **AJAX action prefix:** `svgml_` (e.g. `wp_ajax_svgml_parse_svg`)
@@ -100,7 +102,7 @@ Localized via `wp_localize_script('svgml-admin-js', 'svgmlAdmin', ...)` in `svgm
 
 | File | Key Functions |
 |------|--------------|
-| `svg-map-lite.php` | CPT registration, tab routing, `svgml_admin_enqueue()`, `svgml_render_editor_wrapper()` |
+| `svg-map-lite.php` | CPT registration, tab routing, `svgml_admin_enqueue()`, `svgml_render_editor_wrapper()`, update-checker bootstrap |
 | `includes/ajax.php` | All `wp_ajax_svgml_*` handlers: parse SVG, create/delete map, get JSON, image CRUD |
 | `includes/frontend.php` | `[svg_map]` shortcode, inline CSS generation scoped to `#svgml-wrap-{id}` |
 | `includes/settings.php` | `svgml_render_settings_page()` — handles SVG upload, polygon save, source type |
@@ -122,9 +124,70 @@ Localized via `wp_localize_script('svgml-admin-js', 'svgmlAdmin', ...)` in `svgm
 
 Frontend CSS is scoped: `#svgml-wrap-{map_id}` for isolation between multiple maps on one page.
 
+## Vendor Assets (Fabric.js / noUiSlider)
+
+- `assets/js/vendor/` and `assets/css/vendor/` are **git-ignored** (the `vendor/` rule in `.gitignore` matches any folder named `vendor`, at any depth).
+- `svg-map-lite.php` checks `file_exists()` for each vendor file and **falls back to a CDN URL** when it is missing. So a git-based install/update works without them; it just loads Fabric.js and noUiSlider from CDN.
+- To bundle them locally, run `assets/js/vendor/download-vendor.sh` from that folder. Do this only in a hand-built release ZIP — never commit them.
+
+## Releases & Auto-Update (Plugin Update Checker v5 + GitHub)
+
+The plugin is installed on sites we do not manage, so it updates itself from GitHub
+via **Plugin Update Checker (PUC) v5** by Yahnis Elsts.
+
+### Setup
+- Library lives at `plugin-update-checker/` in the plugin root — **committed to the repo**,
+  installed by hand (download the v5 ZIP from GitHub), *not* via Composer, because
+  `.gitignore` ignores `vendor/`.
+- Bootstrapped in `svg-map-lite.php` with the fully-qualified class name
+  `\YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker()`
+  (no `use` statement — avoids the "must be at top of file" trap).
+- Repo URL `https://github.com/peerventures/svg-map-lite/`, `__FILE__`, slug `svg-map-lite`.
+- Branch is pinned with `->setBranch('main')`.
+- The repo is **public**, so **no access token is used or stored** anywhere. Never add one.
+- The bootstrap is wrapped in an `is_admin() || wp_doing_cron()` guard so it costs nothing
+  on the frontend.
+
+### How updates are found
+PUC asks the GitHub API for the newest **tag / release** on the repo, reads the
+`Version:` header from `svg-map-lite.php` inside that tag, and compares it to the installed
+version. WordPress then shows the normal "update available" notice in Plugins.
+PUC caches the result for ~12 h; `?puc_debug=1` (as admin) forces a re-check.
+
+### Release checklist — follow every time
+1. Bump the `Version:` header in `svg-map-lite.php`.
+2. Bump `SVGML_VERSION` to **exactly the same string**. A mismatch has bitten this repo
+   before (`e7385b5 Fixed version mismatch`) — PUC reads the header, the enqueue cache-buster
+   reads the constant.
+3. Commit and push to `main`.
+4. Create a git tag with the same number, e.g. `git tag 2.0.4 && git push origin 2.0.4`
+   (tags are plain numbers here — no `v` prefix; keep it consistent).
+5. Optionally publish a GitHub Release for that tag so the changelog shows up.
+6. On a test site: Dashboard → Updates → Check again, confirm the new version appears and
+   updates cleanly.
+
+### Gotchas
+- **Never** add a token, `.env`, or credentials to this repo — public repo, and the updater
+  does not need one.
+- Only tracked files end up in the update ZIP. Anything in `.gitignore` (vendor assets, zips)
+  is absent on the client site — that is fine thanks to the CDN fallback, but do not start
+  depending on a git-ignored file at runtime.
+- Do not rename the plugin folder or the main file: PUC's slug and WordPress's folder
+  renaming both key off `svg-map-lite`.
+
 ## Session Rules (token optimization)
 
 - Zero fluff, no pleasantries, no summaries
 - Code only — no explanations unless asked
 - Always show filename above code block
 - Acknowledge new sessions with: "Context loaded. Ready for the first task."
+
+## Coding preferences (for any Claude working in this repo)
+
+- WordPress plugin code. The author is **not strong in PHP** → write **detailed PHP comments**
+  explaining what each block does and why.
+- Prefer **jQuery** over plain JS.
+- **Backward compatible by default:** never change existing option/meta names, defaults, or
+  sanitize callbacks unless that is the explicit task. New options default to off/empty.
+- Be economical: show **diffs, not whole files**; don't re-read files you've already read.
+- Finish with `php -l` on changed PHP files and `node --check` on changed JS.
