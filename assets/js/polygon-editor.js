@@ -82,6 +82,9 @@ jQuery(document).ready(function($) {
     var $zoomReset    = $('#svgml-zoom-reset');
     var $zoomLevel    = $('#svgml-zoom-level');
     var $snapToggle   = $('#svgml-snap-toggle');
+    // Hidden fields in settings.php (regel 548/552) — hier gecachet voor de layer-add callback
+    var $strokeColor  = $('#svgml_poly_stroke_color');
+    var $strokeWidth  = $('#svgml_poly_stroke_width');
 
     $deleteBtn.hide();
     $('.svgml-edit-options').hide();
