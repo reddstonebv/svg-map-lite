@@ -126,9 +126,25 @@ Frontend CSS is scoped: `#svgml-wrap-{map_id}` for isolation between multiple ma
 
 ## Vendor Assets (Fabric.js / noUiSlider)
 
-- `assets/js/vendor/` and `assets/css/vendor/` are **git-ignored** (the `vendor/` rule in `.gitignore` matches any folder named `vendor`, at any depth).
-- `svg-map-lite.php` checks `file_exists()` for each vendor file and **falls back to a CDN URL** when it is missing. So a git-based install/update works without them; it just loads Fabric.js and noUiSlider from CDN.
-- To bundle them locally, run `assets/js/vendor/download-vendor.sh` from that folder. Do this only in a hand-built release ZIP — never commit them.
+- `assets/js/vendor/` and `assets/css/vendor/` are **committed to the repo**. The blanket
+  `vendor/` rule in `.gitignore` (matches any folder named `vendor`, at any depth) is
+  explicitly un-ignored for both via `!/assets/js/vendor/` and `!/assets/css/vendor/`,
+  placed directly below the blanket rule, same style as the PUC exception below. Negating
+  loose files inside `vendor/` would **not** work — git never descends into an excluded
+  folder to see the files in the first place — so the negation must target the folder itself
+  with a leading slash.
+- **Why this matters:** these three files ship inside the update ZIP that PUC pulls from the
+  GitHub tag. If they are git-ignored, WordPress's next auto-update replaces the plugin folder
+  with one that lacks them entirely — this happened once already (`fabric.min.js`,
+  `nouislider.min.js`, `nouislider.min.css`, and `download-vendor.sh` all vanished from every
+  client site in one update cycle).
+- `svg-map-lite.php` still checks `file_exists()` for each vendor file and falls back to a CDN
+  URL when it is missing. That fallback now exists **only as a safety net** (e.g. a manually
+  stripped-down deploy) — it is not the intended delivery path, and normal operation always
+  serves the local files from the repo.
+- `assets/js/vendor/download-vendor.sh` re-downloads the three files from CDN. It is only
+  needed for a fresh checkout where these files are somehow missing; under normal operation
+  they are already present because they're tracked in git.
 - **Exception:** `plugin-update-checker/vendor/` (Parsedown + PucReadmeParser, bundled inside PUC itself) is explicitly un-ignored via `!/plugin-update-checker/vendor/` in `.gitignore`, placed directly below the blanket `vendor/` rule. Unlike Fabric.js/noUiSlider there is **no CDN fallback** for it: PUC calls `Parsedown::instance()` while rendering a GitHub Release's body as changelog HTML (`Puc/v5p7/Vcs/GitHubApi.php`), and a missing class there is a fatal error, not a graceful skip. If this exception is ever removed, every client site fatal-errors on its next update check as soon as a release has a non-empty description.
 
 ## Releases & Auto-Update (Plugin Update Checker v5 + GitHub)
@@ -170,9 +186,10 @@ PUC caches the result for ~12 h; `?puc_debug=1` (as admin) forces a re-check.
 ### Gotchas
 - **Never** add a token, `.env`, or credentials to this repo — public repo, and the updater
   does not need one.
-- Only tracked files end up in the update ZIP. Anything in `.gitignore` (vendor assets, zips)
-  is absent on the client site — that is fine thanks to the CDN fallback, but do not start
-  depending on a git-ignored file at runtime.
+- Only tracked files end up in the update ZIP. Fabric.js/noUiSlider vendor assets are now
+  tracked (see Vendor Assets above) specifically because of this — anything still actually
+  git-ignored (zips, OS/IDE cruft) stays absent on the client site, so do not start depending
+  on a git-ignored file at runtime.
 - Do not rename the plugin folder or the main file: PUC's slug and WordPress's folder
   renaming both key off `svg-map-lite`.
 

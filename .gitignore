@@ -21,6 +21,12 @@ vendor/
 # Release een omschrijving heeft (Parsedown::instance() wordt dan aangeroepen).
 !/plugin-update-checker/vendor/
 
+# Exception: Fabric.js / noUiSlider vendor assets moeten wel mee de repo in.
+# Zonder dit staat de map er niet in de update-ZIP en verdwijnt hij bij een
+# auto-update, waarna elke klantsite terugvalt op de CDN i.p.v. de lokale kopie.
+!/assets/js/vendor/
+!/assets/css/vendor/
+
 # WordPress
 *.log
 
