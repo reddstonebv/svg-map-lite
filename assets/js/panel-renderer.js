@@ -54,18 +54,25 @@
     // value, used by svgml_getLayerRegionIds() below to know which layer to
     // read regions from.
     //
-    // We can ONLY read this from ":visible" right here, at page-ready time —
-    // frontend.php renders layer 0 with display:inline-block and every other
-    // layer with display:none, so at this exact moment (nothing has switched
-    // yet, no animation is running) ":visible" reliably identifies the
-    // active layer. Once switchLayer() in frontend.js starts fading layers
-    // in/out, ":visible" briefly lies (both layers, or neither, can appear
-    // visible mid-animation) — so after this point we never use ":visible"
-    // again. Instead we update this variable from the layer index that
-    // frontend.js passes us directly in the 'svgmlLayerChange' event (see
-    // the listener further down), which is exact regardless of animation
-    // state.
-    var svgml_activeLayerIndex = $allLayers.filter(':visible').first().data('layer');
+    // We do NOT use ":visible" here, even at ready-time. ":visible" depends
+    // on actual rendered layout (offsetWidth/offsetHeight), and a map can sit
+    // inside a container that is itself hidden at page load — an Elementor
+    // tab, an accordion panel, a slider slide not yet active. In that case
+    // every .svgml-layer is display:none-by-ancestor at ready-time, so
+    // ":visible" matches nothing, svgml_activeLayerIndex ends up null, and
+    // svgml_getLayerRegionIds() then fails open (see its own comment below)
+    // and shows the unfiltered list instead of the active layer.
+    //
+    // Instead we take the FIRST .svgml-layer element in DOM order.
+    // frontend.php always renders layer 0 first and gives it
+    // display:inline-block (every other layer gets display:none) — so the
+    // first element in the DOM is the start layer by construction, and that
+    // holds regardless of whether the surrounding container has layout yet.
+    // Once switchLayer() in frontend.js actually switches layers, we stop
+    // relying on this altogether: frontend.js pushes the new index to us
+    // directly via the 'svgmlLayerChange' event (see the listener further
+    // down), which is exact regardless of visibility/animation state.
+    var svgml_activeLayerIndex = $allLayers.first().data('layer');
     if (svgml_activeLayerIndex === undefined) {
         svgml_activeLayerIndex = null; // no layers at all (SVG-mode map) — fine, the helper below no-ops on this
     }
