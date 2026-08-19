@@ -387,6 +387,25 @@
             return;
         }
 
+        // Bug fix: a region selection (panel + active class) belongs to the
+        // layer it was clicked on. When we actually switch layers below, that
+        // selection is stale — leaving it visible made the panel keep showing
+        // info for a region on the layer the user just left.
+        // closePanel() already does both jobs via the existing $activeRegion
+        // logic: it fades the panel out AND clears 'svgml-region-active' /
+        // resets $activeRegion (see closePanel() above), so no new state is
+        // introduced here.
+        closePanel();
+
+        // Broadcast the layer switch, same event-based pattern as
+        // 'svgmlRegionClick' above: frontend.js doesn't know panel-renderer.js
+        // exists (separate IIFE), so instead of calling it directly we fire a
+        // custom jQuery event and let anything that cares (currently
+        // panel-renderer.js, for the per-layer overview list) react on its
+        // own. Fired only here, i.e. only on an ACTUAL switch (past the guard
+        // above) — not when clicking the already-active layer.
+        $(document).trigger('svgmlLayerChange', [index]);
+
         var $current = $('.svgml-layer:visible').not($target);
         if ( $current.length ) {
             $current.stop(true, true).fadeOut(220, function() {

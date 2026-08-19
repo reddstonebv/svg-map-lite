@@ -38,6 +38,38 @@
     var $panel = $('.svgml-panel');   // Single panel instance
     var $svg   = $('.svgml-svg');
 
+    // ── MULTI-LAYER: TRACK THE ACTIVE LAYER FOR THE OVERVIEW LIST ───────────
+    // svgmlData has no notion of "layers" at all (that's PHP/_svgml_layers
+    // post meta, never localized to JS) — the only place that knows which
+    // regions belong to which layer is the DOM: each
+    // <div class="svgml-layer" data-layer="N"> wraps its own <svg class=
+    // "svgml-svg"> with that layer's <polygon id="..."> elements. So we read
+    // laag membership from the DOM instead of from svgmlData.
+    //
+    // $allLayers is cached once here because the layer markup itself is
+    // static after page load (only visibility toggles, elements don't move).
+    var $allLayers = $('.svgml-layer');
+
+    // svgml_activeLayerIndex holds the currently active layer's data-layer
+    // value, used by svgml_getLayerRegionIds() below to know which layer to
+    // read regions from.
+    //
+    // We can ONLY read this from ":visible" right here, at page-ready time —
+    // frontend.php renders layer 0 with display:inline-block and every other
+    // layer with display:none, so at this exact moment (nothing has switched
+    // yet, no animation is running) ":visible" reliably identifies the
+    // active layer. Once switchLayer() in frontend.js starts fading layers
+    // in/out, ":visible" briefly lies (both layers, or neither, can appear
+    // visible mid-animation) — so after this point we never use ":visible"
+    // again. Instead we update this variable from the layer index that
+    // frontend.js passes us directly in the 'svgmlLayerChange' event (see
+    // the listener further down), which is exact regardless of animation
+    // state.
+    var svgml_activeLayerIndex = $allLayers.filter(':visible').first().data('layer');
+    if (svgml_activeLayerIndex === undefined) {
+        svgml_activeLayerIndex = null; // no layers at all (SVG-mode map) — fine, the helper below no-ops on this
+    }
+
     // ── STATUS CLASSES ON SVG REGIONS ────────────────────────────────────────
     // When the page loads, we assign status to each SVG region right away.
     // This way the colors are visible before anyone clicks anywhere.
@@ -142,6 +174,21 @@
     // If overview is enabled, return to overview when closing.
     // Otherwise hide the panel.
     $(document).on('click', '#svgml-panel-close', function() {
+        if (svgmlData.overviewEnabled) {
+            svgml_renderOverview();
+        }
+    });
+
+    // ── MULTI-LAYER: REFRESH OVERVIEW ON LAYER SWITCH ───────────────────────
+    // frontend.js fires 'svgmlLayerChange' (with the new layer's index) right
+    // after an actual layer switch. We update our tracked active layer index
+    // and, when the overview list is enabled, re-render it so it reflects
+    // only the new layer's regions. This reuses the exact same "go back to
+    // overview" behavior the close buttons below already use — a layer
+    // switch resets to a (freshly filtered) overview, same as closing a
+    // detail panel does.
+    $(document).on('svgmlLayerChange', function(e, layerIndex) {
+        svgml_activeLayerIndex = layerIndex;
         if (svgmlData.overviewEnabled) {
             svgml_renderOverview();
         }
@@ -419,6 +466,50 @@
     // ── OVERVIEW FUNCTIONS ──────────────────────────────────────────────────
 
     /**
+     * Look up which region id's belong to one layer, by reading the DOM
+     * (see the svgml_activeLayerIndex comment above for why: svgmlData has
+     * no layer info at all).
+     *
+     * Returns null — meaning "don't filter, show everything, exactly like
+     * before this feature existed" — in every case where filtering isn't
+     * safely applicable:
+     *  - fewer than 2 .svgml-layer elements: single-layer image map, or an
+     *    SVG-mode map (no layers concept at all). Nothing to filter by.
+     *  - layerIndex not known yet (null/undefined): fail-open rather than
+     *    risk hiding every region because we guessed wrong.
+     *  - layerIndex doesn't match any actual .svgml-layer element: same
+     *    fail-open reasoning — better to show too much than to silently
+     *    show an empty list.
+     *
+     * NOTE: defined here inside jQuery(document).ready(), in the very same
+     * scope as $allLayers above. If this function were moved outside that
+     * ready() callback, $allLayers would be undefined wherever this runs
+     * and the filter would silently produce an empty list instead of an
+     * obvious error — so keep it here, next to the other svgml_* helpers.
+     *
+     * @param {number|null} layerIndex – the layer's data-layer value
+     * @returns {Object|null} – lookup object { 'svg-id': true, ... }, or null
+     */
+    function svgml_getLayerRegionIds(layerIndex) {
+        if ($allLayers.length < 2) return null;
+        if (layerIndex === null || layerIndex === undefined) return null;
+
+        var $target = $allLayers.filter('[data-layer="' + layerIndex + '"]');
+        if (!$target.length) return null;
+
+        var ids = {};
+        // Same selector as frontend.js:66 (stripping hardcoded stroke
+        // attributes) — deliberately the same "these are real region
+        // elements" selector, so we don't accidentally pick up some other
+        // element that happens to carry an id (a wrapping <svg>/<img>/div
+        // with an id that has nothing to do with a clickable region).
+        $target.find('.svgml-svg polygon[id], .svgml-svg path[id]').each(function() {
+            ids[this.id] = true;
+        });
+        return ids;
+    }
+
+    /**
      * Render the overview (list of all mapped objects) in all panels.
      * Called on page load if overview is enabled,
      * and when closing a detail panel.
@@ -428,7 +519,18 @@
 
         if ($panel.length) {
             $panel.find('.svgml-panel-content').html(html);
-            $panel.removeAttr('aria-hidden').show();
+            // .stop(true, true) before .show(): svgml_renderOverview() is now
+            // also called right after a layer switch (see the
+            // 'svgmlLayerChange' listener below), and frontend.js's
+            // closePanel() — fired just before that event — starts a
+            // fadeOut(200) on this same $panel without stopping it first. If
+            // that fadeOut is still running when we call .show() here, jQuery
+            // would keep animating opacity toward 0 and hide the panel again
+            // right after we just showed it. .stop(true, true) cancels any
+            // in-flight animation and jumps straight to the end state, so
+            // .show() always wins. No-op when nothing is animating, so this
+            // is safe for every existing caller too (page load, close button).
+            $panel.stop(true, true).removeAttr('aria-hidden').show();
             $panel.find('.svgml-panel-close-standalone').hide();
         }
     }
@@ -483,7 +585,17 @@
                 return '<p class="svgml-panel-empty">Geen objecten beschikbaar.</p>';
             }
 
-            var manualKeys = sortKeys(Object.keys(manualData), function(id) { return manualData[id]; });
+            // Multi-layer filter: only list regions that actually live on the
+            // active layer. layerIds is null on single-layer/SVG maps (see
+            // svgml_getLayerRegionIds() above), in which case we skip
+            // filtering entirely and keep the exact pre-existing behavior.
+            var layerIds           = svgml_getLayerRegionIds(svgml_activeLayerIndex);
+            var manualKeysAll      = Object.keys(manualData);
+            var manualKeysFiltered = layerIds
+                ? manualKeysAll.filter(function(id) { return layerIds.hasOwnProperty(id); })
+                : manualKeysAll;
+
+            var manualKeys = sortKeys(manualKeysFiltered, function(id) { return manualData[id]; });
             $.each(manualKeys, function(_, svgId) {
                 var obj = manualData[svgId];
                 if (!obj) return;
@@ -533,7 +645,16 @@
                 if (objId) jsonLookup[objId] = obj;
             });
 
-            var svgIdsSorted = sortKeys(Object.keys(mapping), function(sid) {
+            // Same multi-layer filter as the manual branch above: only list
+            // regions that live on the active layer, skipped (layerIds ===
+            // null) on single-layer/SVG maps.
+            var layerIds         = svgml_getLayerRegionIds(svgml_activeLayerIndex);
+            var mappingKeysAll   = Object.keys(mapping);
+            var mappingKeysFiltered = layerIds
+                ? mappingKeysAll.filter(function(id) { return layerIds.hasOwnProperty(id); })
+                : mappingKeysAll;
+
+            var svgIdsSorted = sortKeys(mappingKeysFiltered, function(sid) {
                 return jsonLookup[String(mapping[sid])];
             });
             $.each(svgIdsSorted, function(_, svgId) {
