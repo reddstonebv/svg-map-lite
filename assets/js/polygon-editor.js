@@ -145,7 +145,16 @@ jQuery(document).ready(function($) {
             }
             syncLayersToHiddenField();
 
-            loadImageOnCanvas(att.url);
+            // BUGFIX: altijd een callback meegeven die de vlakken van de
+            // ACTIEVE laag tekent. Zonder callback viel loadImageOnCanvas()
+            // terug op het legacy laag-0-veld ($hiddenJson), waardoor bij een
+            // kaart met meerdere lagen de vlakken van laag 1+ verdwenen en
+            // vervangen werden door die van laag 0 — en bij opslaan de echte
+            // vlakken van de bewerkte laag overschreven werden. We hebben
+            // att.url al, dus geen AJAX-rondje nodig zoals in loadLayer().
+            loadImageOnCanvas(att.url, function() {
+                renderLayerPolygons(activeLayerIndex);
+            });
         });
         imageFrame.open();
     });
@@ -225,6 +234,15 @@ jQuery(document).ready(function($) {
 
             // If a callback is provided (e.g. from loadLayer), use it.
             // Otherwise: load the polygons from the legacy hidden field.
+            //
+            // LET OP — valkuil: deze else-tak is puur backward-compat voor oude
+            // aanroepen die geen callback meegeven. $hiddenJson bevat altijd
+            // laag 0's polygonen, nooit die van een andere laag. Een NIEUWE
+            // aanroep van loadImageOnCanvas() moet daarom ALTIJD een callback
+            // meegeven die de juiste laag tekent (zie renderLayerPolygons()).
+            // Zonder callback grijpt dit pad stilzwijgend terug op laag 0 —
+            // precies de bug die ooit de vlakken van laag 1+ overschreef zodra
+            // de achtergrondafbeelding van die laag werd vervangen.
             if (typeof onReadyCallback === 'function') {
                 onReadyCallback();
             } else {
@@ -1598,6 +1616,49 @@ jQuery(document).ready(function($) {
     // ════════════════════════════════════════════════════════════════════
 
     /**
+     * Teken de vlakken van één specifieke laag op het canvas.
+     *
+     * Losgetrokken uit loadLayer() zodat elke plek die een achtergrond-
+     * afbeelding laadt (loadLayer, maar ook de afbeelding-kiezer bij
+     * #svgml-upload-image-btn) dezelfde, correcte laag-tekenlogica gebruikt
+     * — in plaats van per ongeluk in de legacy-laag-0-fallback van
+     * loadImageOnCanvas() te belanden.
+     *
+     * BELANGRIJK: roep deze functie pas aan NADAT de achtergrondafbeelding
+     * geladen is (dus vanuit de callback van loadImageOnCanvas()). canvasBaseW
+     * en canvasBaseH worden pas gezet in de fromURL-callback daarvan; roep je
+     * renderLayerPolygons() eerder aan, dan worden de genormaliseerde
+     * coördinaten (0–1) vermenigvuldigd met een verkeerde of nog lege
+     * canvasmaat en komen de vlakken op de verkeerde plek of op 0,0 terecht.
+     * Beide huidige aanroepen (loadLayer hieronder, en de afbeelding-kiezer)
+     * voldoen hieraan.
+     *
+     * @param {number} layerIndex  Index in de layers-array
+     */
+    function renderLayerPolygons(layerIndex) {
+        var layer = layers[layerIndex];
+        if (!layer) return; // Guard: laag bestaat niet (bv. net verwijderd) — niets te tekenen
+
+        // Eerst eventuele oude vlakken van de vorige laag/afbeelding weghalen
+        clearAllPolygons();
+
+        var cw = canvasBaseW * zoomLevel;
+        var ch = canvasBaseH * zoomLevel;
+
+        $.each(layer.polygons || [], function(i, poly) {
+            if (!poly.id || !poly.points || poly.points.length < 3) return;
+            var pts = $.map(poly.points, function(pt) {
+                return { x: pt.x * cw, y: pt.y * ch };
+            });
+            var fabricPoly = createFabricPolygon(pts, poly.id, true);
+            polygons.push({ id: poly.id, points: poly.points, fabricObj: fabricPoly });
+        });
+
+        canvas.renderAll();
+        renderPolygonList();
+    }
+
+    /**
      * Load a specific layer on the canvas: fetch the image via
      * AJAX and display the associated polygons.
      *
@@ -1620,24 +1681,7 @@ jQuery(document).ready(function($) {
                 // Provide a callback that loads the layer-specific polygons
                 // AFTER the background image is ready (Fabric.js async).
                 loadImageOnCanvas(response.data.url, function() {
-                    // Clear any old polygons
-                    clearAllPolygons();
-
-                    // Load polygons from this specific layer
-                    var cw = canvasBaseW * zoomLevel;
-                    var ch = canvasBaseH * zoomLevel;
-
-                    $.each(layer.polygons || [], function(i, poly) {
-                        if (!poly.id || !poly.points || poly.points.length < 3) return;
-                        var pts = $.map(poly.points, function(pt) {
-                            return { x: pt.x * cw, y: pt.y * ch };
-                        });
-                        var fabricPoly = createFabricPolygon(pts, poly.id, true);
-                        polygons.push({ id: poly.id, points: poly.points, fabricObj: fabricPoly });
-                    });
-
-                    canvas.renderAll();
-                    renderPolygonList();
+                    renderLayerPolygons(idx);
                 });
             }
         });
