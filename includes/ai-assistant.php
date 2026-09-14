@@ -80,6 +80,21 @@ function svgml_render_ai_assistant_page( $map_id ) {
                             'html'  => $html,
                         ];
                     }
+
+                    // Bekende beperking (bewust niet volledig opgelost, zie
+                    // projectplan): op een manual-mode kaart kent
+                    // svgml_ensure_manual_block_keys() alsnog een unieke sleutel
+                    // toe aan elk blok zonder 'field'. Levert de AI echter zelf al
+                    // een niet-lege 'field'-waarde aan (bijv. in de stijl van de
+                    // oude manual_field_N-conventie), dan blijft die letterlijk
+                    // staan — deze functie raakt niet-lege sleutels nooit aan.
+                    // Zie ook de 'manual_data'-import hieronder: die schrijft
+                    // volledig los van deze blokken en kan dus sleutels aanleveren
+                    // die na migratie nergens meer bij een blok horen.
+                    if ( 'manual' === ( get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json' ) ) {
+                        $blocks = svgml_ensure_manual_block_keys( $blocks, $map_id );
+                    }
+
                     update_post_meta( $map_id, '_svgml_panel_blocks', $blocks );
                 }
 
@@ -106,6 +121,14 @@ function svgml_render_ai_assistant_page( $map_id ) {
                 }
 
                 // ── manual_data ───────────────────────────────────────────
+                // Bekende beperking (bewust niet opgelost hier, zie projectplan):
+                // deze import staat volledig los van de panel_config-import
+                // hierboven en herkoppelt sleutels op geen enkele manier. De AI
+                // levert hier doorgaans manual_field_N-stijl sleutels aan (dat is
+                // de conventie die de prompt beschrijft) — op een reeds
+                // gemigreerde kaart (waar $block['field'] al 'mf_...' is) komen
+                // die dus dood binnen: ze matchen geen enkel blok meer. Het
+                // remappen daarvan wordt hier niet gebouwd.
                 if ( isset( $data['manual_data'] ) && is_array( $data['manual_data'] ) ) {
                     $existing = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
                     foreach ( $data['manual_data'] as $poly_id => $fields ) {

@@ -500,6 +500,20 @@ function svgml_ajax_import_panel_settings() {
         ];
     }
 
+    // Bekende beperking (bewust niet volledig opgelost, zie projectplan): op een
+    // manual-mode kaart kent svgml_ensure_manual_block_keys() een verse, unieke
+    // sleutel toe aan elk geïmporteerd blok zonder 'field' — dat dekt het geval
+    // waarin de export-JSON, net als het manual-mode-formulier zelf, 'field'
+    // leeg liet. Bevat de geïmporteerde JSON echter al een NIET-lege 'field'
+    // (bijv. een export van een andere, zelf al gemigreerde kaart), dan blijft
+    // die sleutel letterlijk staan — svgml_ensure_manual_block_keys() raakt
+    // niet-lege sleutels bewust nooit aan. Zo'n vreemde-kaart-sleutel matcht dan
+    // niets in de lokale '_svgml_manual_data'. Het herkoppelen daarvan wordt
+    // hier niet gebouwd.
+    if ( 'manual' === ( get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json' ) ) {
+        $blocks = svgml_ensure_manual_block_keys( $blocks, $map_id );
+    }
+
     update_post_meta( $map_id, '_svgml_panel_blocks',        $blocks );
     update_post_meta( $map_id, '_svgml_panel_title',         sanitize_text_field( $settings['panel_title'] ?? '' ) );
     update_post_meta( $map_id, '_svgml_overview_enabled',    ! empty( $settings['overview_enabled'] ) ? '1' : '' );

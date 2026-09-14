@@ -5,7 +5,7 @@
  * Description: Interactieve kaart plugin. Upload een afbeelding of SVG, teken polygonen,
  *              koppel ze aan een JSON feed, en toon data in een info-panel.
  *              Ondersteunt meerdere kaarten per site.
- * Version:     2.2.0
+ * Version:     2.3.0
  * Author:      REDDSTONE
  * Author URI:  https://reddstone.nl
  * License:     GPL v2 or later
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-define( 'SVGML_VERSION', '2.2.0' );
+define( 'SVGML_VERSION', '2.3.0' );
 define( 'SVGML_PATH',    plugin_dir_path( __FILE__ ) );
 define( 'SVGML_URL',     plugin_dir_url( __FILE__ ) );
 
@@ -94,6 +94,10 @@ if ( is_admin() || wp_doing_cron() ) {
 // INCLUDE FILES
 // Each include handles one responsibility: admin pages, AJAX, frontend, etc.
 // ─────────────────────────────────────────────────────────────────────────────
+// Moet vóór ajax.php geladen worden: de import-handler daarin roept
+// svgml_ensure_manual_block_keys() aan (zie includes/manual-field-keys.php voor
+// uitleg waarom dit bestand hier, onvoorwaardelijk, thuishoort).
+require_once SVGML_PATH . 'includes/manual-field-keys.php';
 require_once SVGML_PATH . 'includes/ajax.php';
 require_once SVGML_PATH . 'includes/frontend.php';
 require_once SVGML_PATH . 'includes/admin-footer.php';

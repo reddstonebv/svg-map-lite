@@ -16,6 +16,25 @@ function svgml_render_panel_builder_page( $map_id ) {
             $map_mode  = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
             $is_manual = ( 'manual' === $map_mode );
 
+            // ── A0: verouderd-formulier-guard (manual-modus) ──────────────────
+            // Als een admin dit formulier open had staan van vóór een plugin-
+            // update (2.2.0 en ouder: alle hidden svgml_block_field[]-inputs
+            // waren toen altijd leeg) en pas NA de update opslaat, dan heeft de
+            // admin_init-migratie (includes/manual-field-keys.php) de blokken
+            // en _svgml_manual_data intussen al herschreven naar stabiele
+            // sleutels — maar deze POST bevat nog de oude, lege waarden. Zonder
+            // deze guard zou hieronder een TWEEDE, andere set sleutels ontstaan,
+            // waardoor data en blokken alsnog stil uit elkaar vallen, ondanks de
+            // migratie. Een geweigerde opslag is hier de bewust gekozen uitkomst
+            // — dat is altijd beter dan een stille, permanente ontkoppeling.
+            // Let op: de overzichtsveld-blokken (_svgml_overview_blocks) worden
+            // verderop in HETZELFDE formulier opgeslagen, dus deze ene guard
+            // dekt die automatisch mee — bouw daar geen tweede guard voor.
+            $svgml_pb_form_v = $_POST['svgml_pb_form_v'] ?? '';
+            if ( $is_manual && '2' !== $svgml_pb_form_v ) {
+                echo '<div class="notice notice-error"><p>Deze pagina was verouderd. Herlaad de pagina en probeer opnieuw.</p></div>';
+            } else {
+
             // ── Primary path: JSON from hidden field (panel-builder.js) ──────
             // assets/js/panel-builder.js serialises the current DOM order into
             // #svgml_panel_blocks before the POST fires, so this field always
@@ -99,6 +118,15 @@ function svgml_render_panel_builder_page( $map_id ) {
                 }
             }
 
+            // Manual-modus: elk blok zonder sleutel (nieuwe blokken, of blokken
+            // die via de fallback-parallel-arrays-weg binnenkwamen) krijgt hier
+            // zijn stabiele sleutel. Bestaande sleutels blijven ongemoeid. Dit is
+            // dezelfde gedeelde functie die ook door de importers in ajax.php en
+            // ai-assistant.php wordt aangeroepen — zie includes/manual-field-keys.php.
+            if ( $is_manual ) {
+                $blocks = svgml_ensure_manual_block_keys( $blocks, $map_id );
+            }
+
             update_post_meta( $map_id, '_svgml_panel_blocks', $blocks );
 
             // ── Save panel settings ──────────────────────────────────────────
@@ -161,6 +189,7 @@ function svgml_render_panel_builder_page( $map_id ) {
             delete_transient( 'svgml_html_'       . $map_id );
 
             echo '<div class="notice notice-success is-dismissible"><p>Panel Builder opgeslagen!</p></div>';
+            } // einde A0-guard else
         }
     }
 
@@ -202,9 +231,14 @@ function svgml_render_panel_builder_page( $map_id ) {
     }
 
     // ── Overview field options ───────────────────────────────────────────────
-    // In manual mode, data keys are manual_field_0, manual_field_1, … (index-based).
-    // The label shown to the user is the panel block's own label (or a type fallback).
-    // In JSON mode, mirror the same $field_names used by the main panel block selects.
+    // Manual-mode datasleutels zijn stabiele per-blok sleutels, opgeslagen in
+    // $block['field'] (toegekend bij opslaan, of via de eenmalige migratie in
+    // includes/manual-field-keys.php). manual_field_{index} is alleen nog de
+    // permanente fallback voor niet-gemigreerde data — svgml_get_manual_field_key()
+    // regelt die fallback, zie dat bestand voor de volledige uitleg.
+    // De label die de gebruiker ziet is het label van het panelblok zelf (of een
+    // type-fallback). In JSON-modus spiegelen we dezelfde $field_names die de
+    // panelblok-selects gebruiken.
     if ( 'manual' === $map_mode ) {
         $ov_type_fallbacks = [
             'thumbnail' => 'Afbeelding', 'heading' => 'Koptekst', 'badge'  => 'Badge',
@@ -218,15 +252,19 @@ function svgml_render_panel_builder_page( $map_id ) {
                 ? $pb['label']
                 : ( $ov_type_fallbacks[ $pb['type'] ?? 'text' ] ?? 'Veld' ) . ' ' . ( $i + 1 );
             $overview_field_options[] = [
-                'value' => 'manual_field_' . $i,
+                'value' => svgml_get_manual_field_key( $pb, $i ),
                 'label' => $pb_label,
             ];
         }
         if ( empty( $overview_field_options ) ) {
+            // Nog geen enkel echt panelblok: vóór deze fix wezen manual_field_0/1/2
+            // hier tenminste nog toevallig naar iets, ná deze fix zijn dat
+            // gegarandeerd dode verwijzingen zodra de gebruiker blokken bouwt (en
+            // die dode waarde zou dan al opgeslagen staan in _svgml_overview_blocks).
+            // Daarom nu één niet-selecteerbare placeholder-optie in plaats van drie
+            // nep-opties.
             $overview_field_options = [
-                [ 'value' => 'manual_field_0', 'label' => 'Veld 1' ],
-                [ 'value' => 'manual_field_1', 'label' => 'Veld 2' ],
-                [ 'value' => 'manual_field_2', 'label' => 'Veld 3' ],
+                [ 'value' => '', 'label' => '— bouw eerst je paneel —', 'disabled' => true ],
             ];
         }
     } else {
@@ -269,6 +307,11 @@ function svgml_render_panel_builder_page( $map_id ) {
 
         <form method="post" action="">
             <?php wp_nonce_field( 'svgml_save_panelbuilder', 'svgml_panelbuilder_nonce' ); ?>
+            <!-- Versie-marker voor de A0-verouderd-formulier-guard hierboven: als
+                 deze waarde niet '2' is bij een POST op een manual-mode kaart,
+                 weigert de opslag-handler bewust met een foutmelding, in plaats
+                 van stil de verkeerde/oude sleutels op te slaan. -->
+            <input type="hidden" name="svgml_pb_form_v" value="2">
 
             <!-- ─── PANEELINSTELLINGEN ─────────────────────────────────── -->
             <div class="svgml-section">
@@ -356,7 +399,11 @@ function svgml_render_panel_builder_page( $map_id ) {
                                 <?php endif; ?>
                             </td>
                             <?php else : ?>
-                            <input type="hidden" name="svgml_block_field[]" value="">
+                            <!-- Manual-modus: geen JSON-veldkeuze, maar WEL de stabiele
+                                 sleutel van dit blok meesturen (of '' voor een blok dat
+                                 zijn sleutel nog niet heeft — de opslag-handler kent er
+                                 dan een nieuwe toe, zie svgml_ensure_manual_block_keys()). -->
+                            <input type="hidden" name="svgml_block_field[]" value="<?php echo esc_attr( $b_field ); ?>">
                             <?php endif; ?>
                             <td>
                                 <select name="svgml_block_type[]" class="svgml-block-type-select">
@@ -486,7 +533,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                             <select id="svgml_overview_sort_field" name="svgml_overview_sort_field">
                                 <option value="" <?php selected( $overview_sort_field, '' ); ?>>— SVG Tekenvolgorde —</option>
                                 <?php foreach ( $overview_field_options as $sort_opt ) : ?>
-                                    <option value="<?php echo esc_attr( $sort_opt['value'] ); ?>" <?php selected( $overview_sort_field, $sort_opt['value'] ); ?>>
+                                    <option value="<?php echo esc_attr( $sort_opt['value'] ); ?>" <?php selected( $overview_sort_field, $sort_opt['value'] ); ?> <?php disabled( ! empty( $sort_opt['disabled'] ) ); ?>>
                                         <?php echo esc_html( $sort_opt['label'] ); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -555,7 +602,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                                     <option value="">— kies veld —</option>
                                     <?php foreach ( $overview_field_options as $ov_opt ) : ?>
                                         <option value="<?php echo esc_attr( $ov_opt['value'] ); ?>"
-                                            <?php selected( $ob_field, $ov_opt['value'] ); ?>>
+                                            <?php selected( $ob_field, $ov_opt['value'] ); ?> <?php disabled( ! empty( $ov_opt['disabled'] ) ); ?>>
                                             <?php echo esc_html( $ov_opt['label'] ); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -719,6 +766,10 @@ function svgml_render_panel_builder_page( $map_id ) {
                     </select>
                 </td>
                 <?php else : ?>
+                <!-- Nieuw blok: bewust value="" laten staan. Nieuwe blokken erven
+                     nooit een sleutel client-side — ze krijgen er pas één
+                     toegekend zodra ze daadwerkelijk worden opgeslagen (server-side,
+                     via svgml_ensure_manual_block_keys()). -->
                 <input type="hidden" name="svgml_block_field[]" value="">
                 <?php endif; ?>
                 <td>
@@ -774,7 +825,7 @@ function svgml_render_panel_builder_page( $map_id ) {
                     <select name="svgml_overview_field[]" class="svgml-overview-field-select">
                         <option value="">— kies veld —</option>
                         <?php foreach ( $overview_field_options as $ov_opt ) : ?>
-                            <option value="<?php echo esc_attr( $ov_opt['value'] ); ?>"><?php echo esc_html( $ov_opt['label'] ); ?></option>
+                            <option value="<?php echo esc_attr( $ov_opt['value'] ); ?>" <?php disabled( ! empty( $ov_opt['disabled'] ) ); ?>><?php echo esc_html( $ov_opt['label'] ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </td>

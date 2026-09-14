@@ -103,12 +103,21 @@ function svgml_render_filters_page( $map_id ) {
         ? ( get_post_meta( $map_id, '_svgml_panel_blocks', true ) ?: [] )
         : [];
 
+    // Manual-modus: veldsleutel is nu de stabiele sleutel uit $block['field'],
+    // met manual_field_{index} alleen nog als permanente fallback voor
+    // niet-gemigreerde data (svgml_get_manual_field_key(), zie
+    // includes/manual-field-keys.php). Een dropdown-optie die vóór een
+    // plugin-update opgeslagen is als manual_field_N wordt door een latere
+    // migratie niet met terugwerkende kracht bijgewerkt in _svgml_filter_fields
+    // — dat is een bewust geaccepteerd, mild risico (zie projectplan): het
+    // filter werkt dan simpelweg niet meer totdat de gebruiker het veld
+    // opnieuw kiest, zonder dataverlies. Geen guard hiervoor gebouwd.
     $filter_field_options = [];
     if ( 'manual' === $map_mode ) {
         foreach ( $panel_blocks as $i => $pb ) {
             if ( ( $pb['type'] ?? '' ) === 'divider' ) continue;
             $filter_field_options[] = [
-                'value' => 'manual_field_' . $i,
+                'value' => svgml_get_manual_field_key( $pb, $i ),
                 'label' => ! empty( $pb['label'] ) ? $pb['label'] : ( $pb['type'] ?? 'Veld ' . $i ),
             ];
         }

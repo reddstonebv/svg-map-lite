@@ -308,9 +308,13 @@ function svgml_get_manual_field_fallback_label( $type, $index ) {
     );
 
     if ( isset( $type_names[ $type ] ) ) {
-        // Volgnummer blijft zichtbaar: de opgeslagen waarde hangt af van de
-        // POSITIE van het blok (manual_field_{index}), dus die positie
-        // zichtbaar houden helpt bij het herkennen van problemen.
+        // Volgnummer blijft zichtbaar, maar is nu puur decoratief: het helpt de
+        // gebruiker een blok visueel te herkennen/terugvinden. Het beschrijft
+        // NIET meer de echte opslagsleutel — die is een stabiele sleutel in
+        // $block['field'] (toegekend bij opslaan, of via de eenmalige migratie
+        // in includes/manual-field-keys.php), met manual_field_{index} alleen
+        // nog als permanente fallback voor niet-gemigreerde data. Zie
+        // svgml_get_manual_field_key() voor de volledige uitleg.
         return $type_names[ $type ] . ' (veld ' . $field_number . ')';
     }
 
@@ -334,6 +338,20 @@ function svgml_render_manual_data_interface( $map_id ) {
         if ( ! wp_verify_nonce( $_POST['svgml_manual_data_nonce'], 'svgml_save_manual_data' ) ) {
             echo '<div class="notice notice-error"><p>Beveiligingsfout. Probeer opnieuw.</p></div>';
         } else {
+            // ── A0-bis: verouderd-formulier-guard ─────────────────────────────
+            // Zelfde val als bij de Panel Builder (zie includes/panel-builder.php,
+            // A0), maar hier destructiever: zonder deze guard zou isset($fields[$field_key])
+            // hieronder voor ELKE sleutel falen als het formulier vóór een
+            // plugin-update gerenderd is (data-manual-key's zijn dan nog
+            // manual_field_N, terwijl _svgml_manual_data intussen door de
+            // admin_init-migratie al mf_... sleutels heeft) — met als gevolg dat
+            // update_post_meta() de VOLLEDIGE regiodata met lege strings zou
+            // overschrijven. Geen ontkoppeling maar totale leegte. Vandaar: bij
+            // een ontbrekende/verouderde marker helemaal niets opslaan.
+            $svgml_manual_form_v = $_POST['svgml_manual_form_v'] ?? '';
+            if ( '2' !== $svgml_manual_form_v ) {
+                echo '<div class="notice notice-error"><p>Deze pagina was verouderd. Herlaad de pagina en probeer opnieuw.</p></div>';
+            } else {
             // Process and save all region data from JSON payload
             $json_all = isset( $_POST['svgml_manual_data_all'] ) ? wp_unslash( $_POST['svgml_manual_data_all'] ) : '';
             if ( ! isset( $_POST['svgml_manual_data_all'] ) ) {
@@ -345,14 +363,57 @@ function svgml_render_manual_data_interface( $map_id ) {
                 if ( ! is_array( $decoded ) ) {
                     echo '<div class="notice notice-error"><p>Ongeldige JSON ontvangen. Probeer opnieuw.</p></div>';
                 } else {
+                    // Nodig voor het A0-ter-vangnet hieronder: een overgeslagen regio
+                    // moet zijn BESTAANDE waarden behouden. update_post_meta() verderop
+                    // vervangt de HELE meta in één keer, dus 'continue' zonder deze data
+                    // zou die regio niet met rust laten maar hem gewoon wissen — precies
+                    // het dataverlies dat A0-ter moest voorkomen.
+                    $existing_data = get_post_meta( $map_id, '_svgml_manual_data', true );
+                    if ( ! is_array( $existing_data ) ) {
+                        $existing_data = [];
+                    }
+
                     $new_data = [];
                     // Insert in submitted order so drag-to-reorder is preserved.
                     foreach ( $decoded as $poly_id => $fields ) {
                         $clean_id = sanitize_text_field( (string) $poly_id );
-                        if ( ! $clean_id || ! is_array( $fields ) ) continue;
+                        if ( ! $clean_id || ! is_array( $fields ) ) {
+                            // Ongeldige regio-ID of geen array aan velden: dit was al zo
+                            // vóór deze wijziging (bestaand gedrag, geen regressie) — een
+                            // regio met een kapotte/lege ID kan sowieso niet teruggevonden
+                            // worden in $existing_data, dus hier bewust WEL 'continue'
+                            // zonder de bestaande-data-behoud-truc van A0-ter hieronder.
+                            continue;
+                        }
+
+                        // ── A0-ter: onafhankelijk vangnet, los van de A0-bis-marker ──
+                        // Een sleutelmismatch is sowieso ongewenst gedrag, ook buiten
+                        // het update-scenario (bug, race condition, iets dat A0-bis
+                        // niet dekt). Bevat $fields wél waarden, maar komt er GEEN
+                        // ENKELE verwachte sleutel in voor, dan is dit vrijwel zeker
+                        // een mismatch — sla deze regio dan over in plaats van hem
+                        // met lege strings te overschrijven. Bestaande data voor deze
+                        // regio blijft dan gewoon staan: expliciet overgenomen uit
+                        // $existing_data, want anders zou deze regio simpelweg
+                        // ontbreken in $new_data en dus alsnog verdwijnen zodra
+                        // update_post_meta() de volledige meta vervangt.
+                        $expected_keys_present = false;
+                        foreach ( $panel_config as $i => $block ) {
+                            if ( array_key_exists( svgml_get_manual_field_key( $block, $i ), $fields ) ) {
+                                $expected_keys_present = true;
+                                break;
+                            }
+                        }
+                        if ( ! empty( $fields ) && ! $expected_keys_present ) {
+                            if ( isset( $existing_data[ $clean_id ] ) ) {
+                                $new_data[ $clean_id ] = $existing_data[ $clean_id ];
+                            }
+                            continue;
+                        }
+
                         $clean_fields = [];
                         foreach ( $panel_config as $i => $block ) {
-                            $field_key = 'manual_field_' . $i;
+                            $field_key = svgml_get_manual_field_key( $block, $i );
                             $clean_fields[ $field_key ] = isset( $fields[ $field_key ] )
                                 ? sanitize_text_field( $fields[ $field_key ] )
                                 : '';
@@ -364,6 +425,7 @@ function svgml_render_manual_data_interface( $map_id ) {
                     echo '<div class="notice notice-success is-dismissible"><p>Regio gegevens opgeslagen!</p></div>';
                 }
             }
+            } // einde A0-bis-guard else
         }
     }
 
@@ -494,7 +556,14 @@ function svgml_render_manual_data_interface( $map_id ) {
             <div class="svgml-manual-content">
                 <form method="post" action="" class="svgml-manual-form" id="svgml-manual-form">
                     <?php wp_nonce_field( 'svgml_save_manual_data', 'svgml_manual_data_nonce' ); ?>
-                    
+                    <!-- Versie-marker voor de A0-bis-verouderd-formulier-guard in de
+                         opslag-handler hierboven: ontbreekt deze waarde (of is hij
+                         niet '2'), dan weigert de handler de opslag bewust — dat
+                         voorkomt dat een vóór-de-update gerenderde pagina (met nog
+                         manual_field_N als data-manual-key) na een update alle
+                         regiodata met lege strings overschrijft. -->
+                    <input type="hidden" name="svgml_manual_form_v" value="2">
+
                     <input type="hidden" name="polygon_id" id="polygon_id" value="<?php echo isset( $all_polygons[0] ) ? esc_attr( $all_polygons[0]['id'] ) : ''; ?>">
                     <input type="hidden" name="svgml_manual_data_all" id="svgml_manual_data_all" value="">
                     
@@ -511,7 +580,7 @@ function svgml_render_manual_data_interface( $map_id ) {
                             $label = isset( $block['label'] ) && !empty( $block['label'] )
                                 ? esc_html( $block['label'] )
                                 : esc_html( svgml_get_manual_field_fallback_label( $type, $i ) );
-                            $field_key = 'manual_field_' . $i;
+                            $field_key = svgml_get_manual_field_key( $block, $i );
                         ?>
                         <div class="form-group">
                             <label for="<?php echo esc_attr( $field_key ); ?>">

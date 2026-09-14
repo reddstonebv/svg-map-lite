@@ -253,6 +253,13 @@
 
             // In manual mode the block has no JSON field key; derive it from
             // the block's array index, which matches the backend storage key.
+            //
+            // NB: as of 2.3.0, manual-mode blocks normally carry a stable
+            // 'field' key of their own (set server-side, see includes/manual-
+            // field-keys.php), so this branch is skipped for a migrated block.
+            // This fallback is intentionally PERMANENT — it is what keeps a
+            // never-migrated map (or a block written by an importer that
+            // didn't assign a stable key) working correctly. Do not remove it.
             if (svgmlData.mapMode === 'manual' && field === '') {
                 field = 'manual_field_' + i;
             }
