@@ -277,6 +277,48 @@ function svgml_render_mapping_table( $svg_ids, $id_mapping, $excluded_ids ) {
 }
 
 /**
+ * Geeft een leesbare naam voor een paneelblok-type, voor gebruik als label
+ * wanneer de gebruiker zelf geen label heeft ingevuld in de Panel Builder.
+ *
+ * Waarom een aparte functie met een array: zo staat de vertaling van
+ * type naar naam op één plek, en kan er later gewoon een regel bij als er
+ * een nieuw bloktype bijkomt in de Panel Builder — zonder deze functie te
+ * hoeven doorzoeken op if/else-ketens.
+ *
+ * @param string $type    Het bloktype, bv. 'thumbnail', 'heading', ...
+ * @param int    $index   Index (0-based) van het blok in $panel_config.
+ * @return string         Leesbare naam, bv. "Thumbnail (veld 3)".
+ */
+function svgml_get_manual_field_fallback_label( $type, $index ) {
+    // Volgnummer is 1-based voor de gebruiker (index 0 = "veld 1").
+    $field_number = $index + 1;
+
+    // Bekende bloktypes uit de Panel Builder → leesbare Nederlandse naam.
+    $type_names = array(
+        'thumbnail'      => 'Thumbnail',
+        'heading'        => 'Kop',
+        'price'          => 'Prijs',
+        'badge'          => 'Badge',
+        'link'           => 'Link',
+        'divider'        => 'Scheidingslijn',
+        'static_button'  => 'Knop',
+        'static_html'    => 'HTML',
+        'text'           => 'Tekst',
+        'html'           => 'HTML',
+    );
+
+    if ( isset( $type_names[ $type ] ) ) {
+        // Volgnummer blijft zichtbaar: de opgeslagen waarde hangt af van de
+        // POSITIE van het blok (manual_field_{index}), dus die positie
+        // zichtbaar houden helpt bij het herkennen van problemen.
+        return $type_names[ $type ] . ' (veld ' . $field_number . ')';
+    }
+
+    // Onbekend/leeg type: val terug op de oude, generieke naam.
+    return 'Veld ' . $field_number;
+}
+
+/**
  * Manual Mode: Data entry interface for manual region mapping
  * Displays a two-column layout: polygon list (left) + data form (right)
  */
@@ -463,15 +505,55 @@ function svgml_render_manual_data_interface( $map_id ) {
                     <?php else : ?>
                         <?php foreach ( $panel_config as $i => $block ) :
                             $type = isset( $block['type'] ) ? $block['type'] : '';
-                            $label = isset( $block['label'] ) && !empty( $block['label'] ) ? esc_html( $block['label'] ) : 'Veld ' . ($i+1);
+                            // Eigen label heeft voorrang; zonder label vallen we terug op een
+                            // naam afgeleid van het bloktype (zie svgml_get_manual_field_fallback_label()),
+                            // want "Veld 1" zegt niets over wat er in dat vak hoort.
+                            $label = isset( $block['label'] ) && !empty( $block['label'] )
+                                ? esc_html( $block['label'] )
+                                : esc_html( svgml_get_manual_field_fallback_label( $type, $i ) );
                             $field_key = 'manual_field_' . $i;
                         ?>
                         <div class="form-group">
                             <label for="<?php echo esc_attr( $field_key ); ?>">
                                 <strong><?php echo $label; ?></strong>
                             </label>
-                            <?php if ( $type === 'text' || $type === 'html' ) : ?>
-                                <textarea 
+                            <?php if ( $type === 'thumbnail' ) : ?>
+                                <?php
+                                // Paneelblok type 'thumbnail': hier moet een AFBEELDING gekozen worden.
+                                // Belangrijk: het opgeslagen formaat blijft een URL-string (net als bij
+                                // een gewoon tekstveld) — géén attachment-ID — want de frontend
+                                // (panel-renderer.js) bouwt hiermee direct een <img src="..."> op en
+                                // verwacht dus een http(s)-URL, geen numeriek ID.
+                                //
+                                // Daarom blijft dit gewoon een <input type="text"> met dezelfde
+                                // class="svgml-manual-field" en data-manual-key als elk ander veld:
+                                // de JS verderop in dit bestand verzamelt ALLE waarden puur op basis
+                                // van die class + attribuut (zie saveCurrentToManualData()). Verlies je
+                                // die class of dat attribuut, dan wordt er bij opslaan stilzwijgend een
+                                // lege waarde weggeschreven — geen foutmelding, dus lastig te debuggen.
+                                //
+                                // De knop "Kies afbeelding" hiernaast is puur een hulpmiddel: hij vult
+                                // via JS (wp.media()) alleen de URL in ditzelfde tekstveld. Met de hand
+                                // een URL plakken blijft dus gewoon werken (backward compatible met
+                                // bestaande handmatige data).
+                                ?>
+                                <div class="svgml-thumbnail-field-wrap">
+                                    <input type="text"
+                                        id="<?php echo esc_attr( $field_key ); ?>"
+                                        name="<?php echo esc_attr( $field_key ); ?>"
+                                        class="regular-text svgml-manual-field svgml-thumbnail-input"
+                                        data-manual-key="<?php echo esc_attr( $field_key ); ?>"
+                                        placeholder="https://...">
+                                    <button type="button" class="button svgml-thumbnail-pick-btn">Kies afbeelding</button>
+                                    <?php // Kleine voorbeeldweergave. De <img> begint verborgen (geen src);
+                                    // JS toont hem zodra het tekstveld een geldige http(s)-URL bevat —
+                                    // zowel na kiezen via de media-library als na handmatig plakken. ?>
+                                    <div class="svgml-thumbnail-preview">
+                                        <img src="" alt="" style="display:none;">
+                                    </div>
+                                </div>
+                            <?php elseif ( $type === 'text' || $type === 'html' ) : ?>
+                                <textarea
                                     id="<?php echo esc_attr( $field_key ); ?>"
                                     name="<?php echo esc_attr( $field_key ); ?>"
                                     class="regular-text svgml-manual-field"
@@ -616,6 +698,31 @@ function svgml_render_manual_data_interface( $map_id ) {
             font-size: 14px;
         }
 
+        /* Thumbnail-veld: tekstveld + knop op één regel, voorbeeld eronder. */
+        .svgml-thumbnail-field-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .svgml-thumbnail-field-wrap .svgml-thumbnail-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .svgml-thumbnail-preview {
+            flex-basis: 100%;
+        }
+
+        .svgml-thumbnail-preview img {
+            max-width: 150px;
+            max-height: 150px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-top: 6px;
+        }
+
         .form-group input[type="text"]:focus,
         .form-group select:focus,
         .form-group textarea:focus {
@@ -668,7 +775,75 @@ function svgml_render_manual_data_interface( $map_id ) {
                     : '';
                 $(this).val(value);
             });
+
+            // Na het vullen van alle velden ook elke thumbnail-preview verversen,
+            // anders blijft bij het wisselen van vlak de voorbeeldweergave van het
+            // vórige vlak zichtbaar (of leeg terwijl het nieuwe vlak wél een URL heeft).
+            $('.svgml-thumbnail-field-wrap').each(function() {
+                updateThumbnailPreview($(this));
+            });
         }
+
+        /**
+         * Toon of verberg de voorbeeldafbeelding van één thumbnail-veld.
+         * $wrap is de .svgml-thumbnail-field-wrap div die zowel het tekstveld
+         * als de <img> bevat. We tonen de <img> alleen als de waarde met
+         * http:// of https:// begint — dezelfde check als panel-renderer.js
+         * gebruikt op de frontend, zodat de admin-preview en de echte weergave
+         * hetzelfde gedrag hebben (een onvolledige/lege waarde toont niets).
+         */
+        function updateThumbnailPreview($wrap) {
+            var url = $wrap.find('.svgml-thumbnail-input').val();
+            var $img = $wrap.find('.svgml-thumbnail-preview img');
+            if (url && /^https?:\/\//i.test(url)) {
+                $img.attr('src', url).show();
+            } else {
+                $img.hide().attr('src', '');
+            }
+        }
+
+        // Klik op "Kies afbeelding": open de WordPress media-library en zet de
+        // gekozen afbeelding-URL in het tekstveld ernaast.
+        // Delegated op '.svgml-manual-content' (in plaats van rechtstreeks op de
+        // knop) omdat er meerdere thumbnail-velden op de pagina kunnen staan —
+        // zo werkt dezelfde ene handler voor elk van hen, en vinden we via
+        // .closest() steeds het juiste veld/preview-paar bij de aangeklikte knop.
+        $('.svgml-manual-content').on('click', '.svgml-thumbnail-pick-btn', function(e) {
+            e.preventDefault(); // dit is geen submit-knop van het formulier
+            var $wrap  = $(this).closest('.svgml-thumbnail-field-wrap');
+            var $input = $wrap.find('.svgml-thumbnail-input');
+
+            // Bewust GEEN hergebruikt/module-level media-frame (zoals elders in de
+            // plugin): met meerdere thumbnail-velden op één pagina moet elke klik
+            // zijn eigen frame openen, anders zou een herbruikt frame de vorige
+            // (verkeerde) $input onthouden.
+            var frame = wp.media({
+                title:    'Kies afbeelding',
+                button:   { text: 'Gebruik afbeelding' },
+                multiple: false,
+                library:  { type: 'image' }
+            });
+
+            frame.on('select', function() {
+                var attachment = frame.state().get('selection').first().toJSON();
+
+                // .val() zet de URL in HETZELFDE tekstveld dat saveCurrentToManualData()
+                // straks met .val() uitleest — geen los data-attribuut of los element,
+                // want dat zou bij opslaan een lege waarde opleveren (zie PHP-comment).
+                // .trigger('input').trigger('change') zorgt dat de preview-listener
+                // hieronder (en eventuele andere logica die op deze events luistert)
+                // meteen meekrijgt dat de waarde is veranderd.
+                $input.val(attachment.url).trigger('input').trigger('change');
+            });
+
+            frame.open();
+        });
+
+        // Ook bij handmatig typen/plakken van een URL (backward compatible pad)
+        // de preview verversen — niet alleen na kiezen via de media-library.
+        $('.svgml-manual-content').on('input', '.svgml-thumbnail-input', function() {
+            updateThumbnailPreview($(this).closest('.svgml-thumbnail-field-wrap'));
+        });
 
         // Handle polygon selection: save current edits, then load the new region.
         $('.svgml-polygon-item').on('click', function() {
