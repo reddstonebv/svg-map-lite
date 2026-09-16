@@ -1091,8 +1091,19 @@ tr.svgml-row-excluded .svgml-exclude-label {
     overflow: auto;
 }
 
-.svgml-polygon-controls-overlay strong {
-    display: block;
+/* Ingeklapt (geen 'open' attribuut): minder padding, zodat het blokje
+   over het canvas echt klein blijft — er is dan alleen de summary-regel. */
+.svgml-polygon-controls-overlay:not([open]) {
+    padding: 6px 12px;
+}
+
+.svgml-polygon-controls-overlay summary {
+    cursor: pointer;         /* Duidelijk klikbaar, ook al ligt dit over het canvas */
+    font-weight: 600;
+    user-select: none;
+}
+
+.svgml-polygon-controls-overlay[open] summary {
     margin-bottom: 8px;
 }
 
@@ -1127,9 +1138,13 @@ tr.svgml-row-excluded .svgml-exclude-label {
 
 .svgml-polygon-controls-overlay li:nth-child(1)::before { content: '🖱️'; }
 .svgml-polygon-controls-overlay li:nth-child(2)::before { content: '✅'; }
-.svgml-polygon-controls-overlay li:nth-child(3)::before { content: '🔍'; }
-.svgml-polygon-controls-overlay li:nth-child(4)::before { content: '✋'; }
+.svgml-polygon-controls-overlay li:nth-child(3)::before { content: '➕'; }
+.svgml-polygon-controls-overlay li:nth-child(4)::before { content: '🔴'; }
 .svgml-polygon-controls-overlay li:nth-child(5)::before { content: '⌫'; }
+.svgml-polygon-controls-overlay li:nth-child(6)::before { content: '🏁'; }
+.svgml-polygon-controls-overlay li:nth-child(7)::before { content: '🔀'; }
+.svgml-polygon-controls-overlay li:nth-child(8)::before { content: '🔍'; }
+.svgml-polygon-controls-overlay li:nth-child(9)::before { content: '✋'; }
 
 
 

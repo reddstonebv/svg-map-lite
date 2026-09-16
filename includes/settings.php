@@ -56,6 +56,73 @@ function svgml_render_settings_page( $map_id ) {
             }
             update_post_meta( $map_id, '_svgml_source_type', $source_type );
 
+            // ── Kaartmodus wijzigen (JSON-feed ↔ Handmatige invoer) ───────────
+            // '_svgml_map_mode' werd voorheen alleen bij het aanmaken van de kaart
+            // geschreven (svg-map-lite.php, svgml_handle_overview_actions()). Hier
+            // maken we het ook achteraf wisselbaar, vanaf het Instellingen-tabblad.
+            // We schrijven UITSLUITEND '_svgml_map_mode' zelf: '_svgml_manual_data',
+            // '_svgml_panel_blocks', '_svgml_filter_fields' en '_svgml_overview_blocks'
+            // blijven ongemoeid, zodat terugschakelen altijd mogelijk blijft zonder
+            // dat er ooit stilzwijgend data verdwijnt. De getekende vlakken
+            // ('_svgml_layers' / '_svgml_svg_ids') zijn toch al modus-onafhankelijk.
+            $old_map_mode = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+            $new_map_mode = sanitize_text_field( $_POST['svgml_map_mode'] ?? $old_map_mode );
+            if ( ! in_array( $new_map_mode, [ 'json', 'manual' ], true ) ) {
+                // Whitelist, zelfde patroon als hierboven bij '_svgml_source_type':
+                // een onverwachte waarde negeren we in plaats van hem op te slaan.
+                $new_map_mode = $old_map_mode;
+            }
+            if ( $new_map_mode !== $old_map_mode ) {
+                update_post_meta( $map_id, '_svgml_map_mode', $new_map_mode );
+
+                // De gecachte frontend-output (HTML + JSON) is modus-specifiek
+                // (andere veldnamen/labels) en moet na een moduswissel dus opnieuw
+                // opgebouwd worden — zelfde transients als overal elders in dit
+                // bestand na een wijziging die de frontend-output raakt.
+                delete_transient( 'svgml_json_cache_' . $map_id );
+                delete_transient( 'svgml_html_'       . $map_id );
+
+                if ( 'manual' === $new_map_mode ) {
+                    // Laat de bestaande eenmalige migratie (includes/manual-field-keys.php)
+                    // meteen draaien in plaats van te wachten op de eerstvolgende keer dat
+                    // een editor-tab geladen wordt (die migratie loopt normaal via de
+                    // admin_init-hook, en die is voor DIT request al gepasseerd terwijl
+                    // '_svgml_map_mode' toen nog op de oude waarde stond). De functie is
+                    // zelf volledig veilig om hier aan te roepen: ze stopt meteen als
+                    // '_svgml_manual_keys_v' al gezet is, en zet die vlag ook meteen als
+                    // er niets te migreren valt (lege of al-gemigreerde '_svgml_panel_blocks').
+                    //
+                    // Let op: op een kaart die van json naar manual wisselt staat
+                    // '_svgml_panel_blocks' meestal niet leeg — gewone velden hebben dan al
+                    // een JSON-veldnaam als 'field' (die blijven ongemoeid), maar divider-,
+                    // static_html- en static_button-blokken zijn in json-modus altijd MET
+                    // een lege 'field' opgeslagen (zie panel-builder.php, $static_types).
+                    // Die krijgen hier alsnog een 'mf_...'-sleutel toegekend. Omdat
+                    // '_svgml_manual_data' op zo'n kaart nog leeg is, valt er niets te
+                    // hernoemen — dit is dus altijd veilig, nooit destructief.
+                    //
+                    // Blijvend gevolg (geen bug): wisselt een kaart later opnieuw json →
+                    // manual nadat '_svgml_manual_keys_v' al op 1 staat, dan draait deze
+                    // migratie niet nogmaals. Is er dan ondertussen in json-modus een
+                    // nieuw divider/static-blok bijgekomen, dan houdt dat blok een lege
+                    // 'field' en valt terug op de positionele 'manual_field_{i}'-sleutel.
+                    // Onschuldig: alleen divider/static_html/static_button-blokken kunnen
+                    // hierin terechtkomen, en panel-renderer.js gebruikt voor die types
+                    // uitsluitend 'static_value' — er wordt dan geen veldopzoeking gedaan,
+                    // dus een verschuivende positionele sleutel raakt nooit een zichtbare
+                    // waarde. 'mf_...' is dus niet de enige geldige vorm van een manual-
+                    // veldsleutel; een JSON-veldnaam of 'manual_field_{i}' zijn beide even
+                    // geldig als 'field'-waarde.
+                    if ( function_exists( 'svgml_migrate_manual_block_keys' ) ) {
+                        svgml_migrate_manual_block_keys( $map_id );
+                    }
+                }
+                // Wissel NAAR json: hier niets migreren. De auto-sync verderop in deze
+                // functie (JSON-modus, leest '_svgml_map_mode' opnieuw uit de database)
+                // vult '_svgml_id_mapping' vanzelf zodra deze pagina wordt opgeslagen
+                // terwijl de modus al op 'json' staat en de feed bereikbaar is.
+            }
+
             // If an SVG attachment ID also came through the hidden field
             $attachment_id = intval( $_POST['svgml_svg_attachment_id'] ?? 0 );
             if ( $attachment_id ) {
@@ -269,6 +336,39 @@ function svgml_render_settings_page( $map_id ) {
             // The first parameter is the action name, the second is the name of the input field.
             wp_nonce_field( 'svgml_save_settings', 'svgml_settings_nonce' );
             ?>
+
+            <!-- ─── KAARTMODUS (JSON-feed vs Handmatige invoer) ────────────── -->
+            <div class="svgml-section">
+                <h2>Kaartmodus</h2>
+                <p class="svgml-description">
+                    Bepaalt of de gegevens per vlak uit een externe JSON-feed komen, of
+                    handmatig in de plugin worden ingevoerd. De getekende vlakken zelf
+                    (SVG-ID's / polygonen, hierboven) zijn hier volledig onafhankelijk van
+                    en blijven bij een wissel altijd gewoon staan.
+                </p>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="svgml_map_mode">Databron</label></th>
+                        <td>
+                            <select id="svgml_map_mode" name="svgml_map_mode"
+                                    data-original="<?php echo esc_attr( $map_mode ); ?>">
+                                <option value="json"   <?php selected( $map_mode, 'json' ); ?>>JSON-feed</option>
+                                <option value="manual" <?php selected( $map_mode, 'manual' ); ?>>Handmatige invoer</option>
+                            </select>
+                            <div class="notice notice-warning inline" style="margin:10px 0 0; padding:8px 12px;">
+                                <p style="margin:0">
+                                    <strong>Let op:</strong> na het wisselen van kaartmodus verwijzen de
+                                    panelblokken, filters, overzichtsvelden én het statusveld nog naar
+                                    veldnamen uit de oude modus, en moeten opnieuw gekozen worden op de
+                                    tabbladen "Info Paneel", "Filters" en "Weergave". Zonder dat opnieuw
+                                    te kiezen werkt bijvoorbeeld de statuskleur niet meer. De getekende
+                                    vlakken blijven wel gewoon staan en gaan niet verloren.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
 
             <!-- ─── SECTION 1: MAP SOURCE ─────────────────────────────────── -->
             <div class="svgml-section">
@@ -516,16 +616,26 @@ function svgml_render_settings_page( $map_id ) {
                                             <span class="dashicons dashicons-trash"></span> Verwijder
                                         </button>
                                     </div>
-                                    <div class="svgml-polygon-controls-overlay">
-                                        <strong>Bediening</strong>
+                                    <?php
+                                    // Inklapbare "Bediening"-lijst: native <details>/<summary> zodat dit
+                                    // ook zonder JS werkt. Standaard dicht (geen 'open' attribuut hier) —
+                                    // de open/dicht-stand wordt per gebruiker onthouden in localStorage
+                                    // door polygon-editor.js (sleutel 'svgml_controls_open').
+                                    ?>
+                                    <details class="svgml-polygon-controls-overlay" id="svgml-polygon-controls-overlay">
+                                        <summary>Bediening</summary>
                                         <ul>
                                             <li>Klik om punten te plaatsen</li>
                                             <li>Klaar of blijf klikken om af te ronden</li>
+                                            <li>Klik op een rand om er een punt aan toe te voegen</li>
+                                            <li>Sleep het rode bolletje in het midden om het hele vlak te verplaatsen</li>
+                                            <li>Backspace verwijdert een geselecteerd punt</li>
+                                            <li>Dubbelklik buiten het vlak om de bewerking af te ronden</li>
+                                            <li>Dubbelklik op een ander vlak om dat meteen te bewerken</li>
                                             <li>Ctrl + scroll om te zoomen</li>
                                             <li>Rechts slepen om te pannen</li>
-                                            <li>Backspace verwijdert een geselecteerd punt</li>
                                         </ul>
-                                    </div>
+                                    </details>
                                 </div>
                             </div>
                         </div>
@@ -650,4 +760,38 @@ function svgml_render_settings_page( $map_id ) {
     // Attach BEFORE polygon-editor so it runs before the editor reads svgmlAdmin.layers.
     // 'before' means this inline script is output immediately before the script tag.
     wp_add_inline_script( 'svgml-polygon-editor', $override_js, 'before' );
+    ?>
+
+    <script>
+    // ── Extra bevestiging bij het wisselen van kaartmodus ──────────────────
+    // De waarschuwingstekst hierboven staat altijd zichtbaar op de pagina,
+    // maar een select-veld is makkelijk per ongeluk te wijzigen. Deze
+    // jQuery-confirm() vraagt alleen om bevestiging als de gekozen modus
+    // daadwerkelijk afwijkt van de modus waarmee de pagina geladen is
+    // (opgeslagen in het 'data-original'-attribuut) — bij een gewone opslag
+    // zonder moduswissel verschijnt dus geen extra popup.
+    jQuery( function( $ ) {
+        var $modeSelect = $( '#svgml_map_mode' );
+        var originalMode = $modeSelect.data( 'original' );
+
+        $modeSelect.closest( 'form' ).on( 'submit', function( e ) {
+            if ( $modeSelect.val() === originalMode ) {
+                return; // Geen wissel, geen extra vraag nodig.
+            }
+
+            var gekozenLabel = $modeSelect.find( 'option:selected' ).text();
+            var bevestigd = window.confirm(
+                'Je staat op het punt de kaartmodus te wijzigen naar "' + gekozenLabel + '".\n\n' +
+                'Panelblokken, filters, overzichtsvelden en het statusveld verwijzen dan naar ' +
+                'veldnamen uit de oude modus en moeten opnieuw gekozen worden.\n' +
+                'De getekende vlakken blijven behouden.\n\nDoorgaan?'
+            );
+
+            if ( ! bevestigd ) {
+                e.preventDefault();
+            }
+        } );
+    } );
+    </script>
+    <?php
 }

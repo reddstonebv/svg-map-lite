@@ -5,7 +5,7 @@
  * Description: Interactieve kaart plugin. Upload een afbeelding of SVG, teken polygonen,
  *              koppel ze aan een JSON feed, en toon data in een info-panel.
  *              Ondersteunt meerdere kaarten per site.
- * Version:     2.3.0
+ * Version:     2.5.1
  * Author:      REDDSTONE
  * Author URI:  https://reddstone.nl
  * License:     GPL v2 or later
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-define( 'SVGML_VERSION', '2.3.0' );
+define( 'SVGML_VERSION', '2.5.1' );
 define( 'SVGML_PATH',    plugin_dir_path( __FILE__ ) );
 define( 'SVGML_URL',     plugin_dir_url( __FILE__ ) );
 

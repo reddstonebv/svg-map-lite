@@ -114,8 +114,40 @@ function svgml_render_display_page( $map_id ) {
     $status_colors     = get_post_meta( $map_id, '_svgml_status_colors', true ) ?: [];
     $status_hex_colors = get_post_meta( $map_id, '_svgml_status_hex_colors', true ) ?: [];
     $status_opacity    = get_post_meta( $map_id, '_svgml_status_opacity', true ) ?: [];
-    $field_names       = svgml_get_json_field_names( $map_id );
     $map_mode          = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
+
+    // ── Veldopties voor de statusveld-dropdown ────────────────────────────────
+    // svgml_get_json_field_names() leest de JSON-feed uit ('_svgml_json_url'):
+    // op een manual-kaart bestaat die feed niet, dus die functie geeft dan altijd
+    // een lege array terug en viel er nooit iets te kiezen. In manual-modus
+    // bouwen we de opties daarom op uit '_svgml_panel_blocks' — exact hetzelfde
+    // patroon als includes/filters.php (rond regel 99-128) en
+    // includes/panel-builder.php (rond regel 224-269) al gebruiken: waarde =
+    // svgml_get_manual_field_key() (de stabiele 'field'-sleutel, met de
+    // permanente positionele fallback 'manual_field_{i}' voor niet-gemigreerde
+    // data — zie includes/manual-field-keys.php), label = het eigen blok-label
+    // met terugval op het bloktype, en dividers slaan we over (die hebben geen
+    // eigen waarde). $field_options is dus altijd een array van
+    // ['value' => ..., 'label' => ...], voor beide modi op dezelfde manier.
+    $field_options = [];
+    if ( 'manual' === $map_mode ) {
+        $panel_blocks = get_post_meta( $map_id, '_svgml_panel_blocks', true ) ?: [];
+        foreach ( $panel_blocks as $i => $pb ) {
+            if ( ( $pb['type'] ?? '' ) === 'divider' ) {
+                continue;
+            }
+            $field_options[] = [
+                'value' => svgml_get_manual_field_key( $pb, $i ),
+                'label' => ! empty( $pb['label'] ) ? $pb['label'] : ( $pb['type'] ?? 'Veld ' . $i ),
+            ];
+        }
+    } else {
+        // JSON-modus: ongewijzigd gedrag, veldnaam is tegelijk waarde en label.
+        foreach ( svgml_get_json_field_names( $map_id ) as $fn ) {
+            $field_options[] = [ 'value' => $fn, 'label' => $fn ];
+        }
+    }
+    $field_option_values = wp_list_pluck( $field_options, 'value' );
     $layer_switcher    = get_post_meta( $map_id, '_svgml_layer_switcher', true ) ?: 'buttons';
     $panel_bg_color      = get_post_meta( $map_id, '_svgml_panel_bg_color',      true ) ?: '#ffffff';
     $panel_text_color    = get_post_meta( $map_id, '_svgml_panel_text_color',     true ) ?: '#333333';
@@ -173,14 +205,17 @@ function svgml_render_display_page( $map_id ) {
                         <td>
                             <select id="svgml_status_field" name="svgml_status_field" style="min-width:220px">
                                 <option value="">— niet ingesteld —</option>
-                                <?php foreach ( $field_names as $fn ) : ?>
-                                    <option value="<?php echo esc_attr( $fn ); ?>" <?php selected( $status_field, $fn ); ?>>
-                                        <?php echo esc_html( $fn ); ?>
+                                <?php foreach ( $field_options as $opt ) : ?>
+                                    <option value="<?php echo esc_attr( $opt['value'] ); ?>" <?php selected( $status_field, $opt['value'] ); ?>>
+                                        <?php echo esc_html( $opt['label'] ); ?>
                                     </option>
                                 <?php endforeach; ?>
-                                <?php if ( $status_field && ! in_array( $status_field, $field_names ) ) : ?>
+                                <?php if ( $status_field && ! in_array( $status_field, $field_option_values, true ) ) : ?>
+                                    <!-- Opgeslagen waarde komt niet (meer) voor in de huidige opties — bijv. na
+                                         het wisselen van kaartmodus (zie includes/settings.php). Duidelijk als
+                                         "onbekend" labelen in plaats van hem te tonen alsof hij nog geldig is. -->
                                     <option value="<?php echo esc_attr( $status_field ); ?>" selected>
-                                        <?php echo esc_html( $status_field ); ?>
+                                        <?php echo esc_html( $status_field ); ?> (onbekend veld — opnieuw kiezen)
                                     </option>
                                 <?php endif; ?>
                             </select>

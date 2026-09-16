@@ -34,6 +34,7 @@ jQuery(document).ready(function($) {
     var POINT_FILL        = '#e76f51';       // Coral: draw points
     var EDIT_POINT_FILL   = '#264653';       // Charcoal: editable points
     var EDIT_POINT_ACTIVE = '#e76f51';       // Coral: selected edit point
+    var CENTER_POINT_FILL = '#e63946';       // Rood: centrumgreep om het hele vlak te verplaatsen
     var SNAP_RADIUS       = 12;              // Pixels: magnetic attraction distance
 
     // ── MULTI-LAYER STATE ────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ jQuery(document).ready(function($) {
     var polygons      = [];          // [ { id, points (normalized), fabricObj }, ... ]
     var selectedPoly  = null;        // Currently selected polygon
     var editCircles   = [];          // Fabric.Circle's of editable points
+    var centerCircle  = null;        // Fabric.Circle: sleepgreep voor het hele vlak
     var editPolyRef   = null;        // Polygon being edited
     var selectedEditPt= null;        // Currently selected edit point
     var imageNatW     = 0;
@@ -88,6 +90,36 @@ jQuery(document).ready(function($) {
 
     $deleteBtn.hide();
     $('.svgml-edit-options').hide();
+
+    // ════════════════════════════════════════════════════════════════════
+    //  BEDIENING-OVERLAY: open/dicht-stand onthouden in localStorage
+    // ════════════════════════════════════════════════════════════════════
+    // De <details> staat in de HTML standaard dicht (geen 'open' attribuut).
+    // Hier zetten we 'm meteen open als de gebruiker 'm de vorige keer open
+    // had staan, en slaan we elke wissel op via het native 'toggle'-event.
+    (function initControlsOverlay() {
+        var STORAGE_KEY     = 'svgml_controls_open';
+        var $controlsOverlay = $('#svgml-polygon-controls-overlay');
+        if (!$controlsOverlay.length) return;
+
+        try {
+            if (window.localStorage && localStorage.getItem(STORAGE_KEY) === '1') {
+                $controlsOverlay.prop('open', true);
+            }
+        } catch (e) {
+            // localStorage kan geblokkeerd zijn (bv. privénavigatie) — dan blijft de lijst gewoon dicht
+        }
+
+        $controlsOverlay.on('toggle', function() {
+            try {
+                if (window.localStorage) {
+                    localStorage.setItem(STORAGE_KEY, this.open ? '1' : '0');
+                }
+            } catch (e) {
+                // Opslaan mislukt (bv. quota/privénavigatie) — geen probleem, alleen het onthouden werkt dan niet
+            }
+        });
+    })();
 
     // ════════════════════════════════════════════════════════════════════
     //  SOURCE TYPE TOGGLE
@@ -408,12 +440,34 @@ jQuery(document).ready(function($) {
             e.preventDefault();
         });
 
-        // Double-click to finish drawing
+        // Double-click to finish drawing, or as shortcut for "Klaar" in edit mode
         $(upperCanvas).on('dblclick.svgmlpan', function(e) {
             if (isDrawing) {
                 e.preventDefault();
                 e.stopPropagation();
                 saveDrawing();
+                return;
+            }
+
+            if (isEditing) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Fabric's eigen hit-test op het rauwe DOM-event: vindt ook
+                // andere (niet-selecteerbare) polygonen, want die blijven 'evented'.
+                var target    = canvas.findTarget(e.originalEvent, false);
+                var currentId = editPolyRef ? editPolyRef.id : null;
+
+                if (target && target.svgmlId && target.svgmlId !== currentId) {
+                    // Dubbelklik op een ánder vlak: huidige bewerking afronden, nieuwe direct openen
+                    var nextId = target.svgmlId;
+                    finishEditing();
+                    enterEditMode(nextId);
+                } else {
+                    // Dubbelklik buiten het vlak (of op het bewerkte vlak/z'n eigen handles): afronden
+                    finishEditing();
+                }
+                updateStatus('Punten opgeslagen.');
             }
         });
     }
@@ -641,8 +695,7 @@ jQuery(document).ready(function($) {
 
         // Edit mode: save modified points
         if (isEditing) {
-            saveEditedPoints();
-            exitEditMode();
+            finishEditing();
             updateStatus('Punten opgeslagen.');
         }
     }
@@ -774,6 +827,35 @@ jQuery(document).ready(function($) {
             editCircles.push(circle);
         });
 
+        // Centrumgreep: zwaartepunt (gemiddelde van de hoekpunten) van het vlak,
+        // enige object dat wél versleepbaar is — verplaatst alle punten mee.
+        var sumX = 0, sumY = 0;
+        $.each(polyData.points, function(i, pt) {
+            sumX += pt.x * cw;
+            sumY += pt.y * ch;
+        });
+        var centerX = sumX / polyData.points.length;
+        var centerY = sumY / polyData.points.length;
+
+        centerCircle = new fabric.Circle({
+            left:        centerX,
+            top:         centerY,
+            radius:      10,
+            fill:        CENTER_POINT_FILL,
+            stroke:      '#fff',
+            strokeWidth: 2,
+            selectable:  true,
+            hasControls: false,
+            hasBorders:  false,
+            originX:     'center',
+            originY:     'center',
+            svgmlCenterPt: true,
+            svgmlPolyId:   polyId,
+        });
+        centerCircle._lastLeft = centerX;
+        centerCircle._lastTop  = centerY;
+        canvas.add(centerCircle);
+
         // Listen for edit point movement
         canvas.on('object:moving', onEditPointMoving);
         canvas.on('object:modified', onEditPointDone);
@@ -798,7 +880,25 @@ jQuery(document).ready(function($) {
      */
     function onEditPointMoving(opt) {
         var obj = opt.target;
-        if (!obj || !obj.svgmlEditPt) return;
+        if (!obj) return;
+
+        // Centrumgreep: verplaats alle hoekpunten mee met dezelfde delta
+        if (obj.svgmlCenterPt) {
+            var dx = obj.left - obj._lastLeft;
+            var dy = obj.top  - obj._lastTop;
+            obj._lastLeft = obj.left;
+            obj._lastTop  = obj.top;
+
+            $.each(editCircles, function(i, c) {
+                c.set({ left: c.left + dx, top: c.top + dy });
+                c.setCoords();
+            });
+
+            updatePolygonFromEditCircles();
+            return;
+        }
+
+        if (!obj.svgmlEditPt) return;
 
         var x = obj.left;
         var y = obj.top;
@@ -821,7 +921,7 @@ jQuery(document).ready(function($) {
      */
     function onEditPointDone(opt) {
         var obj = opt.target;
-        if (!obj || !obj.svgmlEditPt) return;
+        if (!obj || (!obj.svgmlEditPt && !obj.svgmlCenterPt)) return;
         updatePolygonFromEditCircles();
     }
 
@@ -839,7 +939,7 @@ jQuery(document).ready(function($) {
         }
 
         // Don't show if we're dragging an object
-        if (opt.target && opt.target.svgmlEditPt) {
+        if (opt.target && (opt.target.svgmlEditPt || opt.target.svgmlCenterPt)) {
             removeHoverPreview();
             return;
         }
@@ -898,9 +998,9 @@ jQuery(document).ready(function($) {
         if (!isEditing || !editPolyRef) return;
         if (isPanning) return;
 
-        // If clicked on an existing edit point or polygon, do nothing
+        // If clicked on an existing edit point, center handle or polygon, do nothing
         var target = opt.target;
-        if (target && (target.svgmlEditPt || target.svgmlId)) return;
+        if (target && (target.svgmlEditPt || target.svgmlCenterPt || target.svgmlId)) return;
 
         var pointer = canvas.getPointer(opt.e);
         var px = pointer.x;
@@ -1012,6 +1112,8 @@ jQuery(document).ready(function($) {
             strokeWidth:         3,
             selectable:          false,
             hasControls:         false,
+            lockMovementX:       true,
+            lockMovementY:       true,
             perPixelTargetFind:  true,
             objectCaching:       false,
             svgmlId:             editPolyRef.id,
@@ -1044,6 +1146,16 @@ jQuery(document).ready(function($) {
     }
 
     /**
+     * Snelkoppeling: bewerking opslaan én afsluiten in één keer
+     * (zelfde als op "Klaar" klikken). Gebruikt door de Klaar-knop
+     * en door de dubbelklik-snelkoppeling.
+     */
+    function finishEditing() {
+        saveEditedPoints();
+        exitEditMode();
+    }
+
+    /**
      * Exit edit mode: remove edit points, restore polygon style.
      */
     function exitEditMode() {
@@ -1054,13 +1166,19 @@ jQuery(document).ready(function($) {
         editCircles    = [];
         selectedEditPt = null;
 
+        // Remove the center drag handle
+        if (centerCircle) { canvas.remove(centerCircle); }
+        centerCircle = null;
+
         // Restore polygon style
         if (editPolyRef && editPolyRef.fabricObj) {
             editPolyRef.fabricObj.set({
-                fill:        POLY_FILL,
-                stroke:      POLY_STROKE,
-                strokeWidth: POLY_STROKE_WIDTH,
-                selectable:  true
+                fill:          POLY_FILL,
+                stroke:        POLY_STROKE,
+                strokeWidth:   POLY_STROKE_WIDTH,
+                selectable:    true,
+                lockMovementX: true,
+                lockMovementY: true
             });
         }
 
