@@ -387,4 +387,72 @@ jQuery(document).ready(function($) {
         });
     });
 
+    // ── TOGGLE EXCLUDE (regio uitsluiten/herstellen, "Data per vlak") ──────────
+    // Gedelegeerd op document i.p.v. rechtstreeks op de knoppen: de regio-lijst
+    // kan versleept/herschikt worden (jquery-ui-sortable, zie mapping.php) en
+    // in theorie opnieuw opgebouwd, dus een vaste voorouder als bindpunt is
+    // veiliger dan binden bij page-load op knoppen die er dan nog staan.
+    //
+    // Sinds 2.5.3 gaat dit via AJAX i.p.v. het oude <form method="post"> per
+    // knop: dat deed elke klik een volledige paginapost + herlaad, wat bij
+    // bijvoorbeeld dertig vlakken achter elkaar uitsluiten onwerkbaar was.
+    $(document).on('click', '.svgml-exclude-toggle-btn', function(e) {
+        // .svgml-exclude-toggle-btn zit ín .svgml-polygon-item, en die laatste
+        // heeft zijn eigen (direct gebonden) click-handler die de regio
+        // selecteert. Die handler zit dichter bij de knop dan dit gedelegeerde
+        // handler op document, dus hij vuurt al vóórdat de klik hier
+        // aankomt — stopPropagation() hier is te laat om 'm nog te stoppen.
+        // De echte guard staat daarom in mapping.php's polygon-item
+        // click-handler zelf (checkt of e.target in deze knop zit). Deze
+        // stopPropagation() blijft staan als nette afronding naar eventuele
+        // andere ouders, maar is niet waar de bescherming vandaan komt.
+        e.stopPropagation();
+
+        var $btn   = $(this);
+        var svgId  = $btn.data('svg-id');
+        var $item  = $btn.closest('.svgml-polygon-item');
+        var mapId  = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.mapId : 0;
+        var nonce  = (typeof svgmlAdmin !== 'undefined') ? svgmlAdmin.nonce : '';
+
+        if (!svgId || !mapId) {
+            return;
+        }
+
+        // Knop tijdens de call op disabled: voorkomt dat een dubbelklik twee
+        // toggles achter elkaar afvuurt (en de status weer terugflipt).
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url:  svgmlAdmin.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'svgml_toggle_exclude',
+                nonce:  nonce,
+                map_id: mapId,
+                svg_id: svgId
+            },
+            success: function(response) {
+                $btn.prop('disabled', false);
+
+                if (!response || !response.success) {
+                    alert('Kon de uitsluiting niet bijwerken: ' + (response && response.data ? response.data : 'onbekende fout.'));
+                    return;
+                }
+
+                // Zelfde weergave-logica als voorheen server-side in mapping.php:
+                // svgml-item-excluded op het regio-item, is-excluded + tekst/titel
+                // op de knop.
+                var isExcluded = !!response.data.excluded;
+                $item.toggleClass('svgml-item-excluded', isExcluded);
+                $btn.toggleClass('is-excluded', isExcluded);
+                $btn.attr('title', isExcluded ? 'Herstellen' : 'Uitsluiten');
+                $btn.text(isExcluded ? '⊘ Uitgesloten' : '✕ Uitsluiten');
+            },
+            error: function() {
+                $btn.prop('disabled', false);
+                alert('AJAX-fout: kon de uitsluiting niet bijwerken. Probeer het opnieuw.');
+            }
+        });
+    });
+
 }); // End jQuery(document).ready

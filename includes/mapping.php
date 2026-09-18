@@ -429,21 +429,12 @@ function svgml_render_manual_data_interface( $map_id ) {
         }
     }
 
-    // Handle exclude toggle (submitted via AJAX button in the sidebar)
-    if ( isset( $_POST['svgml_exclude_toggle_nonce'] ) ) {
-        if ( wp_verify_nonce( $_POST['svgml_exclude_toggle_nonce'], 'svgml_exclude_toggle' ) ) {
-            $toggle_id   = sanitize_text_field( $_POST['svgml_toggle_id'] ?? '' );
-            $excl        = get_post_meta( $map_id, '_svgml_excluded_ids', true ) ?: [];
-            if ( ! is_array( $excl ) ) $excl = [];
-            if ( in_array( $toggle_id, $excl, true ) ) {
-                $excl = array_values( array_diff( $excl, [ $toggle_id ] ) );
-            } else {
-                $excl[] = $toggle_id;
-            }
-            update_post_meta( $map_id, '_svgml_excluded_ids', $excl );
-            delete_transient( 'svgml_html_' . $map_id );
-        }
-    }
+    // Exclude-toggle: sinds 2.5.3 verlopen via AJAX (svgml_ajax_toggle_exclude()
+    // in includes/ajax.php), niet meer via een POST van dit formulier. De knop
+    // in de regio-lijst hieronder is nu een gewoon <button type="button"> zonder
+    // eigen <form> — er komt dus nooit meer een svgml_exclude_toggle_nonce POST
+    // binnen. Het svgml_exclude_toggle-nonce-vak wordt nergens anders gebruikt,
+    // dus die hele server-side afhandeling kon hier vervallen.
 
     // Get map data
     $layers      = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
@@ -539,14 +530,21 @@ function svgml_render_manual_data_interface( $map_id ) {
                                     <?php echo esc_html( $poly['layer'] ); ?>
                                 </div>
                                 <?php endif; ?>
-                                <form method="post" style="margin:0">
-                                    <?php wp_nonce_field( 'svgml_exclude_toggle', 'svgml_exclude_toggle_nonce' ); ?>
-                                    <input type="hidden" name="svgml_toggle_id" value="<?php echo esc_attr( $poly['id'] ); ?>">
-                                    <button type="submit" class="svgml-exclude-toggle-btn <?php echo $is_excluded ? 'is-excluded' : ''; ?>"
-                                            title="<?php echo $is_excluded ? 'Herstellen' : 'Uitsluiten'; ?>">
-                                        <?php echo $is_excluded ? '⊘ Uitgesloten' : '✕ Uitsluiten'; ?>
-                                    </button>
-                                </form>
+                                <?php
+                                // Sinds 2.5.3 geen <form method="post"> meer: dat deed bij
+                                // elke klik een volledige paginapost + herlaad (bij dertig
+                                // vlakken achter elkaar uitsluiten dus dertig herladingen).
+                                // Nu een gewoon type="button" met de regio-ID in een
+                                // data-attribuut; de klik-handler in admin.js stuurt 'm via
+                                // AJAX naar svgml_ajax_toggle_exclude() en werkt daarna zelf
+                                // de classes/tekst hieronder bij, zonder page reload.
+                                ?>
+                                <button type="button"
+                                        class="svgml-exclude-toggle-btn <?php echo $is_excluded ? 'is-excluded' : ''; ?>"
+                                        data-svg-id="<?php echo esc_attr( $poly['id'] ); ?>"
+                                        title="<?php echo $is_excluded ? 'Herstellen' : 'Uitsluiten'; ?>">
+                                    <?php echo $is_excluded ? '⊘ Uitgesloten' : '✕ Uitsluiten'; ?>
+                                </button>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -915,7 +913,19 @@ function svgml_render_manual_data_interface( $map_id ) {
         });
 
         // Handle polygon selection: save current edits, then load the new region.
-        $('.svgml-polygon-item').on('click', function() {
+        //
+        // Let op: sinds 2.5.3 zit de exclude-knop (.svgml-exclude-toggle-btn) als
+        // gewoon <button> in dit item i.p.v. in een eigen <form>. Zijn eigen
+        // click-handler (gedelegeerd, assets/js/admin.js) zit op document en
+        // vuurt dus pas AF nadat de klik hier al doorheen gebubbeld is — een
+        // stopPropagation() in die handler komt te laat om dít handler te
+        // stoppen. Vandaar deze expliciete guard: klik op (of in) de
+        // exclude-knop mag nooit de regio activeren/laden, dus die slaan we
+        // hier gewoon over.
+        $('.svgml-polygon-item').on('click', function(e) {
+            if ($(e.target).closest('.svgml-exclude-toggle-btn').length) {
+                return;
+            }
             saveCurrentToManualData();
             $('.svgml-polygon-item').removeClass('active');
             $(this).addClass('active');

@@ -36,6 +36,10 @@ jQuery(document).ready(function($) {
     var EDIT_POINT_ACTIVE = '#e76f51';       // Coral: selected edit point
     var CENTER_POINT_FILL = '#e63946';       // Rood: centrumgreep om het hele vlak te verplaatsen
     var SNAP_RADIUS       = 12;              // Pixels: magnetic attraction distance
+    // Minimaal aantal punten voor een geldig vlak. Gedeeld tussen saveDrawing()
+    // (weigert af te ronden onder dit aantal) en removeLastDrawnPoints() (mag
+    // nooit terugdraaien tot ónder dit aantal) — zo blijven beide grenzen gelijk.
+    var MIN_DRAW_POINTS   = 3;
 
     // ── MULTI-LAYER STATE ────────────────────────────────────────────────────
     var layers        = [];          // Array of layer objects
@@ -445,6 +449,16 @@ jQuery(document).ready(function($) {
             if (isDrawing) {
                 e.preventDefault();
                 e.stopPropagation();
+                // Een dubbelklik genereert zelf twee losse mousedown-events, en
+                // onCanvasClick() (hierboven) zet bij ÉLKE mousedown een punt
+                // neer. Zonder correctie krijgen we dus 2 spookpunten (plus hun
+                // stip/lijn-helpers) op de plek waar we net dubbelklikten.
+                // e.detail alleen is hier niet genoeg: bij de EERSTE mousedown
+                // van de dubbelklik is detail nog gewoon 1, dus die klik is op
+                // dat moment niet te onderscheiden van een normale enkele klik.
+                // Daarom draaien we hier, ná afloop, de laatste 2 automatisch
+                // toegevoegde punten terug vóórdat we het vlak afronden.
+                removeLastDrawnPoints(2);
                 saveDrawing();
                 return;
             }
@@ -669,7 +683,7 @@ jQuery(document).ready(function($) {
     function saveDrawing() {
         // Draw mode: save new polygon
         if (isDrawing) {
-            if (drawPoints.length < 3) {
+            if (drawPoints.length < MIN_DRAW_POINTS) {
                 updateStatus('Minimaal 3 punten vereist.');
                 return;
             }
@@ -719,6 +733,18 @@ jQuery(document).ready(function($) {
             }
             polyId = polyId.trim();
 
+            // Tekens die sowieso nooit goed gaan, ongeacht CSS-escaping elders:
+            // < > " ' ` \ hebben geen enkel legitiem gebruik in een vlak-ID, en
+            // control characters (tab/newline/enz.) kunnen niet zinvol getoond
+            // worden in de polygon-lijst of in dit prompt-dialoogvenster.
+            // Een punt of spatie wordt HIER NIET geblokkeerd: die worden overal
+            // waar een ID in een CSS-selector belandt correct ge-escaped via
+            // svgml.idSelector() (assets/js/utils.js).
+            if (/[<>"'\x60\\\x00-\x1F\x7F]/.test(polyId)) {
+                alert('Dit ID bevat een teken dat niet gebruikt kan worden: < > " \' ` of \\. Kies een andere ID.');
+                continue;
+            }
+
             if (findPolyByIdAcrossLayers(polyId) && !$('#svgml-allow-multiview').is(':checked')) {
                 alert('Deze ID bestaat al. Kies een andere ID, of vink "Multi-View toestaan" aan om dubbele ID\'s te gebruiken.');
                 continue;
@@ -744,6 +770,41 @@ jQuery(document).ready(function($) {
     function cleanupHelpers() {
         $.each(drawHelpers, function(i, obj) { canvas.remove(obj); });
         drawHelpers = [];
+        canvas.renderAll();
+    }
+
+    /**
+     * Draait de laatste `count` toegevoegde tekenpunten terug, inclusief hun
+     * helper-objecten (stip + eventuele verbindingslijn) op het canvas.
+     *
+     * Gebruikt door de dblclick-afrond-handler: een dubbelklik levert altijd
+     * 2 extra mousedown-events op (zie setupPanEvents()), die elk via
+     * onCanvasClick() al een punt hebben toegevoegd. Die 2 spookpunten moeten
+     * terug vóórdat het vlak wordt opgeslagen.
+     *
+     * Gaat nooit verder terug dan MIN_DRAW_POINTS: als er te weinig "echte"
+     * punten staan (bijv. de gebruiker dubbelklikt vlak op het bedoelde
+     * laatste punt van een driehoek, in plaats van ernaast), blijft er altijd
+     * een geldig vlak over in plaats van er ineens 2 te weinig.
+     */
+    function removeLastDrawnPoints(count) {
+        var removable = Math.min(count, Math.max(0, drawPoints.length - MIN_DRAW_POINTS));
+
+        for (var i = 0; i < removable; i++) {
+            // Was dit het allereerste punt van de tekening? Dan hoort er geen
+            // verbindingslijn bij (die wordt pas vanaf het 2e punt getekend,
+            // zie onCanvasClick()) — dan is er dus maar 1 helper om te poppen.
+            var wasFirstPoint = (drawPoints.length === 1);
+            drawPoints.pop();
+
+            if (!wasFirstPoint) {
+                var line = drawHelpers.pop();
+                if (line) canvas.remove(line);
+            }
+            var dot = drawHelpers.pop();
+            if (dot) canvas.remove(dot);
+        }
+
         canvas.renderAll();
     }
 

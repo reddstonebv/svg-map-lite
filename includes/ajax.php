@@ -589,3 +589,67 @@ function svgml_ajax_duplicate_map() {
         'redirect' => admin_url( 'admin.php?page=svgml-settings&map_id=' . $new_id ),
     ] );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOGGLE EXCLUDE (regio uitsluiten/herstellen in "Data per vlak")
+// ─────────────────────────────────────────────────────────────────────────────
+// Sinds 2.5.3 loopt dit via AJAX. Voorheen postte de knop in de regio-lijst
+// (includes/mapping.php) via een eigen <form method="post"> naar dezelfde
+// pagina, wat bij elke klik de volledige pagina herlaadde — bij dertig
+// vlakken achter elkaar uitsluiten dus dertig herladingen. De knop is nu een
+// gewoon <button type="button"> (zie mapping.php), en assets/js/admin.js
+// stuurt de klik hierheen. De server-side logica hieronder is verder
+// ongewijzigd t.o.v. de oude POST-afhandeling: _svgml_excluded_ids ophalen,
+// het svg-id erin of eruit halen, en wegschrijven — de vorm van deze meta
+// verandert dus niet.
+add_action( 'wp_ajax_svgml_toggle_exclude', 'svgml_ajax_toggle_exclude' );
+
+function svgml_ajax_toggle_exclude() {
+
+    check_ajax_referer( 'svgml_admin_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( 'Geen rechten.' );
+        return;
+    }
+
+    $map_id = intval( $_POST['map_id'] ?? 0 );
+    if ( ! $map_id ) {
+        wp_send_json_error( 'Geen kaart ID opgegeven.' );
+        return;
+    }
+
+    $svg_id = sanitize_text_field( $_POST['svg_id'] ?? '' );
+    if ( '' === $svg_id ) {
+        wp_send_json_error( 'Geen regio ID opgegeven.' );
+        return;
+    }
+
+    $excluded = get_post_meta( $map_id, '_svgml_excluded_ids', true ) ?: [];
+    if ( ! is_array( $excluded ) ) {
+        $excluded = [];
+    }
+
+    if ( in_array( $svg_id, $excluded, true ) ) {
+        // Stond al in de lijst → weer terugzetten (niet meer uitgesloten).
+        $excluded    = array_values( array_diff( $excluded, [ $svg_id ] ) );
+        $is_excluded = false;
+    } else {
+        // Stond er nog niet in → nu uitsluiten.
+        $excluded[]  = $svg_id;
+        $is_excluded = true;
+    }
+
+    update_post_meta( $map_id, '_svgml_excluded_ids', $excluded );
+
+    // Zelfde cache-invalidatie als bij andere wijzigingen die de gerenderde
+    // frontend-HTML of de JSON-cache van deze kaart raken.
+    delete_transient( 'svgml_html_' . $map_id );
+    delete_transient( 'svgml_json_cache_' . $map_id );
+
+    // Stuur terug of de regio nu wél/niet uitgesloten is, zodat de JS weet
+    // welke classes/tekst het op de knop en het regio-item moet zetten.
+    wp_send_json_success( [
+        'excluded' => $is_excluded,
+    ] );
+}

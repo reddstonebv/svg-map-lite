@@ -573,7 +573,10 @@ jQuery(document).ready(function($) {
 
         // Loop through all regions that have a data object (works for both JSON and manual mode)
         $.each(regionLookup, function(svgId, obj) {
-            var $region = $svg.find('#' + svgId);
+            // svgml.idSelector() i.p.v. kale '#' + svgId: voorkomt dat een punt
+            // of spatie in de ID (bijv. "0.30") als CSS class-selector wordt
+            // gelezen in plaats van als onderdeel van de ID.
+            var $region = $svg.find(svgml.idSelector(svgId));
             if (!$region.length) return; // Region not in SVG – skip
 
             // Does not apply to excluded regions

@@ -55,8 +55,10 @@
     if (excludedIds.length > 0) {
         $.each(excludedIds, function(i, svgId) {
             // Find the SVG element with this specific id
-            // We search within the SVG so we don't affect other page elements
-            $svg.find('#' + svgId).addClass('svgml-region-excluded');
+            // We search within the SVG so we don't affect other page elements.
+            // svgml.idSelector() escaped de ID zodat een punt of spatie erin
+            // (bijv. "0.30") niet als CSS class-selector wordt gelezen.
+            $svg.find(svgml.idSelector(svgId)).addClass('svgml-region-excluded');
         });
     }
 

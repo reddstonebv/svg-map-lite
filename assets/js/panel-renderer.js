@@ -22,6 +22,7 @@
  *   svgmlData.jsonData        – Full JSON dataset
  *   svgmlData.jsonIdField     – Name of the ID field in the JSON
  *   svgmlData.mapping         – { 'svg-id': 'json-object-id', ... }
+ *   svgmlData.excludedIds     – Array of excluded SVG IDs (_svgml_excluded_ids), may be absent/empty
  */
 
 (function($) {
@@ -33,6 +34,13 @@
     if (typeof svgmlData === 'undefined') {
         return; // No svgmlData available – stop
     }
+
+    // ── UITGESLOTEN VLAKKEN (_svgml_excluded_ids) ────────────────────────────
+    // svgmlData.excludedIds kan ontbreken (ouder cachegeheugen, of gewoon geen
+    // enkel vlak uitgesloten) of leeg zijn. Zelfde opvang als frontend.js:38,
+    // zodat we hier altijd gewoon een array hebben om .indexOf() op te doen,
+    // zonder overal opnieuw te moeten checken of svgmlData.excludedIds bestaat.
+    var excludedIds = svgmlData.excludedIds || [];
 
     // ── DOM REFERENCES ───────────────────────────────────────────────────────
     var $panel = $('.svgml-panel');   // Single panel instance
@@ -112,7 +120,9 @@
                 if (!statusValue) return;
                 var cssClass = statusColors[statusValue] || '';
                 if (!cssClass) return;
-                $svg.find('#' + svgId).addClass('svgml-status-' + cssClass);
+                // svgml.idSelector(): een punt of spatie in svgId (bijv. "0.30")
+                // mag niet als CSS class-selector gelezen worden.
+                $svg.find(svgml.idSelector(svgId)).addClass('svgml-status-' + cssClass);
             });
             return;
         }
@@ -144,7 +154,8 @@
             var cssClass = statusColors[statusValue] || '';
             if (!cssClass) return;
 
-            $svg.find('#' + svgId).addClass('svgml-status-' + cssClass);
+            // svgml.idSelector(): zelfde reden als hierboven bij manual mode.
+            $svg.find(svgml.idSelector(svgId)).addClass('svgml-status-' + cssClass);
         });
     }
 
@@ -563,6 +574,18 @@
         var itemClass         = 'svgml-overview-item' + (isClickable ? '' : ' svgml-overview-item--no-click');
         var html              = '<div class="svgml-overview-list">';
 
+        // Helper: bouwt de class-attribute voor één overview-item, met de
+        // basis itemClass hierboven plus (indien van toepassing) de
+        // "--excluded" modifier voor een uitgesloten vlak. De vergelijking
+        // gaat altijd op svgId (het echte SVG-element-id), nooit op json-id
+        // — dat is ook wat _svgml_excluded_ids bevat. De items blijven wel
+        // gewoon in de DOM staan; deze class is alleen een CSS-haakje zodat
+        // de gebruiker zelf kan kiezen om ze te verbergen.
+        function itemClassFor(svgId) {
+            var isExcluded = excludedIds.indexOf(String(svgId)) !== -1;
+            return itemClass + (isExcluded ? ' svgml-overview-item--excluded' : '');
+        }
+
         // Sort helper: returns a new key array ordered by the configured field.
         // If no field is configured, auto-selects a "name" field (case-insensitive)
         // when present on the items; otherwise preserves the original order.
@@ -636,7 +659,9 @@
                 }
 
                 // data-json-id = svgId in manual mode (no separate JSON ID)
-                html += '<div class="' + itemClass + '" ' +
+                // svgId is hier de sleutel (het svg-id), dus rechtstreeks te
+                // gebruiken voor de excluded-check in itemClassFor().
+                html += '<div class="' + itemClassFor(svgId) + '" ' +
                         'data-svg-id="' + svgml.escapeHtml(svgId) + '" ' +
                         'data-json-id="' + svgml.escapeHtml(svgId) + '">' +
                         rowHtml +
@@ -697,7 +722,9 @@
                     rowHtml = '<span class="svgml-overview-title">' + svgml.escapeHtml(firstVal || String(jsonId)) + '</span>';
                 }
 
-                html += '<div class="' + itemClass + '" ' +
+                // svgId is hier de sleutel uit mapping (svg-id → json-id), dus
+                // ook hier vergelijken we op svgId, niet op jsonId.
+                html += '<div class="' + itemClassFor(svgId) + '" ' +
                         'data-svg-id="' + svgml.escapeHtml(svgId) + '" ' +
                         'data-json-id="' + svgml.escapeHtml(String(jsonId)) + '">' +
                         rowHtml +
@@ -765,21 +792,35 @@
     $(document).on('mouseenter', '.svgml-overview-item', function() {
         var svgId = $(this).data('svg-id');
         if (!svgId) return;
+        // Uitgesloten vlak: hoort niet mee te doen met de hover-highlight op
+        // de kaart. String(svgId) omdat jQuery .data() een numeriek ogende
+        // waarde (bijv. "12") automatisch omzet naar een getal, terwijl
+        // excludedIds (afkomstig uit _svgml_excluded_ids) strings bevat.
+        if (excludedIds.indexOf(String(svgId)) !== -1) return;
         // Support multi-view: find all SVG elements sharing this json-id via the mapping
         var jsonId  = String($(this).data('json-id') || svgId);
         var mapping = (typeof svgmlData !== 'undefined') ? (svgmlData.mapping || {}) : {};
+        // svgml.idSelector() i.p.v. handmatige '[id="..."]'-opbouw: die vorm
+        // brak zelf niet op een punt/spatie, maar wél bij een dubbele quote in
+        // de ID. Nu via de gedeelde helper, voor consistentie op één plek.
         if (svgmlData.mapMode === 'manual') {
-            $('[id="' + svgId + '"]').addClass('svgml-region-hover');
+            $(svgml.idSelector(svgId)).addClass('svgml-region-hover');
         } else {
             $.each(mapping, function(sid, jid) {
                 if (String(jid) === jsonId) {
-                    $('[id="' + sid + '"]').addClass('svgml-region-hover');
+                    $(svgml.idSelector(sid)).addClass('svgml-region-hover');
                 }
             });
         }
     });
 
     $(document).on('mouseleave', '.svgml-overview-item', function() {
+        // Zelfde uitzondering als bij mouseenter hierboven: voor een
+        // uitgesloten vlak is er nooit een 'svgml-region-hover' class gezet,
+        // dus hier ook vroeg stoppen in plaats van zinloos alle
+        // hover-classes op de kaart te verwijderen.
+        var svgId = $(this).data('svg-id');
+        if (svgId && excludedIds.indexOf(String(svgId)) !== -1) return;
         $('.svgml-region-hover').removeClass('svgml-region-hover');
     });
 
@@ -791,6 +832,11 @@
         var svgId  = $(this).data('svg-id');
         var jsonId = $(this).data('json-id');
         var obj    = null;
+
+        // Uitgesloten vlak: mag niet meer klikbaar zijn, ook niet als de
+        // 'svgml-overview-item--no-click' modifier (nog) niet via CSS is
+        // verborgen. String(svgId): zelfde reden als bij de hover-handlers.
+        if (excludedIds.indexOf(String(svgId)) !== -1) return;
 
         if (svgmlData.mapMode === 'manual') {
             // ── Manual mode: look up directly by svgId ────────────────────────
@@ -812,16 +858,18 @@
 
         if (!obj) return;
 
-        // Trigger the same event as a click on the SVG region
+        // Trigger the same event as a click on the SVG region.
+        // svgml.idSelector(): een punt of spatie in svgId (bijv. "0.30") mag
+        // niet als CSS class-selector gelezen worden.
         $(document).trigger('svgmlRegionClick', [{
             jsonObject: obj,
             svgId:      svgId,
-            $region:    $svg.find('#' + svgId)
+            $region:    $svg.find(svgml.idSelector(svgId))
         }]);
 
         // Mark the corresponding SVG region as active
         $svg.find('[id]').removeClass('svgml-region-active');
-        $svg.find('#' + svgId).addClass('svgml-region-active');
+        $svg.find(svgml.idSelector(svgId)).addClass('svgml-region-active');
     });
 
     // ── HELPER FUNCTIONS ────────────────────────────────────────────────────

@@ -102,4 +102,37 @@
         return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
     };
 
+    /**
+     * Bouwt een veilige CSS ID-selector voor een vlak-/regio-ID.
+     *
+     * Waarom dit nodig is: veel plekken selecteerden een SVG-element tot nu
+     * toe met kale string-concatenatie, bijv. $svg.find('#' + svgId). Zodra
+     * svgId een punt bevat (bijv. "0.30", een veelvoorkomend unit-nummer),
+     * leest de browser dat als element-ID "0" met class "30" — de lookup
+     * levert dan altijd 0 resultaten op, ook al bestaat het element wél.
+     * Hetzelfde probleem geldt voor een spatie in een ID.
+     *
+     * @param  {string} id — De rauwe vlak-/regio-ID (mag punten/spaties bevatten)
+     * @returns {string}   — Een complete, klaar-voor-gebruik selector-string
+     */
+    window.svgml.idSelector = function( id ) {
+        id = String(id);
+
+        if ( window.CSS && typeof CSS.escape === 'function' ) {
+            // Spec-correcte weg: CSS.escape() escaped een punt, spatie, én een
+            // cijfer vooraan (zoals bij "0.30") allemaal op de juiste manier.
+            return '#' + CSS.escape(id);
+        }
+
+        // Fallback voor browsers zonder CSS.escape (verwaarloosbaar in de
+        // praktijk, maar zonder kost om af te dekken). We bouwen hier bewust
+        // GEEN eigen ident-escaping: een naïeve backslash vóór een cijfer
+        // (bijv. "\0") wordt door de CSS-parser juist verkeerd geïnterpreteerd
+        // als begin van een unicode-escape-sequentie en kan met de volgende
+        // cijfers samensmelten tot een heel ander teken. De attribute-selector
+        // vorm heeft dat probleem niet — daar hoeft alleen een backslash of
+        // dubbele quote in de waarde zelf geëscaped te worden.
+        return '[id="' + id.replace(/([\\"])/g, '\\$1') + '"]';
+    };
+
 })();
