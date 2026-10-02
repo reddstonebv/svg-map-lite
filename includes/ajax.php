@@ -527,8 +527,9 @@ function svgml_ajax_import_panel_settings() {
 
 /**
  * AJAX: DUPLICATE MAP
- * Copies all settings/panel config from one map to a new map,
- * but clears image/region-specific data so the user can attach a new image.
+ * Maakt een volledige kopie van een kaart: alle _svgml_-meta (inclusief
+ * afbeelding, vlakken, koppeling, uitsluitingen en regiodata) gaat mee.
+ * Alleen de titel verschilt ("Kopie van …").
  */
 add_action( 'wp_ajax_svgml_duplicate_map', 'svgml_ajax_duplicate_map' );
 
@@ -564,25 +565,44 @@ function svgml_ajax_duplicate_map() {
         return;
     }
 
-    // Fields that are image- or region-specific and must NOT be copied.
-    $clear_keys = [
-        '_svgml_svg_attachment_id',
-        '_svgml_image_attachment_id',
-        '_svgml_layers',
-        '_svgml_polygons',
-        '_svgml_svg_ids',
-        '_svgml_id_mapping',
-        '_svgml_excluded_ids',
-        '_svgml_manual_data',
-    ];
-
+    // ── Alle _svgml_-meta 1-op-1 kopiëren ──────────────────────────────────
+    // Sinds 2.5.4 wordt een duplicaat een VOLLEDIGE kopie: afbeelding/SVG,
+    // lagen en getekende vlakken, regio-ID's, koppeling, uitsluitingen en
+    // handmatige regiodata komen allemaal mee.
+    //
+    // Tot en met 2.5.3 stond hier een $clear_keys-lijst die die velden juist
+    // leegmaakte. Die redenering ("attachment-ID's zijn niet geldig") hoort bij
+    // IMPORT vanaf een andere site — daar verwijst een attachment-ID naar een
+    // bestand dat op deze site niet bestaat. Dupliceren gebeurt altijd binnen
+    // dezelfde site, dus de ID's zijn hier gewoon geldig. Het leegmaken leverde
+    // een vrijwel lege, onbruikbare kaart op.
+    //
+    // Let op: includes/import-export.php (svgml_handle_import) heeft zijn
+    // EIGEN clear-logica. Die blijft bewust staan en deelt geen code met dit.
+    //
+    // Ook '_svgml_manual_keys_v' (de migratievlag uit manual-field-keys.php)
+    // komt via deze prefix-loop mee. Dat is nodig: de gekopieerde blokken
+    // hebben al stabiele sleutels, dus de migratie mag op het duplicaat niet
+    // opnieuw draaien.
+    //
+    // Gedeelde referenties zijn er niet: get_post_meta() geeft een kopie van
+    // de waarde terug en update_post_meta() schrijft een eigen rij voor
+    // $new_id. Een vlak verslepen of een stijl aanpassen in het duplicaat
+    // raakt het origineel dus niet. (De afbeelding zelf is wél hetzelfde
+    // mediabestand — dat is precies de bedoeling.)
     $all_meta = get_post_meta( $source_id );
     foreach ( $all_meta as $key => $values ) {
+        // Alleen meta van deze plugin; WP-interne meta (_edit_lock e.d.) niet.
         if ( strpos( $key, '_svgml_' ) !== 0 ) {
             continue;
         }
-        $value = in_array( $key, $clear_keys, true ) ? '' : maybe_unserialize( $values[0] );
-        update_post_meta( $new_id, $key, $value );
+        // get_post_meta() zonder key geeft geserialiseerde strings terug;
+        // maybe_unserialize() maakt er weer arrays van.
+        $value = maybe_unserialize( $values[0] );
+        // update_post_meta() haalt intern backslashes weg (wp_unslash). Nu ook
+        // regiodata en vlakken meekomen, zou een '\' in tekst of CSS daardoor
+        // verdwijnen. wp_slash() vooraf zorgt dat de waarde exact gelijk blijft.
+        update_post_meta( $new_id, $key, wp_slash( $value ) );
     }
 
     wp_send_json_success( [
