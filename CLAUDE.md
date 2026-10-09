@@ -65,7 +65,7 @@ All tabs share `svgml_render_editor_wrapper()` which reads `map_id` from `$_GET[
 - `_svgml_status_field` / `_svgml_status_colors` / `_svgml_status_hex_colors`
 
 ### Style
-- `_svgml_custom_css` — scoped to `#svgml-wrap-{map_id}`
+- `_svgml_custom_css` — free CSS from the Styles tab, output as-is (**not** auto-scoped; only loaded on pages that render this map, see CSS loading)
 - `_svgml_poly_stroke_color` / `_svgml_poly_stroke_width`
 - `_svgml_layer_switcher` — `buttons`, `dropdown`, or `tabs`
 
@@ -104,7 +104,7 @@ Localized via `wp_localize_script('svgml-admin-js', 'svgmlAdmin', ...)` in `svgm
 |------|--------------|
 | `svg-map-lite.php` | CPT registration, tab routing, `svgml_admin_enqueue()`, `svgml_render_editor_wrapper()`, update-checker bootstrap |
 | `includes/ajax.php` | All `wp_ajax_svgml_*` handlers: parse SVG, create/delete map, get JSON, image CRUD |
-| `includes/frontend.php` | `[svg_map]` shortcode, inline CSS generation scoped to `#svgml-wrap-{id}` |
+| `includes/frontend.php` | Shortcodes, per-map CSS (`svgml_get_map_css()`, `svgml_get_map_root_css()`, `svgml_get_map_style_tag()`), all-maps CSS (`svgml_output_custom_css()`) |
 | `includes/settings.php` | `svgml_render_settings_page()` — handles SVG upload, polygon save, source type |
 | `includes/mapping.php` | `svgml_render_mapping_page()` — JSON mapping + manual data entry |
 
@@ -122,7 +122,51 @@ Localized via `wp_localize_script('svgml-admin-js', 'svgmlAdmin', ...)` in `svgm
 - `[svg_map_panel id="X"]` — renders the info panel standalone
 - `[svg_map_filters id="X"]` — renders the filter UI standalone
 
-Frontend CSS is scoped: `#svgml-wrap-{map_id}` for isolation between multiple maps on one page.
+Each of the three shortcodes prepends the map's CSS (`<style id="svgml-custom-css-{id}">`) to
+its return value, once per request per map — see CSS loading. The `$map_id` used is the one
+after the `wpml_object_id` swap, i.e. the same ID as in `#svgml-wrap-{id}`.
+
+Standalone panel markup (since 2.6.0):
+`<div class="svgml-panel svgml-panel-standalone svgml-panel-map-{id}" id="svgml-panel-standalone" data-map-id="{id}">`.
+`svgml-panel-map-{id}` / `data-map-id` are only added when a map ID resolved. The fixed IDs
+`svgml-panel-standalone` / `svgml-panel-content-standalone` and the existing classes must stay —
+customer CSS and `panel-renderer.js` (`$('.svgml-panel')`) depend on them. Use
+`.svgml-panel-map-{id}` to style one map's panel; the panel is outside `#svgml-wrap-{id}`, so the
+generated `#svgml-wrap-{id} .svgml-panel-inner` rules never reach it (known, intentionally not
+changed).
+
+## CSS loading (since 2.6.0)
+
+Generated rules are scoped to `#svgml-wrap-{map_id}`; the free Custom CSS is not.
+
+**Default:** a page only gets the CSS of maps it actually renders. `svgml_get_map_style_tag( $map_id )`
+returns `<style id="svgml-custom-css-{id}">` = `:root` vars + generated rules + Custom CSS, and
+the shortcode puts it in front of its HTML. Rules:
+- A static list makes it one tag per map per request (map + filters + panel → one style).
+- Only returned when `( did_action('wp_head') && ! doing_action('wp_head') ) || wp_doing_ajax()
+  || Elementor editor->is_edit_mode()`. Not during `wp_head` (SEO plugins rendering content for
+  og-tags), not in other wp-admin requests (HTML export).
+- Never inside the `svgml_html_{id}` transient — it is prepended after the cache, so saved CSS
+  changes show immediately.
+- The tag lands in the `<body>`, so it comes after all head CSS (incl. Customizer Extra CSS,
+  `wp_head` 101): at equal specificity map CSS now wins over Customizer CSS (before 2.6.0 it lost).
+- Known limits: a shortcode rendered before `wp_head` gets no CSS; a render after `wp_head` that
+  is thrown away (excerpt/schema) uses up the once-per-request slot. Escape hatch: the filter.
+- `:root` vars (`--svgml-accent`, `--svgml-panel-bg`): with two maps on one page the last
+  rendered map wins.
+
+**Filter `svgml_load_all_map_css`** (default `false`): `true` restores the pre-2.6.0 behaviour —
+`svgml_output_custom_css()` prints the CSS of all published maps in `wp_head`, and the shortcodes
+print nothing.
+```php
+add_filter( 'svgml_load_all_map_css', '__return_true' );
+```
+
+**`svgml_output_custom_css()` (no arguments) must not change.** It stays hooked on `wp_head`
+(so existing `remove_action()` calls keep working) but returns early only while *in* `wp_head`
+with the filter off. `svg-map-lite-html-export/includes/inline-css.php` calls it directly via
+`ob_start()` and relies on exactly one `<style id="svgml-custom-css">`, the header comment, the
+`:root` block first, then all maps' CSS (it filters out other maps itself).
 
 ## Vendor Assets (Fabric.js / noUiSlider)
 

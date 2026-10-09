@@ -221,10 +221,13 @@ function svgml_render_shortcode( $atts ) {
     echo '<script id="svgml-data-' . esc_attr( $map_id ) . '">var svgmlData = ' . $js_data . ';</script>';
 
     // ── HTML TRANSIENT CACHE ───────────────────────────────────────────────────
+    // De kaart-CSS (svgml_get_map_style_tag) wordt hier en onderaan BUITEN de
+    // cache vóór de HTML geplakt. Zat hij in de transient, dan bleef na het
+    // opslaan van nieuwe kleuren/Custom CSS tot 12 uur lang de oude CSS staan.
     $transient_key = 'svgml_html_' . $map_id;
     $cached_html   = get_transient( $transient_key );
     if ( false !== $cached_html ) {
-        return $cached_html;
+        return svgml_get_map_style_tag( $map_id ) . $cached_html;
     }
 
     // ── BUILD HTML WITH OUTPUT BUFFER ──────────────────────────────────────────
@@ -329,7 +332,9 @@ function svgml_render_shortcode( $atts ) {
     <?php
     $html = ob_get_clean();
     set_transient( $transient_key, $html, 12 * HOUR_IN_SECONDS );
-    return $html;
+
+    // Eerst opslaan in de cache (zonder CSS), dan pas de CSS ervoor plakken.
+    return svgml_get_map_style_tag( $map_id ) . $html;
 }
 
 /**
@@ -366,9 +371,20 @@ function svgml_render_panel_shortcode( $atts ) {
         ? get_post_meta( $map_id, '_svgml_panel_title', true )
         : '';
 
+    // Koppel het paneel aan zijn kaart, zodat paneel-CSS per kaart te scopen is
+    // (.svgml-panel-map-{id}) en JS het kaart-ID kan uitlezen (data-map-id).
+    // Het paneel staat buiten #svgml-wrap-{id}, dus zonder deze class kan CSS
+    // het paneel van kaart A niet onderscheiden van dat van kaart B.
+    // De bestaande id's en classes blijven ongewijzigd: klanten gebruiken ze in
+    // hun CSS en panel-renderer.js zoekt op $('.svgml-panel').
+    // $map_id is hier al de WPML-vertaling (of de fallback-kaart). Is er geen
+    // kaart gevonden (0), dan voegen we niets toe.
+    $map_class = $map_id ? ' svgml-panel-map-' . $map_id : '';
+    $map_attr  = $map_id ? ' data-map-id="' . esc_attr( $map_id ) . '"' : '';
+
     ob_start();
     ?>
-    <div class="svgml-panel svgml-panel-standalone" id="svgml-panel-standalone" aria-hidden="true">
+    <div class="svgml-panel svgml-panel-standalone<?php echo esc_attr( $map_class ); ?>" id="svgml-panel-standalone"<?php echo $map_attr; ?> aria-hidden="true">
         <div class="svgml-panel-inner">
 
             <button class="svgml-panel-close svgml-panel-close-standalone"
@@ -388,7 +404,10 @@ function svgml_render_panel_shortcode( $atts ) {
         </div>
     </div>
     <?php
-    return ob_get_clean();
+    // Kaart-CSS vóór het paneel (één keer per pagina per kaart, zie
+    // svgml_get_map_style_tag). Staat het paneel boven de kaart, dan komt de
+    // CSS dus hier mee en niet pas bij de kaart.
+    return svgml_get_map_style_tag( $map_id ) . ob_get_clean();
 }
 
 /**
@@ -510,7 +529,8 @@ function svgml_render_filters_shortcode( $atts ) {
     </div>
     </div>
     <?php
-    return ob_get_clean();
+    // Kaart-CSS vóór de filterbalk (één keer per pagina per kaart).
+    return svgml_get_map_style_tag( $map_id ) . ob_get_clean();
 }
 
 /**
@@ -524,10 +544,31 @@ function svgml_clear_json_cache( $map_id = 0 ) {
 }
 
 /**
- * OUTPUT CUSTOM CSS IN <HEAD>
- * Generates CSS for all published svgml_map posts
+ * OUTPUT CUSTOM CSS VAN ALLE KAARTEN (oud gedrag, html-export)
+ *
+ * Print één <style id="svgml-custom-css"> met de CSS van ALLE gepubliceerde
+ * kaarten. Sinds 2.6.0 laadt een normale pagina deze functie NIET meer via
+ * wp_head: elke shortcode levert zelf de CSS van zijn eigen kaart (zie
+ * svgml_get_map_style_tag). Het oude gedrag komt terug met de filter:
+ *   add_filter( 'svgml_load_all_map_css', '__return_true' );
+ *
+ * LET OP: de extensie svg-map-lite-html-export roept deze functie ZONDER
+ * argumenten aan (buiten wp_head, via ob_start) en verwacht precies deze
+ * opbouw: één <style id="svgml-custom-css">, de kop-comment, het :root-blok
+ * als eerste blok, daarna de CSS van alle kaarten. Niet aanpassen.
  */
 function svgml_output_custom_css() {
+
+    // Roept WordPress ons aan via de wp_head-hook (de add_action bovenaan dit
+    // bestand) en staat de filter uit? Dan doen we niets: de shortcodes leveren
+    // de CSS nu zelf. doing_action() is alleen true TIJDENS wp_head, dus een
+    // directe aanroep (zoals de html-export) draait gewoon volledig door.
+    // De add_action blijft bewust staan, zodat een bestaande
+    // remove_action( 'wp_head', 'svgml_output_custom_css' ) van een thema of
+    // klant blijft werken.
+    if ( doing_action( 'wp_head' ) && ! apply_filters( 'svgml_load_all_map_css', false ) ) {
+        return;
+    }
 
     $css_output = '';
 
@@ -538,222 +579,18 @@ function svgml_output_custom_css() {
         'posts_per_page' => -1,
     ] );
 
+    // CSS per kaart achter elkaar plakken (opbouw: zie svgml_get_map_css).
     foreach ( $maps as $map ) {
-        $map_id = $map->ID;
-
-        // Helper function
-        $get_meta = function( $key, $default = '' ) use ( $map_id ) {
-            $result = get_post_meta( $map_id, '_svgml_' . $key, true );
-            if ( '' === $result || false === $result ) {
-                return $default;
-            }
-            return $result;
-        };
-
-        // Specificity prefix — scoped to this map's unique wrapper ID so CSS
-        // from map A can never bleed into map B when multiple maps are published.
-        $p = "#svgml-wrap-{$map_id}";
-
-        // Get map-specific colors and settings
-        $status_colors     = $get_meta( 'status_colors', [] );
-        $status_hex_colors = $get_meta( 'status_hex_colors', [] );
-        $status_opacity    = $get_meta( 'status_opacity', [] );
-
-        if ( ! is_array( $status_colors ) ) $status_colors = [];
-        if ( ! is_array( $status_hex_colors ) ) $status_hex_colors = [];
-        if ( ! is_array( $status_opacity ) ) $status_opacity = [];
-
-        foreach ( $status_hex_colors as $status_val => $hex ) {
-            if ( ! sanitize_hex_color( $hex ) ) continue;
-
-            $css_class = $status_colors[ $status_val ] ?? '';
-            if ( empty( $css_class ) ) continue;
-
-            $opacity_pct  = max( 10, min( 100, intval( $status_opacity[ $status_val ] ?? 100 ) ) );
-            $fill_opacity = round( $opacity_pct / 100, 2 );
-
-            $rgba_light = svgml_hex_to_rgba( $hex, 0.12 );
-            $rgba_mid   = svgml_hex_to_rgba( $hex, 0.90 );
-
-            $css_output .= "{$p} .svgml-svg [id].svgml-status-{$css_class},"
-                         . "{$p} .svgml-svg [id].svgml-status-{$css_class} * { "
-                         . "fill: {$hex}; "
-                         . "fill-opacity: {$fill_opacity}; }\n";
-
-            $css_output .= "{$p} .svgml-badge.svgml-badge-{$css_class} { "
-                         . "background-color: {$rgba_light}; "
-                         . "color: {$hex}; "
-                         . "border: 1px solid {$rgba_mid}; }\n";
-        }
-
-        // Filter colors
-        $filter_match_color = $get_meta( 'filter_match_color', '' );
-        $filter_dim_color   = $get_meta( 'filter_dim_color', '' );
-
-        if ( ! empty( $filter_match_color ) && sanitize_hex_color( $filter_match_color ) ) {
-            $css_output .= "{$p} .svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded),"
-                         . "{$p} .svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded) *"
-                         . " { fill: {$filter_match_color}; }\n";
-        }
-
-        if ( ! empty( $filter_dim_color ) && sanitize_hex_color( $filter_dim_color ) ) {
-            $css_output .= "{$p} .svgml-svg [id].svgml-region-dimmed,"
-                         . "{$p} .svgml-svg [id].svgml-region-dimmed *"
-                         . " { fill: {$filter_dim_color}; opacity: 1; }\n";
-        }
-
-        // Panel & Filter Styling
-        $panel_bg_color      = $get_meta( 'panel_bg_color',      '' );
-        $panel_text_color    = $get_meta( 'panel_text_color',     '' );
-        $panel_border_radius = $get_meta( 'panel_border_radius',  '' );
-        $filter_bg_color     = $get_meta( 'filter_bg_color',      '' );
-        $filter_text_color   = $get_meta( 'filter_text_color',    '' );
-        $panel_border_color  = $get_meta( 'panel_border_color',   '' );
-        $panel_border_width  = $get_meta( 'panel_border_width',   '' );
-        $slider_accent_color = $get_meta( 'slider_accent_color',  '' );
-
-        if ( ! empty( $panel_bg_color ) && sanitize_hex_color( $panel_bg_color ) ) {
-            $css_output .= "{$p} .svgml-panel-inner { background-color: {$panel_bg_color}; }\n";
-        }
-        if ( ! empty( $panel_text_color ) && sanitize_hex_color( $panel_text_color ) ) {
-            $css_output .= "{$p} .svgml-panel-inner, {$p} .svgml-panel-inner * { color: {$panel_text_color}; }\n";
-        }
-        if ( '' !== $panel_border_radius ) {
-            $radius = max( 0, min( 50, intval( $panel_border_radius ) ) );
-            $css_output .= "{$p} .svgml-panel-inner { border-radius: {$radius}px; }\n";
-        }
-        if ( ! empty( $filter_bg_color ) && sanitize_hex_color( $filter_bg_color ) ) {
-            $css_output .= "{$p} .svgml-filters-bar { background-color: {$filter_bg_color}; }\n";
-        }
-        if ( ! empty( $filter_text_color ) && sanitize_hex_color( $filter_text_color ) ) {
-            $css_output .= "{$p} .svgml-filters-bar, {$p} .svgml-filter-label { color: {$filter_text_color}; }\n";
-        }
-        if ( ! empty( $panel_border_color ) && sanitize_hex_color( $panel_border_color ) && '' !== $panel_border_width && intval( $panel_border_width ) > 0 ) {
-            $bw = intval( $panel_border_width );
-            $css_output .= "{$p} .svgml-panel-inner { border: {$bw}px solid {$panel_border_color}; }\n";
-        }
-        if ( ! empty( $slider_accent_color ) && sanitize_hex_color( $slider_accent_color ) ) {
-            $css_output .= "{$p} .svgml-range-slider .noUi-connect { background-color: {$slider_accent_color}; }\n";
-            $css_output .= "{$p} .svgml-range-slider .noUi-handle { border-color: {$slider_accent_color}; }\n";
-        }
-
-        // Input field styling
-        $input_bg_color     = $get_meta( 'input_bg_color',     '' );
-        $input_text_color   = $get_meta( 'input_text_color',   '' );
-        $input_border_color = $get_meta( 'input_border_color', '' );
-        $input_focus_color  = $get_meta( 'input_focus_color',  '' );
-
-        $input_selectors       = "{$p} .svgml-filter-input-single, {$p} .svgml-filter-input-min, {$p} .svgml-filter-input-max, {$p} .svgml-filter-search";
-        $input_focus_selectors = "{$p} .svgml-filter-input-single:focus, {$p} .svgml-filter-input-min:focus, {$p} .svgml-filter-input-max:focus, {$p} .svgml-filter-search:focus";
-
-        if ( ! empty( $input_bg_color ) && sanitize_hex_color( $input_bg_color ) ) {
-            $css_output .= "{$input_selectors} { background-color: {$input_bg_color}; }\n";
-        }
-        if ( ! empty( $input_text_color ) && sanitize_hex_color( $input_text_color ) ) {
-            $css_output .= "{$input_selectors} { color: {$input_text_color}; }\n";
-        }
-        if ( ! empty( $input_border_color ) && sanitize_hex_color( $input_border_color ) ) {
-            $css_output .= "{$input_selectors} { border-color: {$input_border_color}; }\n";
-        }
-        if ( ! empty( $input_focus_color ) && sanitize_hex_color( $input_focus_color ) ) {
-            $css_output .= "{$input_focus_selectors} { border-color: {$input_focus_color}; outline-color: {$input_focus_color}; }\n";
-        }
-
-        // Polygon stroke styling — meta keys: _svgml_poly_stroke_color / _svgml_poly_stroke_width
-        $poly_stroke_color = sanitize_text_field(
-            get_post_meta( $map_id, '_svgml_poly_stroke_color', true )
-        );
-        if ( empty( $poly_stroke_color ) ) {
-            $poly_stroke_color = '#ffffff';
-        }
-
-        $raw_stroke_width  = get_post_meta( $map_id, '_svgml_poly_stroke_width', true );
-        $poly_stroke_width = ( is_numeric( $raw_stroke_width ) && floatval( $raw_stroke_width ) > 0 )
-                             ? floatval( $raw_stroke_width )
-                             : 1;
-
-        $raw_hover_width  = get_post_meta( $map_id, '_svgml_poly_stroke_width_hover', true );
-        $hover_width      = ( is_numeric( $raw_hover_width ) && floatval( $raw_hover_width ) > 0 )
-                            ? floatval( $raw_hover_width )
-                            : 3;
-
-        $raw_highlight_color   = get_post_meta( $map_id, '_svgml_highlight_color', true );
-        $highlight_color       = ( ! empty( $raw_highlight_color ) && sanitize_hex_color( $raw_highlight_color ) )
-                                 ? $raw_highlight_color
-                                 : $poly_stroke_color;
-
-        $raw_highlight_opacity = get_post_meta( $map_id, '_svgml_highlight_opacity', true );
-        $highlight_opacity     = ( is_numeric( $raw_highlight_opacity ) )
-                                 ? round( max( 0.0, min( 1.0, floatval( $raw_highlight_opacity ) ) ), 2 )
-                                 : 0.7;
-
-        // vector-effect: non-scaling-stroke → stroke-width is screen pixels.
-        $sw       = round( $poly_stroke_width, 2 );
-        $sw_hover = round( $hover_width, 2 );
-
-        $stroke_rgba_half  = svgml_hex_to_rgba( $poly_stroke_color, 0.5 );
-        $stroke_rgba_full  = svgml_hex_to_rgba( $poly_stroke_color, 0.9 );
-        $highlight_rgba    = svgml_hex_to_rgba( $highlight_color, $highlight_opacity );
-
-        $sel_base = implode( ', ', [
-            "{$p} .svgml-poly-region",
-            "{$p} .svgml-svg polygon[id]",
-            "{$p} .svgml-svg path[id]",
-        ] );
-        $sel_hover = implode( ', ', [
-            "{$p} .svgml-poly-region:hover",
-            "{$p} .svgml-poly-region.svgml-region-hover",
-            "{$p} .svgml-svg polygon[id]:hover",
-            "{$p} .svgml-svg path[id]:hover",
-        ] );
-        $sel_active = implode( ', ', [
-            "{$p} .svgml-poly-region.svgml-region-active",
-            "{$p} .svgml-svg polygon[id].svgml-region-active",
-            "{$p} .svgml-svg path[id].svgml-region-active",
-        ] );
-
-        $css_output .= "{$sel_base} { "
-                     . "stroke: {$stroke_rgba_half} !important; "
-                     . "stroke-width: {$sw}px !important; "
-                     . "vector-effect: non-scaling-stroke !important; }\n";
-        $css_output .= "{$sel_hover} { "
-                     . "fill: {$highlight_rgba} !important; "
-                     . "stroke: {$stroke_rgba_full} !important; "
-                     . "stroke-width: {$sw_hover}px !important; "
-                     . "vector-effect: non-scaling-stroke !important; }\n";
-        $css_output .= "{$sel_active} { "
-                     . "fill: {$highlight_rgba} !important; "
-                     . "stroke: {$poly_stroke_color} !important; "
-                     . "stroke-width: {$sw_hover}px !important; "
-                     . "vector-effect: non-scaling-stroke !important; }\n";
-
-        // Custom CSS (per-map)
-        $custom_css = $get_meta( 'custom_css', '' );
-        if ( ! empty( trim( $custom_css ) ) ) {
-            $css_output .= "/* Map: " . esc_html( $map->post_title ) . " */\n";
-            $css_output .= wp_strip_all_tags( $custom_css ) . "\n";
-        }
-    } // end foreach $maps
+        $css_output .= svgml_get_map_css( $map->ID );
+    }
 
     // Build a :root block with CSS variables derived from the first (or only) published map.
     // When multiple maps exist on the same page, the last map's values win for :root —
     // per-map overrides are handled by the .svgml-wrap-prefixed rules above.
+    // (Bewust "=" en niet ".=": ongewijzigd oud gedrag, de html-export rekent hierop.)
     $root_css = '';
     foreach ( $maps as $map ) {
-        $mid = $map->ID;
-
-        $accent  = get_post_meta( $mid, '_svgml_slider_accent_color', true ) ?: '#cc0000';
-        $panel_bg = get_post_meta( $mid, '_svgml_panel_bg_color',     true ) ?: '#ffffff';
-
-        if ( ! sanitize_hex_color( $accent ) )   $accent   = '#cc0000';
-        if ( ! sanitize_hex_color( $panel_bg ) ) $panel_bg = '#ffffff';
-
-        $root_css = ":root {\n"
-                  . "    --svgml-accent:   {$accent};\n"
-                  . "    --svgml-panel-bg: {$panel_bg};\n"
-                  . "    --svgml-panel-w:  300px;\n"
-                  . "    --svgml-thumb-ratio: 56.25%;\n"
-                  . "}\n";
+        $root_css = svgml_get_map_root_css( $map->ID );
     }
 
     if ( empty( $css_output ) && empty( $root_css ) ) return;
@@ -763,6 +600,318 @@ function svgml_output_custom_css() {
     if ( $root_css ) echo $root_css;
     echo $css_output;
     echo "</style>\n";
+}
+
+/**
+ * <STYLE>-TAG MET DE CSS VAN ÉÉN KAART (voor in de shortcode-output)
+ *
+ * Elke shortcode ([svg_map], [svg_map_panel], [svg_map_filters]) zet het
+ * resultaat hiervan vóór zijn eigen HTML. Zo laadt een pagina alleen de CSS
+ * van de kaarten die er echt op staan, in plaats van die van alle kaarten.
+ *
+ * Geeft een lege string terug als:
+ * - de CSS van deze kaart in dit request al is uitgevoerd (bijv. [svg_map] én
+ *   [svg_map_panel] van dezelfde kaart op één pagina → maar één keer CSS);
+ * - de filter svgml_load_all_map_css aan staat (dan staat alles al in de
+ *   <head> via svgml_output_custom_css, en zou het hier dubbel komen);
+ * - we niet op een gewone frontend-pagina ná de <head> zitten (zie hieronder).
+ *
+ * De tag mag NIET in de gecachte shortcode-HTML (transient svgml_html_{id})
+ * terechtkomen, anders klopt hij niet meer na het opslaan van nieuwe CSS.
+ * De shortcodes plakken hem daarom pas ná de cache ervoor.
+ *
+ * @param int $map_id ID van de svgml_map-post (al omgezet naar de WPML-vertaling).
+ * @return string <style id="svgml-custom-css-{id}">…</style> of ''.
+ */
+function svgml_get_map_style_tag( $map_id ) {
+
+    // "static" onthoudt deze lijst tussen aanroepen binnen hetzelfde request
+    // (dus binnen één paginaweergave). Bij het volgende paginabezoek is hij
+    // weer leeg.
+    static $printed = [];
+
+    $map_id = (int) $map_id;
+    if ( ! $map_id || isset( $printed[ $map_id ] ) ) {
+        return '';
+    }
+
+    if ( apply_filters( 'svgml_load_all_map_css', false ) ) {
+        return '';
+    }
+
+    // Wanneer mag de CSS mee in de shortcode-output?
+    // - did_action( 'wp_head' ): de <head> is al geprint, we zitten in de body
+    //   van een gewone frontend-pagina (ook Elementor-popups in de footer).
+    // - ! doing_action( 'wp_head' ): NIET terwijl de <head> nog bezig is. Sommige
+    //   SEO-plugins renderen dan de content voor een og:description; daar hoort
+    //   geen CSS-tekst in, en dat zou het "al uitgevoerd"-slot verbruiken.
+    // - wp_doing_ajax(): AJAX-renders, o.a. de Elementor-editor die een widget
+    //   na het bewerken opnieuw rendert via admin-ajax.php.
+    // - Elementor edit-mode: bij het OPENEN van de editor rendert Elementor de
+    //   widgets op de editorpagina zelf (wp-admin/post.php?action=elementor):
+    //   geen wp_head en geen AJAX. Zonder deze check verliest een kaart in de
+    //   editor zijn kleuren. is_edit_mode() is Elementors eigen functie en is
+    //   alleen true bij action=elementor / elementor_ajax of in de preview.
+    // De html-export draait op admin_init via admin.php?action=export: geen
+    // wp_head, geen AJAX en geen Elementor edit-mode, dus daar komt hier nooit
+    // een <style> uit (geen dubbele CSS).
+    // (De Elementor-check staat als laatste: PHP stopt bij de eerste "true",
+    // dus op een gewone frontend-pagina wordt Elementor niet eens gevraagd.)
+    $allowed = ( did_action( 'wp_head' ) && ! doing_action( 'wp_head' ) )
+               || wp_doing_ajax()
+               || ( class_exists( '\Elementor\Plugin' )
+                    && isset( \Elementor\Plugin::$instance->editor )
+                    && \Elementor\Plugin::$instance->editor->is_edit_mode() );
+    if ( ! $allowed ) {
+        return '';
+    }
+
+    // Pas markeren als de tag echt wordt teruggegeven.
+    $printed[ $map_id ] = true;
+
+    // :root-variabelen eerst, net als in svgml_output_custom_css(). Staan er
+    // twee kaarten op één pagina, dan wint de :root van de laatst gerenderde.
+    return "\n<style id=\"svgml-custom-css-{$map_id}\">\n"
+         . "/* SVG Map Lite – kaart {$map_id} */\n"
+         . svgml_get_map_root_css( $map_id )
+         . svgml_get_map_css( $map_id )
+         . "</style>\n";
+}
+
+/**
+ * :ROOT-BLOK MET CSS-VARIABELEN VAN ÉÉN KAART
+ * (--svgml-accent en --svgml-panel-bg worden in frontend.css gebruikt.)
+ *
+ * @param int $map_id
+ * @return string
+ */
+function svgml_get_map_root_css( $map_id ) {
+
+    $accent   = get_post_meta( $map_id, '_svgml_slider_accent_color', true ) ?: '#cc0000';
+    $panel_bg = get_post_meta( $map_id, '_svgml_panel_bg_color',      true ) ?: '#ffffff';
+
+    // Ongeldige of lege hex-waarde → standaardkleur.
+    if ( ! sanitize_hex_color( $accent ) )   $accent   = '#cc0000';
+    if ( ! sanitize_hex_color( $panel_bg ) ) $panel_bg = '#ffffff';
+
+    return ":root {\n"
+         . "    --svgml-accent:   {$accent};\n"
+         . "    --svgml-panel-bg: {$panel_bg};\n"
+         . "    --svgml-panel-w:  300px;\n"
+         . "    --svgml-thumb-ratio: 56.25%;\n"
+         . "}\n";
+}
+
+/**
+ * GEGENEREERDE + CUSTOM CSS VAN ÉÉN KAART (zonder <style>-tag en zonder :root)
+ *
+ * Statuskleuren, filterkleuren, paneel- en invoerveldstijl, polygoonlijnen
+ * (allemaal gescoped op #svgml-wrap-{id}) en als laatste de vrije Custom CSS
+ * uit het tabblad Stijlen (NIET automatisch gescoped).
+ * Wordt gebruikt door svgml_output_custom_css() (alle kaarten) en
+ * svgml_get_map_style_tag() (één kaart).
+ *
+ * @param int $map_id
+ * @return string
+ */
+function svgml_get_map_css( $map_id ) {
+
+    $css_output = '';
+
+    // Helper function
+    $get_meta = function( $key, $default = '' ) use ( $map_id ) {
+        $result = get_post_meta( $map_id, '_svgml_' . $key, true );
+        if ( '' === $result || false === $result ) {
+            return $default;
+        }
+        return $result;
+    };
+
+    // Specificity prefix — scoped to this map's unique wrapper ID so CSS
+    // from map A can never bleed into map B when multiple maps are published.
+    $p = "#svgml-wrap-{$map_id}";
+
+    // Get map-specific colors and settings
+    $status_colors     = $get_meta( 'status_colors', [] );
+    $status_hex_colors = $get_meta( 'status_hex_colors', [] );
+    $status_opacity    = $get_meta( 'status_opacity', [] );
+
+    if ( ! is_array( $status_colors ) ) $status_colors = [];
+    if ( ! is_array( $status_hex_colors ) ) $status_hex_colors = [];
+    if ( ! is_array( $status_opacity ) ) $status_opacity = [];
+
+    foreach ( $status_hex_colors as $status_val => $hex ) {
+        if ( ! sanitize_hex_color( $hex ) ) continue;
+
+        $css_class = $status_colors[ $status_val ] ?? '';
+        if ( empty( $css_class ) ) continue;
+
+        $opacity_pct  = max( 10, min( 100, intval( $status_opacity[ $status_val ] ?? 100 ) ) );
+        $fill_opacity = round( $opacity_pct / 100, 2 );
+
+        $rgba_light = svgml_hex_to_rgba( $hex, 0.12 );
+        $rgba_mid   = svgml_hex_to_rgba( $hex, 0.90 );
+
+        $css_output .= "{$p} .svgml-svg [id].svgml-status-{$css_class},"
+                     . "{$p} .svgml-svg [id].svgml-status-{$css_class} * { "
+                     . "fill: {$hex}; "
+                     . "fill-opacity: {$fill_opacity}; }\n";
+
+        $css_output .= "{$p} .svgml-badge.svgml-badge-{$css_class} { "
+                     . "background-color: {$rgba_light}; "
+                     . "color: {$hex}; "
+                     . "border: 1px solid {$rgba_mid}; }\n";
+    }
+
+    // Filter colors
+    $filter_match_color = $get_meta( 'filter_match_color', '' );
+    $filter_dim_color   = $get_meta( 'filter_dim_color', '' );
+
+    if ( ! empty( $filter_match_color ) && sanitize_hex_color( $filter_match_color ) ) {
+        $css_output .= "{$p} .svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded),"
+                     . "{$p} .svgml-svg [id]:not(.svgml-region-dimmed):not(.svgml-region-excluded) *"
+                     . " { fill: {$filter_match_color}; }\n";
+    }
+
+    if ( ! empty( $filter_dim_color ) && sanitize_hex_color( $filter_dim_color ) ) {
+        $css_output .= "{$p} .svgml-svg [id].svgml-region-dimmed,"
+                     . "{$p} .svgml-svg [id].svgml-region-dimmed *"
+                     . " { fill: {$filter_dim_color}; opacity: 1; }\n";
+    }
+
+    // Panel & Filter Styling
+    $panel_bg_color      = $get_meta( 'panel_bg_color',      '' );
+    $panel_text_color    = $get_meta( 'panel_text_color',     '' );
+    $panel_border_radius = $get_meta( 'panel_border_radius',  '' );
+    $filter_bg_color     = $get_meta( 'filter_bg_color',      '' );
+    $filter_text_color   = $get_meta( 'filter_text_color',    '' );
+    $panel_border_color  = $get_meta( 'panel_border_color',   '' );
+    $panel_border_width  = $get_meta( 'panel_border_width',   '' );
+    $slider_accent_color = $get_meta( 'slider_accent_color',  '' );
+
+    if ( ! empty( $panel_bg_color ) && sanitize_hex_color( $panel_bg_color ) ) {
+        $css_output .= "{$p} .svgml-panel-inner { background-color: {$panel_bg_color}; }\n";
+    }
+    if ( ! empty( $panel_text_color ) && sanitize_hex_color( $panel_text_color ) ) {
+        $css_output .= "{$p} .svgml-panel-inner, {$p} .svgml-panel-inner * { color: {$panel_text_color}; }\n";
+    }
+    if ( '' !== $panel_border_radius ) {
+        $radius = max( 0, min( 50, intval( $panel_border_radius ) ) );
+        $css_output .= "{$p} .svgml-panel-inner { border-radius: {$radius}px; }\n";
+    }
+    if ( ! empty( $filter_bg_color ) && sanitize_hex_color( $filter_bg_color ) ) {
+        $css_output .= "{$p} .svgml-filters-bar { background-color: {$filter_bg_color}; }\n";
+    }
+    if ( ! empty( $filter_text_color ) && sanitize_hex_color( $filter_text_color ) ) {
+        $css_output .= "{$p} .svgml-filters-bar, {$p} .svgml-filter-label { color: {$filter_text_color}; }\n";
+    }
+    if ( ! empty( $panel_border_color ) && sanitize_hex_color( $panel_border_color ) && '' !== $panel_border_width && intval( $panel_border_width ) > 0 ) {
+        $bw = intval( $panel_border_width );
+        $css_output .= "{$p} .svgml-panel-inner { border: {$bw}px solid {$panel_border_color}; }\n";
+    }
+    if ( ! empty( $slider_accent_color ) && sanitize_hex_color( $slider_accent_color ) ) {
+        $css_output .= "{$p} .svgml-range-slider .noUi-connect { background-color: {$slider_accent_color}; }\n";
+        $css_output .= "{$p} .svgml-range-slider .noUi-handle { border-color: {$slider_accent_color}; }\n";
+    }
+
+    // Input field styling
+    $input_bg_color     = $get_meta( 'input_bg_color',     '' );
+    $input_text_color   = $get_meta( 'input_text_color',   '' );
+    $input_border_color = $get_meta( 'input_border_color', '' );
+    $input_focus_color  = $get_meta( 'input_focus_color',  '' );
+
+    $input_selectors       = "{$p} .svgml-filter-input-single, {$p} .svgml-filter-input-min, {$p} .svgml-filter-input-max, {$p} .svgml-filter-search";
+    $input_focus_selectors = "{$p} .svgml-filter-input-single:focus, {$p} .svgml-filter-input-min:focus, {$p} .svgml-filter-input-max:focus, {$p} .svgml-filter-search:focus";
+
+    if ( ! empty( $input_bg_color ) && sanitize_hex_color( $input_bg_color ) ) {
+        $css_output .= "{$input_selectors} { background-color: {$input_bg_color}; }\n";
+    }
+    if ( ! empty( $input_text_color ) && sanitize_hex_color( $input_text_color ) ) {
+        $css_output .= "{$input_selectors} { color: {$input_text_color}; }\n";
+    }
+    if ( ! empty( $input_border_color ) && sanitize_hex_color( $input_border_color ) ) {
+        $css_output .= "{$input_selectors} { border-color: {$input_border_color}; }\n";
+    }
+    if ( ! empty( $input_focus_color ) && sanitize_hex_color( $input_focus_color ) ) {
+        $css_output .= "{$input_focus_selectors} { border-color: {$input_focus_color}; outline-color: {$input_focus_color}; }\n";
+    }
+
+    // Polygon stroke styling — meta keys: _svgml_poly_stroke_color / _svgml_poly_stroke_width
+    $poly_stroke_color = sanitize_text_field(
+        get_post_meta( $map_id, '_svgml_poly_stroke_color', true )
+    );
+    if ( empty( $poly_stroke_color ) ) {
+        $poly_stroke_color = '#ffffff';
+    }
+
+    $raw_stroke_width  = get_post_meta( $map_id, '_svgml_poly_stroke_width', true );
+    $poly_stroke_width = ( is_numeric( $raw_stroke_width ) && floatval( $raw_stroke_width ) > 0 )
+                         ? floatval( $raw_stroke_width )
+                         : 1;
+
+    $raw_hover_width  = get_post_meta( $map_id, '_svgml_poly_stroke_width_hover', true );
+    $hover_width      = ( is_numeric( $raw_hover_width ) && floatval( $raw_hover_width ) > 0 )
+                        ? floatval( $raw_hover_width )
+                        : 3;
+
+    $raw_highlight_color   = get_post_meta( $map_id, '_svgml_highlight_color', true );
+    $highlight_color       = ( ! empty( $raw_highlight_color ) && sanitize_hex_color( $raw_highlight_color ) )
+                             ? $raw_highlight_color
+                             : $poly_stroke_color;
+
+    $raw_highlight_opacity = get_post_meta( $map_id, '_svgml_highlight_opacity', true );
+    $highlight_opacity     = ( is_numeric( $raw_highlight_opacity ) )
+                             ? round( max( 0.0, min( 1.0, floatval( $raw_highlight_opacity ) ) ), 2 )
+                             : 0.7;
+
+    // vector-effect: non-scaling-stroke → stroke-width is screen pixels.
+    $sw       = round( $poly_stroke_width, 2 );
+    $sw_hover = round( $hover_width, 2 );
+
+    $stroke_rgba_half  = svgml_hex_to_rgba( $poly_stroke_color, 0.5 );
+    $stroke_rgba_full  = svgml_hex_to_rgba( $poly_stroke_color, 0.9 );
+    $highlight_rgba    = svgml_hex_to_rgba( $highlight_color, $highlight_opacity );
+
+    $sel_base = implode( ', ', [
+        "{$p} .svgml-poly-region",
+        "{$p} .svgml-svg polygon[id]",
+        "{$p} .svgml-svg path[id]",
+    ] );
+    $sel_hover = implode( ', ', [
+        "{$p} .svgml-poly-region:hover",
+        "{$p} .svgml-poly-region.svgml-region-hover",
+        "{$p} .svgml-svg polygon[id]:hover",
+        "{$p} .svgml-svg path[id]:hover",
+    ] );
+    $sel_active = implode( ', ', [
+        "{$p} .svgml-poly-region.svgml-region-active",
+        "{$p} .svgml-svg polygon[id].svgml-region-active",
+        "{$p} .svgml-svg path[id].svgml-region-active",
+    ] );
+
+    $css_output .= "{$sel_base} { "
+                 . "stroke: {$stroke_rgba_half} !important; "
+                 . "stroke-width: {$sw}px !important; "
+                 . "vector-effect: non-scaling-stroke !important; }\n";
+    $css_output .= "{$sel_hover} { "
+                 . "fill: {$highlight_rgba} !important; "
+                 . "stroke: {$stroke_rgba_full} !important; "
+                 . "stroke-width: {$sw_hover}px !important; "
+                 . "vector-effect: non-scaling-stroke !important; }\n";
+    $css_output .= "{$sel_active} { "
+                 . "fill: {$highlight_rgba} !important; "
+                 . "stroke: {$poly_stroke_color} !important; "
+                 . "stroke-width: {$sw_hover}px !important; "
+                 . "vector-effect: non-scaling-stroke !important; }\n";
+
+    // Custom CSS (per-map)
+    $custom_css = $get_meta( 'custom_css', '' );
+    if ( ! empty( trim( $custom_css ) ) ) {
+        $css_output .= "/* Map: " . esc_html( get_post_field( 'post_title', $map_id ) ) . " */\n";
+        $css_output .= wp_strip_all_tags( $custom_css ) . "\n";
+    }
+
+    return $css_output;
 }
 
 /**
