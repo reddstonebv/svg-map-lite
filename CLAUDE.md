@@ -135,6 +135,10 @@ customer CSS and `panel-renderer.js` (`$('.svgml-panel')`) depend on them. Use
 generated `#svgml-wrap-{id} .svgml-panel-inner` rules never reach it (known, intentionally not
 changed).
 
+Link arrow (since 2.6.1): the `↗` after frontend link buttons (`.svgml-link-btn`, `.svgml-ov-link`)
+in `panel-renderer.js` is wrapped in `<span class="svgml-link-arrow" aria-hidden="true">`, so
+customer CSS can hide or replace it. The admin previews in `admin-footer.php` keep the bare `↗`.
+
 ## CSS loading (since 2.6.0)
 
 Generated rules are scoped to `#svgml-wrap-{map_id}`; the free Custom CSS is not.

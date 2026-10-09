@@ -336,7 +336,7 @@
                    'target="_blank" rel="noopener noreferrer" ' +
                    'class="svgml-link-btn">' +
                 svgml.escapeHtml(label || sbUrl) +
-                ' ↗</a>' +
+                ' <span class="svgml-link-arrow" aria-hidden="true">↗</span></a>' +
                 '</div>';
         }
 
@@ -412,7 +412,7 @@
                            'target="_blank" rel="noopener noreferrer" ' +
                            'class="svgml-link-btn">' +
                         svgml.escapeHtml(label || linkUrl) +
-                        ' ↗</a>' +
+                        ' <span class="svgml-link-arrow" aria-hidden="true">↗</span></a>' +
                         '</div>';
                 }
                 break;
@@ -779,7 +779,7 @@
             case 'link':
                 if (/^https?:\/\//i.test(String(value))) {
                     return '<a href="' + svgml.escapeHtml(String(value)) + '" class="svgml-ov-link" target="_blank" rel="noopener" onclick="event.stopPropagation()">' +
-                           svgml.escapeHtml(label || svgml_humanizeFieldName(field) || 'Link') + ' ↗</a>';
+                           svgml.escapeHtml(label || svgml_humanizeFieldName(field) || 'Link') + ' <span class="svgml-link-arrow" aria-hidden="true">↗</span></a>';
                 }
                 return '';
 
