@@ -33,6 +33,170 @@ function svgml_enqueue_frontend_assets() {
 add_action( 'wp_head', 'svgml_output_custom_css' );
 
 /**
+ * Geeft de lagen van een kaart terug als één genormaliseerde lijst, voor ZOWEL
+ * image-kaarten als SVG-kaarten. Alle code die lagen nodig heeft (mapping-tab,
+ * "Data per vlak", frontend) gebruikt deze functie en checkt dus niet zelf op
+ * source_type of map_mode.
+ *
+ * Elk item: [ 'name' => string, 'ids' => string[], 'labels' => [ id => weergavenaam ],
+ *              'svg_attachment_id' => int ]
+ *  - image-bron: komt uit '_svgml_layers' (de ID's zijn de polygoon-ID's).
+ *  - svg-bron:   komt uit '_svgml_svg_layers' (de ID's zijn per laag geparsed en
+ *                bij het opslaan van de Instellingen bewaard).
+ *
+ * Geeft null terug als de kaart "geen lagen" heeft. Voor een SVG-kaart is dat
+ * ook zo bij minder dan 2 geldige lagen: dan geldt het oude enkel-bestand-pad
+ * (legacy) en verandert er niets aan het gedrag van bestaande kaarten.
+ *
+ * LET OP: lees in het lagenpad NOOIT '_svgml_svg_attachment_id' of
+ * '_svgml_polygons'. Dat zijn spiegels van laag 0, alleen bedoeld voor legacy,
+ * de thumb en de export.
+ *
+ * @param  int        $map_id
+ * @return array|null
+ */
+function svgml_get_layer_defs( $map_id ) {
+    $source_type = get_post_meta( $map_id, '_svgml_source_type', true ) ?: 'svg';
+    $defs        = [];
+
+    if ( 'image' === $source_type ) {
+        // Image-modus: één item per laag, ID's = de getekende polygonen.
+        $layers = get_post_meta( $map_id, '_svgml_layers', true );
+        if ( ! is_array( $layers ) || empty( $layers ) ) {
+            return null;
+        }
+        foreach ( $layers as $li => $layer ) {
+            $ids    = [];
+            $labels = [];
+            foreach ( ( $layer['polygons'] ?? [] ) as $poly ) {
+                $pid = $poly['id'] ?? '';
+                if ( $pid ) {
+                    $ids[]          = $pid;
+                    $labels[ $pid ] = $poly['name'] ?? $pid;
+                }
+            }
+            $defs[] = [
+                'name'              => $layer['name'] ?? ( 'Laag ' . ( $li + 1 ) ),
+                'ids'               => $ids,
+                'labels'            => $labels,
+                'svg_attachment_id' => 0,
+            ];
+        }
+        return $defs;
+    }
+
+    // SVG-modus: alleen lagen met een bestand tellen mee.
+    $svg_layers = get_post_meta( $map_id, '_svgml_svg_layers', true );
+    if ( ! is_array( $svg_layers ) ) {
+        return null;
+    }
+    foreach ( $svg_layers as $layer ) {
+        $att_id = absint( $layer['svg_attachment_id'] ?? 0 );
+        if ( ! $att_id ) continue;
+        $ids = ( isset( $layer['ids'] ) && is_array( $layer['ids'] ) ) ? array_values( $layer['ids'] ) : [];
+        $defs[] = [
+            'name'              => ( '' !== ( $layer['name'] ?? '' ) ) ? $layer['name'] : ( 'Laag ' . ( count( $defs ) + 1 ) ),
+            'ids'               => $ids,
+            'labels'            => [], // SVG-ID's hebben geen aparte weergavenaam
+            'svg_attachment_id' => $att_id,
+        ];
+    }
+
+    // Eén (of nul) geldige laag = geen lagen: legacy-pad, identiek aan vroeger.
+    return ( count( $defs ) >= 2 ) ? $defs : null;
+}
+
+/**
+ * Leest een SVG-bestand uit de mediabibliotheek en maakt het klaar om inline
+ * in de pagina te zetten. Geeft '' terug als het bestand ontbreekt of leeg is.
+ * (Verplaatst uit svgml_render_shortcode(); de bewerkingen zijn ongewijzigd.)
+ *
+ * @param  int    $attachment_id
+ * @return string
+ */
+function svgml_prepare_svg_markup( $attachment_id ) {
+    $svg_path    = get_attached_file( $attachment_id );
+    $svg_content = ( $svg_path && file_exists( $svg_path ) ) ? file_get_contents( $svg_path ) : '';
+
+    if ( empty( $svg_content ) ) {
+        return '';
+    }
+
+    // ponytail: twee inline SVG's (lagen) met hetzelfde id in <defs>/<clipPath>/<mask>/
+    // gradient delen het document, dus url(#clip0) pakt de EERSTE match. Bovengrens: lagen
+    // uit hetzelfde ontwerptool-export kunnen elkaars clip/gradient tonen. Upgrade: de id's
+    // en bijbehorende url(#…)-verwijzingen per laag prefixen bij het renderen.
+
+    // Remove XML declarations
+    $svg_content = preg_replace( '/<\?xml[^?]*\?>\s*/i', '', $svg_content );
+    $svg_content = preg_replace( '/<!DOCTYPE[^>]*>\s*/i', '', $svg_content );
+
+    // Add CSS class to root SVG element
+    $svg_content = preg_replace(
+        '/<svg\b/i',
+        '<svg class="svgml-svg"',
+        $svg_content,
+        1
+    );
+
+    // Obliterate embedded <style> blocks (Illustrator/Inkscape export artefacts)
+    // before any attribute stripping, so selector rules can't survive.
+    $svg_content = preg_replace( '/<style\b[^>]*>.*?<\/style>/is', '', $svg_content );
+
+    // Strip hardcoded presentation attributes so PHP-generated CSS wins.
+    $svg_content = preg_replace( '/\bstroke="[^"]*"/i',       '', $svg_content );
+    $svg_content = preg_replace( '/\bstroke-width="[^"]*"/i', '', $svg_content );
+    $svg_content = preg_replace( '/\bstroke-color="[^"]*"/i', '', $svg_content );
+    $svg_content = preg_replace( '/\bfill="[^"]*"/i',         '', $svg_content );
+    // Strip inline style blocks on shape elements only (not on <svg> or <g>)
+    $svg_content = preg_replace(
+        '/(<(?:polygon|path|circle|ellipse|rect|line|polyline)\b[^>]*?)\s+style="[^"]*"/i',
+        '$1',
+        $svg_content
+    );
+
+    return $svg_content;
+}
+
+/**
+ * Toont de laag-switcher (buttons / dropdown / tabs). Verplaatst uit
+ * svgml_render_shortcode() zodat image- én SVG-lagen dezelfde markup gebruiken,
+ * waar frontend.js (switchLayer) en panel-renderer.js op reageren.
+ *
+ * @param array  $layers          Items met minimaal 'name'; de array-key is de laag-index.
+ * @param string $layer_switcher  'buttons', 'dropdown' of iets anders (= tabs/custom).
+ */
+function svgml_render_layer_switcher( $layers, $layer_switcher ) {
+    if ( 'buttons' === $layer_switcher ) : ?>
+        <div class="svgml-layer-switcher svgml-layer-buttons">
+            <?php foreach ( $layers as $li => $layer ) : ?>
+                <button type="button"
+                        class="svgml-layer-btn <?php echo $li === 0 ? 'svgml-layer-btn-active' : ''; ?>"
+                        data-layer="<?php echo $li; ?>">
+                    <?php echo esc_html( $layer['name'] ); ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+    <?php elseif ( 'dropdown' === $layer_switcher ) : ?>
+        <div class="svgml-layer-switcher svgml-layer-dropdown-wrap">
+            <select class="svgml-layer-select" id="svgml-layer-select">
+                <?php foreach ( $layers as $li => $layer ) : ?>
+                    <option value="<?php echo $li; ?>"><?php echo esc_html( $layer['name'] ); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    <?php else : ?>
+        <div class="svgml-layer-switcher svgml-layer-custom">
+            <?php foreach ( $layers as $li => $layer ) : ?>
+                <span class="svgml-layer-option <?php echo $li === 0 ? 'svgml-layer-option-active' : ''; ?>" data-layer="<?php echo $li; ?>">
+                    <?php echo esc_html( $layer['name'] ); ?>
+                </span>
+            <?php endforeach; ?>
+        </div>
+    <?php endif;
+}
+
+/**
  * SHORTCODE: [svg_map id="123"]
  * Renders the interactive map. The id attribute refers to a svgml_map post ID.
  * If no id is provided, attempts to find the first published svgml_map post.
@@ -114,6 +278,7 @@ function svgml_render_shortcode( $atts ) {
     // ── VALIDATIE OP BASIS VAN BRONTYPE ──────────────────────────────────────
     $is_image_mode = ( 'image' === $source_type );
     $svg_content   = '';
+    $svg_layers_markup = []; // gevuld bij een kaart met meerdere SVG-lagen
     $image_url     = '';
 
     if ( $is_image_mode ) {
@@ -130,47 +295,35 @@ function svgml_render_shortcode( $atts ) {
         }
     } else {
         // SVG-modus
-        if ( ! $svg_attachment_id ) {
-            $admin_link = current_user_can( 'manage_options' )
-                ? ' <a href="' . admin_url( 'admin.php?page=svgml-settings' ) . '">[Configureer SVG Map Lite]</a>'
-                : '';
-            return '<p class="svgml-error">SVG kaart niet geconfigureerd.' . $admin_link . '</p>';
+        // Eerst kijken of deze kaart meerdere SVG-lagen heeft. null = legacy:
+        // één bestand via '_svgml_svg_attachment_id', exact zoals vroeger.
+        $svg_layer_defs = svgml_get_layer_defs( $map_id );
+
+        if ( $svg_layer_defs ) {
+            // Gelaagd pad: per laag het eigen bestand inline klaarmaken. We lezen
+            // hier bewust NIET $svg_attachment_id (dat is de spiegel van laag 0).
+            foreach ( $svg_layer_defs as $def ) {
+                $layer_markup = svgml_prepare_svg_markup( $def['svg_attachment_id'] );
+                if ( '' === $layer_markup ) continue; // ontbrekend bestand: laag overslaan
+                $svg_layers_markup[] = [ 'name' => $def['name'], 'markup' => $layer_markup ];
+            }
+            if ( empty( $svg_layers_markup ) ) {
+                return '<p class="svgml-error">SVG-bestand kon niet worden geladen.</p>';
+            }
+        } else {
+            if ( ! $svg_attachment_id ) {
+                $admin_link = current_user_can( 'manage_options' )
+                    ? ' <a href="' . admin_url( 'admin.php?page=svgml-settings' ) . '">[Configureer SVG Map Lite]</a>'
+                    : '';
+                return '<p class="svgml-error">SVG kaart niet geconfigureerd.' . $admin_link . '</p>';
+            }
+
+            $svg_content = svgml_prepare_svg_markup( $svg_attachment_id );
+
+            if ( empty( $svg_content ) ) {
+                return '<p class="svgml-error">SVG-bestand kon niet worden geladen.</p>';
+            }
         }
-
-        $svg_path    = get_attached_file( $svg_attachment_id );
-        $svg_content = ( $svg_path && file_exists( $svg_path ) ) ? file_get_contents( $svg_path ) : '';
-
-        if ( empty( $svg_content ) ) {
-            return '<p class="svgml-error">SVG-bestand kon niet worden geladen.</p>';
-        }
-
-        // Remove XML declarations
-        $svg_content = preg_replace( '/<\?xml[^?]*\?>\s*/i', '', $svg_content );
-        $svg_content = preg_replace( '/<!DOCTYPE[^>]*>\s*/i', '', $svg_content );
-
-        // Add CSS class to root SVG element
-        $svg_content = preg_replace(
-            '/<svg\b/i',
-            '<svg class="svgml-svg"',
-            $svg_content,
-            1
-        );
-
-        // Obliterate embedded <style> blocks (Illustrator/Inkscape export artefacts)
-        // before any attribute stripping, so selector rules can't survive.
-        $svg_content = preg_replace( '/<style\b[^>]*>.*?<\/style>/is', '', $svg_content );
-
-        // Strip hardcoded presentation attributes so PHP-generated CSS wins.
-        $svg_content = preg_replace( '/\bstroke="[^"]*"/i',       '', $svg_content );
-        $svg_content = preg_replace( '/\bstroke-width="[^"]*"/i', '', $svg_content );
-        $svg_content = preg_replace( '/\bstroke-color="[^"]*"/i', '', $svg_content );
-        $svg_content = preg_replace( '/\bfill="[^"]*"/i',         '', $svg_content );
-        // Strip inline style blocks on shape elements only (not on <svg> or <g>)
-        $svg_content = preg_replace(
-            '/(<(?:polygon|path|circle|ellipse|rect|line|polyline)\b[^>]*?)\s+style="[^"]*"/i',
-            '$1',
-            $svg_content
-        );
     }
 
     // ── JSON DATA OPHALEN ────────────────────────────────────────────────────
@@ -256,35 +409,7 @@ function svgml_render_shortcode( $atts ) {
                     $has_multiple_layers = count( $layers ) > 1;
                     ?>
 
-                    <?php if ( $has_multiple_layers ) : ?>
-                        <?php if ( $layer_switcher === 'buttons' ) : ?>
-                            <div class="svgml-layer-switcher svgml-layer-buttons">
-                                <?php foreach ( $layers as $li => $layer ) : ?>
-                                    <button type="button"
-                                            class="svgml-layer-btn <?php echo $li === 0 ? 'svgml-layer-btn-active' : ''; ?>"
-                                            data-layer="<?php echo $li; ?>">
-                                        <?php echo esc_html( $layer['name'] ); ?>
-                                    </button>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php elseif ( $layer_switcher === 'dropdown' ) : ?>
-                            <div class="svgml-layer-switcher svgml-layer-dropdown-wrap">
-                                <select class="svgml-layer-select" id="svgml-layer-select">
-                                    <?php foreach ( $layers as $li => $layer ) : ?>
-                                        <option value="<?php echo $li; ?>"><?php echo esc_html( $layer['name'] ); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        <?php else : ?>
-                            <div class="svgml-layer-switcher svgml-layer-custom">
-                                <?php foreach ( $layers as $li => $layer ) : ?>
-                                    <span class="svgml-layer-option <?php echo $li === 0 ? 'svgml-layer-option-active' : ''; ?>" data-layer="<?php echo $li; ?>">
-                                        <?php echo esc_html( $layer['name'] ); ?>
-                                    </span>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
+                    <?php if ( $has_multiple_layers ) svgml_render_layer_switcher( $layers, $layer_switcher ); ?>
 
                     <!-- ── LAYERS ──────────────────────────────────────────────────── -->
                     <?php foreach ( $layers as $li => $layer ) :
@@ -319,6 +444,22 @@ function svgml_render_shortcode( $atts ) {
                                              class="svgml-poly-region" />
                                 <?php endforeach; ?>
                             </svg>
+                        </div>
+                    <?php endforeach; ?>
+                <?php elseif ( ! empty( $svg_layers_markup ) ) : ?>
+                    <?php
+                    // ── SVG-LAGEN ────────────────────────────────────────────────
+                    // Zelfde wrapper-klasse (.svgml-layer + data-layer) als bij image-
+                    // lagen, zodat de bestaande switcher, switchLayer() en het
+                    // 'svgmlLayerChange'-event zonder aanpassing werken.
+                    if ( count( $svg_layers_markup ) > 1 ) {
+                        svgml_render_layer_switcher( $svg_layers_markup, $layer_switcher );
+                    }
+                    foreach ( $svg_layers_markup as $li => $svg_layer ) : ?>
+                        <div class="svgml-svg-layer svgml-layer"
+                             data-layer="<?php echo $li; ?>"
+                             style="position:relative; width:100%; display:<?php echo $li > 0 ? 'none' : 'inline-block'; ?>;">
+                            <?php echo $svg_layer['markup']; ?>
                         </div>
                     <?php endforeach; ?>
                 <?php else : ?>

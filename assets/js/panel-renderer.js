@@ -528,7 +528,10 @@
         // elements" selector, so we don't accidentally pick up some other
         // element that happens to carry an id (a wrapping <svg>/<img>/div
         // with an id that has nothing to do with a clickable region).
-        $target.find('.svgml-svg polygon[id], .svgml-svg path[id]').each(function() {
+        // Bij SVG-lagen (.svgml-svg-layer) kunnen regio's ook rect/circle/g/... zijn,
+        // dus daar nemen we elk element met een id mee (het is alleen een opzoek-set;
+        // extra id's uit <defs> doen geen kwaad). Image-lagen: selector ongewijzigd.
+        $target.find('.svgml-svg polygon[id], .svgml-svg path[id], .svgml-svg-layer .svgml-svg [id]').each(function() {
             ids[this.id] = true;
         });
         return ids;

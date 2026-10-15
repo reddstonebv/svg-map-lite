@@ -129,6 +129,88 @@ function svgml_render_settings_page( $map_id ) {
                 update_post_meta( $map_id, '_svgml_svg_attachment_id', $attachment_id );
             }
 
+            // ── SVG-LAGEN (alleen bij bron 'svg') ───────────────────────────────
+            // Het verborgen veld 'svgml_svg_layers_json' bevat per rij { name,
+            // svg_attachment_id }. Alleen als het veld meegestuurd is (een oud,
+            // vóór de update geladen formulier heeft het niet) raken we de meta aan.
+            // Image-modus laat '_svgml_svg_layers' volledig met rust.
+            if ( 'svg' === $source_type && isset( $_POST['svgml_svg_layers_json'] ) ) {
+                $raw_rows = json_decode( stripslashes( $_POST['svgml_svg_layers_json'] ), true );
+                $rows     = []; // alleen rijen mét een bruikbaar bestand
+                if ( is_array( $raw_rows ) ) {
+                    foreach ( $raw_rows as $raw_row ) {
+                        $row_att = intval( $raw_row['svg_attachment_id'] ?? 0 );
+                        if ( ! $row_att ) continue;
+                        $row_name = sanitize_text_field( $raw_row['name'] ?? '' );
+                        if ( '' === $row_name ) $row_name = 'Laag ' . ( count( $rows ) + 1 );
+                        $rows[] = [ 'name' => $row_name, 'svg_attachment_id' => $row_att ];
+                    }
+                }
+
+                if ( count( $rows ) < 2 ) {
+                    // Terug naar één (of geen) laag: de lagenmeta leegmaken, dan is
+                    // de kaart weer een gewone legacy-kaart. Heeft de enige rij een
+                    // bestand, dan wordt '_svgml_svg_ids' opnieuw uit dát bestand
+                    // opgebouwd (anders bleef de unie van de oude lagen staan).
+                    update_post_meta( $map_id, '_svgml_svg_layers', [] );
+                    if ( 1 === count( $rows ) ) {
+                        $single = svgml_parse_svg_ids( $rows[0]['svg_attachment_id'] );
+                        if ( ! is_wp_error( $single ) ) {
+                            update_post_meta( $map_id, '_svgml_svg_attachment_id', $rows[0]['svg_attachment_id'] );
+                            update_post_meta( $map_id, '_svgml_svg_ids', $single['ids'] );
+                        }
+                    }
+                } else {
+                    // Meerdere lagen: elk bestand opnieuw parsen op de server (de
+                    // ID's uit de browser worden niet vertrouwd).
+                    $new_svg_layers = [];
+                    $union_ids      = [];
+                    $layer_error    = '';
+                    foreach ( $rows as $row ) {
+                        $parsed = svgml_parse_svg_ids( $row['svg_attachment_id'] );
+                        if ( is_wp_error( $parsed ) ) {
+                            $layer_error = esc_html( $row['name'] ) . ': ' . esc_html( $parsed->get_error_message() );
+                            break;
+                        }
+                        $new_svg_layers[] = [
+                            'name'              => $row['name'],
+                            'svg_attachment_id' => $row['svg_attachment_id'],
+                            'ids'               => $parsed['ids'],
+                            'ignorable'         => $parsed['ignorable'],
+                        ];
+                        $union_ids = array_merge( $union_ids, $parsed['ids'] );
+                    }
+
+                    // Zelfde regel als bij polygonen: een ID mag niet in meerdere
+                    // lagen voorkomen, tenzij Multi-View is aangevinkt.
+                    $duplicates = [];
+                    if ( '' === $layer_error && ! isset( $_POST['svgml_allow_multiview'] ) ) {
+                        $duplicates = svgml_find_duplicate_ids( $new_svg_layers );
+                    }
+
+                    if ( '' !== $layer_error ) {
+                        // De vorige waarde van '_svgml_svg_layers' blijft ongemoeid.
+                        echo '<div class="notice notice-error"><p>SVG-lagen niet opgeslagen. ' . $layer_error . '</p></div>';
+                    } elseif ( ! empty( $duplicates ) ) {
+                        // Ook hier blijft de vorige waarde staan.
+                        echo '<div class="notice notice-error"><p>SVG-lagen niet opgeslagen: deze ID\'s staan in meer dan één laag: <strong>'
+                            . esc_html( implode( ', ', $duplicates ) )
+                            . '</strong>. Maak de ID\'s uniek, of vink "Multi-View toestaan" aan als dit opzettelijk is.</p></div>';
+                    } else {
+                        // 'ignorable' hoeft niet bewaard te blijven (alleen voor de check).
+                        foreach ( $new_svg_layers as &$stored_layer ) {
+                            unset( $stored_layer['ignorable'] );
+                        }
+                        unset( $stored_layer );
+                        update_post_meta( $map_id, '_svgml_svg_layers', $new_svg_layers );
+                        // Laag 0 spiegelen naar de legacy-meta (alleen voor legacy, thumb en export).
+                        update_post_meta( $map_id, '_svgml_svg_attachment_id', $new_svg_layers[0]['svg_attachment_id'] );
+                        // '_svgml_svg_ids' = unie van alle lagen (voor mapping, filters e.d.).
+                        update_post_meta( $map_id, '_svgml_svg_ids', array_values( array_unique( $union_ids ) ) );
+                    }
+                }
+            }
+
             // ── ALWAYS save image attachment ID first ─────────────────────────
             // This field is set by JavaScript when the user picks an image
             // from the media library. We save it regardless of the layers
@@ -237,6 +319,10 @@ function svgml_render_settings_page( $map_id ) {
                     }
 
                     // Match polygons against feed
+                    // ponytail: automatisch koppelen geldt alleen voor polygonen (image-modus).
+                    // SVG-ID's worden hier bewust NIET automatisch gekoppeld: dat kan bij
+                    // bestaande SVG-kaarten handmatige koppelingen overschrijven. Upgrade:
+                    // alleen koppelen waar nog geen bestaande koppeling in $id_mapping staat.
                     $new_mappings = [];
                     foreach ( $clean_layers as $layer ) {
                         foreach ( ( $layer['polygons'] ?? [] ) as $poly ) {
@@ -322,6 +408,9 @@ function svgml_render_settings_page( $map_id ) {
     $layer_switcher      = get_post_meta( $map_id, '_svgml_layer_switcher', true ) ?: 'buttons';
     $map_mode            = get_post_meta( $map_id, '_svgml_map_mode', true ) ?: 'json';
     $allow_multiview     = get_post_meta( $map_id, '_svgml_allow_multiview', true ) === '1';
+    // Opgeslagen SVG-lagen (alleen gevuld bij een kaart met meerdere SVG-lagen).
+    $svg_layers_saved    = get_post_meta( $map_id, '_svgml_svg_layers', true );
+    if ( ! is_array( $svg_layers_saved ) ) $svg_layers_saved = [];
 
     ?>
     <div class="wrap svgml-admin-wrap">
@@ -406,6 +495,14 @@ function svgml_render_settings_page( $map_id ) {
                     </tr>
                 </table>
 
+                <!-- Multi-View: gedeeld door beide bronnen (polygonen én SVG-lagen).
+                     Zelfde id/name als voorheen, dus polygon-editor.js en de opslag
+                     ('_svgml_allow_multiview') werken ongewijzigd. -->
+                <label style="display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;font-size:13px;">
+                    <input type="checkbox" id="svgml-allow-multiview" name="svgml_allow_multiview" value="1"<?php checked( $allow_multiview ); ?>>
+                    Multi-View toestaan (dubbele ID's over lagen)
+                </label>
+
                 <!-- ── SVG UPLOAD (zichtbaar als source_type = 'svg') ────────── -->
                 <div id="svgml-source-svg" class="svgml-source-panel" <?php if ( 'svg' !== $source_type ) echo 'style="display:none"'; ?>>
                     <h3 style="margin:0 0 8px">SVG Bestand</h3>
@@ -462,6 +559,46 @@ function svgml_render_settings_page( $map_id ) {
                             </td>
                         </tr>
                     </table>
+
+                    <!-- ── SVG-LAGEN (verdiepingen) ─────────────────────────────────
+                         Het bestand hierboven is laag 1. Extra lagen komen hieronder.
+                         Met maar één laag verandert er niets aan het gedrag van de kaart.
+                         De rijen worden door admin.js naar #svgml_svg_layers_json gezet. -->
+                    <h4 style="margin:14px 0 6px">Lagen / verdiepingen (optioneel)</h4>
+                    <p class="svgml-description" style="margin-top:0">
+                        Geef laag 1 (het bestand hierboven) een naam en voeg extra SVG-bestanden toe
+                        om tussen verdiepingen te kunnen wisselen. Elk ID mag maar in één laag voorkomen,
+                        tenzij Multi-View is aangevinkt.
+                    </p>
+                    <p>
+                        <label>Naam laag 1:
+                            <input type="text" id="svgml-svg-layer0-name" class="regular-text"
+                                   placeholder="Bijv. Begane grond"
+                                   value="<?php echo esc_attr( $svg_layers_saved[0]['name'] ?? '' ); ?>">
+                        </label>
+                    </p>
+                    <div id="svgml-svg-layer-rows">
+                        <?php foreach ( array_slice( $svg_layers_saved, 1 ) as $extra_layer ) :
+                            $extra_att  = absint( $extra_layer['svg_attachment_id'] ?? 0 );
+                            $extra_file = $extra_att ? basename( (string) get_attached_file( $extra_att ) ) : '';
+                        ?>
+                            <div class="svgml-svg-layer-row" data-attachment-id="<?php echo esc_attr( $extra_att ); ?>" style="margin:0 0 8px;">
+                                <input type="text" class="svgml-svg-layer-name regular-text"
+                                       placeholder="Naam van de laag"
+                                       value="<?php echo esc_attr( $extra_layer['name'] ?? '' ); ?>">
+                                <span class="svgml-svg-layer-file"><?php echo esc_html( $extra_file ); ?></span>
+                                <button type="button" class="button svgml-svg-layer-pick">SVG kiezen</button>
+                                <button type="button" class="button button-link-delete svgml-svg-layer-remove">Laag verwijderen</button>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <p>
+                        <button type="button" id="svgml-add-svg-layer" class="button button-secondary">
+                            <span class="dashicons dashicons-plus-alt2"></span> Laag toevoegen
+                        </button>
+                    </p>
+                    <div id="svgml-svg-layers-status"></div>
+                    <input type="hidden" id="svgml_svg_layers_json" name="svgml_svg_layers_json" value="">
                 </div>
 
                 <!-- ── AFBEELDING + POLYGON EDITOR (zichtbaar als source_type = 'image') ── -->
@@ -551,10 +688,6 @@ function svgml_render_settings_page( $map_id ) {
 
                                 <!-- Vlakkenlijst: overzicht van alle getekende polygonen -->
                                 <div class="svgml-polygon-list-wrap">
-                                    <label style="display:inline-flex;align-items:center;gap:6px;margin:10px 0 4px;font-size:13px;">
-                                        <input type="checkbox" id="svgml-allow-multiview" name="svgml_allow_multiview" value="1"<?php checked( $allow_multiview ); ?>>
-                                        Multi-View toestaan (dubbele ID's)
-                                    </label>
                                     <h4 style="margin:14px 0 6px">Getekende vlakken</h4>
                                     <table class="wp-list-table widefat fixed striped" id="svgml-polygon-list">
                                         <thead>

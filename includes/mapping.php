@@ -75,20 +75,18 @@ function svgml_render_json_mapping_interface( $map_id ) {
     $id_mapping   = get_post_meta( $map_id, '_svgml_id_mapping', true ) ?: [];
     $excluded_ids = get_post_meta( $map_id, '_svgml_excluded_ids', true ) ?: [];
     $json_url     = get_post_meta( $map_id, '_svgml_json_url', true ) ?: '';
-    $layers       = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
-    $source_type  = get_post_meta( $map_id, '_svgml_source_type', true ) ?: 'svg';
 
-    // ── Build layer lookup voor image-modus met meerdere lagen ────────────────
-    $id_to_layer = [];
-    if ( 'image' === $source_type && ! empty( $layers ) ) {
-        foreach ( $layers as $li => $layer ) {
-            foreach ( ($layer['polygons'] ?? []) as $poly ) {
-                $pid = $poly['id'] ?? '';
-                if ( $pid ) {
-                    $id_to_layer[ $pid ] = $layer['name'] ?? ('Laag ' . ($li + 1));
-                    if ( ! in_array( $pid, $svg_ids, true ) ) {
-                        $svg_ids[] = $pid;
-                    }
+    // ── Lagen ophalen (image-lagen óf SVG-lagen, zie svgml_get_layer_defs()) ────
+    // null = geen lagen (legacy enkel-bestand-SVG of image zonder lagen).
+    // We checken hier bewust niet zelf op source_type: de helper beslist.
+    $layer_defs = svgml_get_layer_defs( $map_id );
+
+    // ID's uit de lagen die (nog) niet in '_svgml_svg_ids' staan erbij zetten.
+    if ( $layer_defs ) {
+        foreach ( $layer_defs as $def ) {
+            foreach ( $def['ids'] as $pid ) {
+                if ( ! in_array( $pid, $svg_ids, true ) ) {
+                    $svg_ids[] = $pid;
                 }
             }
         }
@@ -136,29 +134,18 @@ function svgml_render_json_mapping_interface( $map_id ) {
             // ── Build a per-layer grouping of SVG IDs ──────────────────────
             // With multiple layers we show a separate table per layer.
             // With one layer or SVG mode: just one table without layer title.
-            $has_multi_layers = ( 'image' === $source_type && count( $layers ) > 1 );
+            $has_multi_layers = ( $layer_defs && count( $layer_defs ) > 1 );
 
             if ( $has_multi_layers ) {
-                // Group SVG IDs per layer
-                $layer_groups = []; // [ layer-name => [ svg_id, ... ] ]
-                $ungrouped    = []; // IDs that don't belong to a layer
-
-                foreach ( $layers as $li => $layer ) {
-                    $lname = $layer['name'] ?? ( 'Laag ' . ( $li + 1 ) );
-                    $layer_groups[ $lname ] = [];
-                    foreach ( ( $layer['polygons'] ?? [] ) as $poly ) {
-                        $pid = $poly['id'] ?? '';
-                        if ( $pid ) $layer_groups[ $lname ][] = $pid;
-                    }
-                }
-
-                // IDs that are in svgml_svg_ids but not in a layer (edge case)
+                // ID's die in '_svgml_svg_ids' staan maar in geen laag zitten
                 $all_grouped = [];
-                foreach ( $layer_groups as $ids ) $all_grouped = array_merge( $all_grouped, $ids );
+                foreach ( $layer_defs as $def ) $all_grouped = array_merge( $all_grouped, $def['ids'] );
                 $ungrouped = array_diff( $svg_ids, $all_grouped );
 
                 // Render one table per layer
-                foreach ( $layer_groups as $lname => $layer_svg_ids ) :
+                foreach ( $layer_defs as $def ) :
+                    $lname         = $def['name'];
+                    $layer_svg_ids = $def['ids'];
                     if ( empty( $layer_svg_ids ) ) continue;
                 ?>
                     <div class="svgml-layer-section">
@@ -437,25 +424,26 @@ function svgml_render_manual_data_interface( $map_id ) {
     // dus die hele server-side afhandeling kon hier vervallen.
 
     // Get map data
-    $layers      = get_post_meta( $map_id, '_svgml_layers', true ) ?: [];
-    $source_type = get_post_meta( $map_id, '_svgml_source_type', true ) ?: 'svg';
+    $layer_defs  = svgml_get_layer_defs( $map_id ); // image- of SVG-lagen, null = geen lagen
     $manual_data = get_post_meta( $map_id, '_svgml_manual_data', true ) ?: [];
     $excluded_ids = get_post_meta( $map_id, '_svgml_excluded_ids', true ) ?: [];
     if ( ! is_array( $excluded_ids ) ) $excluded_ids = [];
 
     // Build list of all polygons
     $all_polygons = [];
-    if ( 'image' === $source_type && ! empty( $layers ) ) {
-        foreach ( $layers as $layer_idx => $layer ) {
-            foreach ( ( $layer['polygons'] ?? [] ) as $poly ) {
-                $pid = $poly['id'] ?? '';
-                if ( $pid ) {
-                    $all_polygons[] = [
-                        'id'    => $pid,
-                        'name'  => $poly['name'] ?? $pid,
-                        'layer' => $layer['name'] ?? ( 'Laag ' . ( $layer_idx + 1 ) ),
-                    ];
-                }
+    // Let op: deze lijst bepaalt welke regio's een veld krijgen, en de opslag hieronder
+    // vervangt '_svgml_manual_data' VOLLEDIG. Een ID dat hier niet gerenderd wordt, wordt
+    // dus bij het eerstvolgende opslaan gewist. Daarom komen hier de ID's van ALLE lagen in.
+    // Een ID dat in twee lagen staat (Multi-View) komt tweemaal in de lijst; de data is op
+    // ID gekeyed en wordt gedeeld (de JS hieronder klapt dubbelen samen bij het opslaan).
+    if ( $layer_defs ) {
+        foreach ( $layer_defs as $def ) {
+            foreach ( $def['ids'] as $pid ) {
+                $all_polygons[] = [
+                    'id'    => $pid,
+                    'name'  => $def['labels'][ $pid ] ?? $pid,
+                    'layer' => $def['name'],
+                ];
             }
         }
     } else {

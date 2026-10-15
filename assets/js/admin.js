@@ -75,8 +75,17 @@ jQuery(document).ready(function($) {
             // Show a preview of the selected SVG
             updatePreview(attachment.url, attachment.filename);
 
-            // Tell WordPress to parse the SVG and extract IDs
-            parseSvg(attachment.id);
+            // Tell WordPress to parse the SVG and extract IDs.
+            // Staan er al 2 of meer laagrijen in het formulier, dan is dit de picker
+            // van laag 1: alleen een voorbeeld (layer_index=0, geen meta-write), zodat
+            // '_svgml_svg_ids' niet overschreven wordt voordat het formulier is opgeslagen.
+            // De oude aanroep (die wél schrijft) is er alleen nog bij precies één rij.
+            if (svgLayerCount() >= 2) {
+                syncLayersField();
+                previewLayers();
+            } else {
+                parseSvg(attachment.id);
+            }
         });
 
         // Open the media window
@@ -106,7 +115,177 @@ jQuery(document).ready(function($) {
         // Adjust the button
         $uploadBtn.text('Selecteer SVG');
         $(this).hide();
+
+        syncLayersField();
     });
+
+
+    // ── SVG-LAGEN (verdiepingen) ─────────────────────────────────────────────
+    // Rij 1 = de bestaande picker hierboven (#svgml_svg_attachment_id + naamveld),
+    // extra lagen = .svgml-svg-layer-row in #svgml-svg-layer-rows. De rijen worden
+    // naar het verborgen veld #svgml_svg_layers_json geschreven; PHP (settings.php)
+    // parset de bestanden zelf opnieuw en vertrouwt de ID's uit de browser niet.
+
+    var $layerRows   = $('#svgml-svg-layer-rows');
+    var $layersJson  = $('#svgml_svg_layers_json');
+    var $layerStatus = $('#svgml-svg-layers-status');
+
+    /** Aantal laagrijen in het formulier: rij 1 + alle extra rijen. */
+    function svgLayerCount() {
+        return 1 + $layerRows.find('.svgml-svg-layer-row').length;
+    }
+
+    /** Verzamelt alle rijen als [ { name, svg_attachment_id }, ... ]. */
+    function collectLayers() {
+        var rows = [{
+            name: $.trim($('#svgml-svg-layer0-name').val() || ''),
+            svg_attachment_id: parseInt($attachmentInput.val(), 10) || 0
+        }];
+        $layerRows.find('.svgml-svg-layer-row').each(function() {
+            var $row = $(this);
+            rows.push({
+                name: $.trim($row.find('.svgml-svg-layer-name').val() || ''),
+                svg_attachment_id: parseInt($row.attr('data-attachment-id'), 10) || 0
+            });
+        });
+        return rows;
+    }
+
+    /** Schrijft de rijen als JSON in het verborgen veld (ook voor Ctrl+S-opslag). */
+    function syncLayersField() {
+        if (!$layersJson.length) return;
+        $layersJson.val(JSON.stringify(collectLayers()));
+    }
+
+    /** Escape voor tekst die in HTML terechtkomt. */
+    function escText(str) {
+        return $('<div>').text(str).html();
+    }
+
+    /**
+     * Parset elke laag via AJAX (met layer_index: er wordt niets opgeslagen) en toont
+     * per laag het aantal regio's plus een waarschuwing bij dubbele ID's over lagen.
+     * Zelfde regel als de server: ID's binnen defs/clipPath/... tellen niet mee, en
+     * met Multi-View aan is een dubbel ID toegestaan.
+     */
+    function previewLayers() {
+        var rows    = collectLayers();
+        var results = [];
+        var pending = 0;
+
+        $layerStatus.html('<span class="spinner is-active" style="float:none"></span>');
+
+        $.each(rows, function(i, row) {
+            if (!row.svg_attachment_id) return;
+            pending++;
+            $.ajax({
+                url:  svgmlAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action:        'svgml_parse_svg',
+                    nonce:         svgmlAdmin.nonce,
+                    attachment_id: row.svg_attachment_id,
+                    map_id:        svgmlAdmin.mapId || 0,
+                    layer_index:   i
+                }
+            }).done(function(resp) {
+                results[i] = resp.success ? resp.data : { error: resp.data };
+            }).fail(function(xhr, status, error) {
+                results[i] = { error: 'AJAX error: ' + error };
+            }).always(function() {
+                pending--;
+                if (pending === 0) renderLayerStatus(rows, results);
+            });
+        });
+
+        if (pending === 0) $layerStatus.empty();
+    }
+
+    function renderLayerStatus(rows, results) {
+        var html  = '';
+        var seen  = {};
+        var multi = $('#svgml-allow-multiview').is(':checked');
+
+        $.each(rows, function(i, row) {
+            var res   = results[i];
+            var label = escText(row.name || ('Laag ' + (i + 1)));
+            if (!res) return;
+            if (res.error) {
+                html += '<div class="svgml-status-box svgml-status-error">✗ ' + label + ': ' + escText(res.error) + '</div>';
+                return;
+            }
+            html += '<div class="svgml-status-box svgml-status-success">✓ ' + label + ': ' + res.count + ' regio\'s</div>';
+            var ignore = {};
+            $.each(res.ignorable || [], function(k, id) { ignore[id] = true; });
+            $.each(res.ids, function(k, id) {
+                if (ignore[id]) return;
+                seen[id] = (seen[id] || 0) + 1;
+            });
+        });
+
+        var dups = [];
+        $.each(seen, function(id, n) { if (n > 1) dups.push(id); });
+        if (dups.length && !multi) {
+            html += '<div class="svgml-status-box svgml-status-error">Dubbele ID\'s over lagen: <strong>' +
+                    escText(dups.join(', ')) + '</strong>. Opslaan wordt geweigerd tenzij je ' +
+                    '"Multi-View toestaan" aanvinkt.</div>';
+        }
+        $layerStatus.html(html);
+    }
+
+    // Laag toevoegen: nieuwe rij en meteen de mediakiezer openen.
+    $('#svgml-add-svg-layer').on('click', function(e) {
+        e.preventDefault();
+        var $row = $(
+            '<div class="svgml-svg-layer-row" data-attachment-id="" style="margin:0 0 8px;">' +
+            '<input type="text" class="svgml-svg-layer-name regular-text" placeholder="Naam van de laag"> ' +
+            '<span class="svgml-svg-layer-file"></span> ' +
+            '<button type="button" class="button svgml-svg-layer-pick">SVG kiezen</button> ' +
+            '<button type="button" class="button button-link-delete svgml-svg-layer-remove">Laag verwijderen</button>' +
+            '</div>'
+        );
+        $layerRows.append($row);
+        syncLayersField();
+        $row.find('.svgml-svg-layer-pick').trigger('click');
+    });
+
+    // Bestand kiezen voor een extra laag.
+    $(document).on('click', '.svgml-svg-layer-pick', function(e) {
+        e.preventDefault();
+        var $row  = $(this).closest('.svgml-svg-layer-row');
+        var frame = wp.media({
+            title:    svgmlAdmin.strings.selectSvg,
+            button:   { text: svgmlAdmin.strings.useSvg },
+            multiple: false,
+            library:  { type: ['image/svg+xml'] }
+        });
+        frame.on('select', function() {
+            var att = frame.state().get('selection').first().toJSON();
+            $row.attr('data-attachment-id', att.id);
+            $row.find('.svgml-svg-layer-file').text(att.filename);
+            syncLayersField();
+            previewLayers();
+        });
+        frame.open();
+    });
+
+    // Extra laag verwijderen.
+    $(document).on('click', '.svgml-svg-layer-remove', function(e) {
+        e.preventDefault();
+        $(this).closest('.svgml-svg-layer-row').remove();
+        syncLayersField();
+        if (svgLayerCount() >= 2) { previewLayers(); } else { $layerStatus.empty(); }
+    });
+
+    // Naam gewijzigd, of Multi-View omgezet: veld en waarschuwing bijwerken.
+    $(document).on('input change', '#svgml-svg-layer0-name, .svgml-svg-layer-name', syncLayersField);
+    $(document).on('change', '#svgml-allow-multiview', function() {
+        if (svgLayerCount() >= 2) previewLayers();
+    });
+
+    // Bij het laden en vlak voor het opslaan het veld vullen.
+    syncLayersField();
+    $layersJson.closest('form').on('submit', syncLayersField);
 
 
     // ── HELPER FUNCTIONS ────────────────────────────────────────────────────

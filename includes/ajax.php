@@ -184,9 +184,66 @@ function svgml_ajax_get_image_url() {
 }
 
 /**
+ * Parset één SVG-bestand uit de mediabibliotheek naar een lijst regio-ID's.
+ * Gedeeld door de AJAX-handler hieronder en door de opslag van de SVG-lagen in
+ * settings.php, zodat beide exact dezelfde regels gebruiken.
+ *
+ * @param  int $attachment_id  WP attachment ID van de SVG.
+ * @return array|WP_Error      [ 'ids' => string[], 'ignorable' => string[] ] of een WP_Error
+ *                             met een Nederlandse foutmelding. 'ignorable' zijn de ID's
+ *                             binnen defs/clipPath/mask/gradients/pattern/symbol; die telt de
+ *                             uniciteitscheck over lagen niet mee (zie svgml_find_duplicate_ids()).
+ */
+function svgml_parse_svg_ids( $attachment_id ) {
+    // Alleen echte SVG-bijlagen accepteren (het plan eiste dit; de mediakiezer filtert
+    // alleen aan de clientkant).
+    if ( 'image/svg+xml' !== get_post_mime_type( $attachment_id ) ) {
+        return new WP_Error( 'svgml_not_svg', 'Het gekozen bestand is geen SVG-bestand.' );
+    }
+
+    $file_path = get_attached_file( $attachment_id );
+
+    if ( ! $file_path || ! file_exists( $file_path ) ) {
+        return new WP_Error( 'svgml_missing', 'SVG-bestand niet gevonden op de server.' );
+    }
+
+    $svg_content = file_get_contents( $file_path );
+
+    if ( ! $svg_content ) {
+        return new WP_Error( 'svgml_empty', 'SVG-bestand is leeg of kon niet worden gelezen.' );
+    }
+
+    $svg_xml = simplexml_load_string( $svg_content, 'SimpleXMLElement', LIBXML_NOERROR );
+
+    if ( ! $svg_xml ) {
+        return new WP_Error( 'svgml_invalid', 'SVG kon niet worden verwerkt. Is het een geldig SVG-bestand?' );
+    }
+
+    $ids = [];
+    svgml_extract_ids_from_svg( $svg_xml, $ids );
+
+    if ( empty( $ids ) ) {
+        return new WP_Error( 'svgml_no_ids', 'Geen elementen met een id-attribuut gevonden. Voeg id\'s toe aan je SVG-vlakken.' );
+    }
+
+    $ignorable = [];
+    svgml_extract_defs_ids( $svg_xml, $ignorable );
+
+    return [
+        'ids'       => array_values( array_unique( $ids ) ),
+        'ignorable' => array_values( array_unique( $ignorable ) ),
+    ];
+}
+
+/**
  * AJAX: PARSE SVG
  * Extracts ID attributes from an uploaded SVG file
  * Now receives map_id to save IDs to post meta
+ *
+ * Optionele POST-param 'layer_index' (SVG-lagen): dan wordt er NIETS naar meta
+ * geschreven en geeft de handler alleen de ID's terug (voorbeeld/duplicaatcontrole).
+ * De definitieve opslag gebeurt bij het opslaan van het Instellingen-formulier.
+ * Zonder 'layer_index' werkt de handler exact zoals vroeger.
  */
 add_action( 'wp_ajax_svgml_parse_svg', 'svgml_ajax_parse_svg' );
 
@@ -201,43 +258,31 @@ function svgml_ajax_parse_svg() {
 
     $attachment_id = intval( $_POST['attachment_id'] ?? 0 );
     $map_id = intval( $_POST['map_id'] ?? 0 );
+    $is_layer_preview = isset( $_POST['layer_index'] ) && '' !== $_POST['layer_index'];
 
     if ( ! $attachment_id ) {
         wp_send_json_error( 'Geen geldig attachment ID meegestuurd.' );
         return;
     }
 
-    $file_path = get_attached_file( $attachment_id );
+    $parsed = svgml_parse_svg_ids( $attachment_id );
 
-    if ( ! $file_path || ! file_exists( $file_path ) ) {
-        wp_send_json_error( 'SVG-bestand niet gevonden op de server.' );
+    if ( is_wp_error( $parsed ) ) {
+        wp_send_json_error( $parsed->get_error_message() );
         return;
     }
 
-    $svg_content = file_get_contents( $file_path );
+    $ids = $parsed['ids'];
 
-    if ( ! $svg_content ) {
-        wp_send_json_error( 'SVG-bestand is leeg of kon niet worden gelezen.' );
+    // Laag-voorbeeld: niets opslaan, alleen terugsturen.
+    if ( $is_layer_preview ) {
+        wp_send_json_success( [
+            'ids'       => $ids,
+            'ignorable' => $parsed['ignorable'],
+            'count'     => count( $ids ),
+        ] );
         return;
     }
-
-    $svg_xml = simplexml_load_string( $svg_content, 'SimpleXMLElement', LIBXML_NOERROR );
-
-    if ( ! $svg_xml ) {
-        wp_send_json_error( 'SVG kon niet worden verwerkt. Is het een geldig SVG-bestand?' );
-        return;
-    }
-
-    $ids = [];
-    svgml_extract_ids_from_svg( $svg_xml, $ids );
-
-    if ( empty( $ids ) ) {
-        wp_send_json_error( 'Geen elementen met een id-attribuut gevonden. Voeg id\'s toe aan je SVG-vlakken.' );
-        return;
-    }
-
-    $ids = array_unique( $ids );
-    $ids = array_values( $ids );
 
     // Save to post meta if map_id provided, otherwise use options (for backward compat)
     if ( $map_id ) {
@@ -274,6 +319,58 @@ function svgml_extract_ids_from_svg( $element, &$ids ) {
     foreach ( $element->children() as $child ) {
         svgml_extract_ids_from_svg( $child, $ids );
     }
+}
+
+/**
+ * Verzamelt de ID's van elementen die BINNEN een definitie-container staan
+ * (defs, clipPath, mask, linearGradient, radialGradient, pattern, symbol),
+ * inclusief die container zelf. Dat zijn geen klikbare regio's, maar
+ * ontwerptools (Figma/Illustrator) geven ze in elke export dezelfde naam
+ * (bijv. "clip0"). Alleen gebruikt door de uniciteitscheck over lagen; de lijst
+ * regio-ID's (svgml_extract_ids_from_svg) blijft ongewijzigd.
+ *
+ * @param SimpleXMLElement $element
+ * @param array            $ids      Wordt gevuld (by reference).
+ * @param bool             $inside   True zodra we in een definitie-container zitten.
+ */
+function svgml_extract_defs_ids( $element, &$ids, $inside = false ) {
+    $containers = [ 'defs', 'clippath', 'mask', 'lineargradient', 'radialgradient', 'pattern', 'symbol' ];
+
+    // Lokale naam zonder namespace-prefix, kleine letters.
+    $name   = strtolower( $element->getName() );
+    $inside = $inside || in_array( $name, $containers, true );
+
+    if ( $inside ) {
+        $attrs = $element->attributes();
+        if ( isset( $attrs['id'] ) ) {
+            $id = trim( (string) $attrs['id'] );
+            if ( '' !== $id ) $ids[] = $id;
+        }
+    }
+
+    foreach ( $element->children() as $child ) {
+        svgml_extract_defs_ids( $child, $ids, $inside );
+    }
+}
+
+/**
+ * Zoekt ID's die in 2 of meer lagen voorkomen (dezelfde regel als de
+ * duplicaat-check bij polygonen in polygon-editor.js: tenzij Multi-View aan
+ * staat is een dubbel ID over lagen heen niet toegestaan).
+ * ID's uit definitie-containers (zie svgml_extract_defs_ids) tellen niet mee.
+ *
+ * @param  array $layers  Lijst van [ 'ids' => string[], 'ignorable' => string[] ].
+ * @return string[]       De dubbele ID's (leeg = alles uniek).
+ */
+function svgml_find_duplicate_ids( $layers ) {
+    $seen = []; // id => aantal lagen waarin het voorkomt
+    foreach ( $layers as $layer ) {
+        $relevant = array_diff( $layer['ids'] ?? [], $layer['ignorable'] ?? [] );
+        foreach ( array_unique( $relevant ) as $id ) {
+            $seen[ $id ] = ( $seen[ $id ] ?? 0 ) + 1;
+        }
+    }
+    return array_keys( array_filter( $seen, function( $n ) { return $n > 1; } ) );
 }
 
 /**

@@ -169,6 +169,17 @@ function svgml_handle_import() {
         update_post_meta( $new_id, '_svgml_layers', $layers );
     }
 
+    // Idem voor de SVG-lagen: attachment-ID's gelden alleen op de bronsite. Zonder
+    // geldige bestanden valt de kaart terug op het legacy-pad (zie svgml_get_layer_defs()).
+    $svg_layers = get_post_meta( $new_id, '_svgml_svg_layers', true );
+    if ( is_array( $svg_layers ) && ! empty( $svg_layers ) ) {
+        foreach ( $svg_layers as &$svg_layer ) {
+            $svg_layer['svg_attachment_id'] = '';
+        }
+        unset( $svg_layer );
+        update_post_meta( $new_id, '_svgml_svg_layers', $svg_layers );
+    }
+
     wp_redirect( admin_url( 'admin.php?page=svgml-settings&map_id=' . $new_id . '&imported=1' ) );
     exit;
 }
